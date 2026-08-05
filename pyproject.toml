@@ -9,7 +9,7 @@ description = "MCP server 封装 STM32CubeMX 命令行,通过 MCP 工具配置�
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "h666zhang", email = "3286266250@qq.com" }]
+authors = [{ name = "F1ZyCaO_3286", email = "3286266250@qq.com" }]
 keywords = ["mcp", "stm32", "stm32cubemx", "embedded", "hal"]
 classifiers = [
     "Development Status :: 3 - Alpha",
