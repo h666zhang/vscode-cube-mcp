@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vscode-cube-mcp"
+version = "0.1.0"
+description = "MCP server 封装 STM32CubeMX 命令行,通过 MCP 工具配置引脚/外设并生成 HAL 工程"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Vscode_cube_mcp contributors" }]
+keywords = ["mcp", "stm32", "stm32cubemx", "embedded", "hal"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Embedded Systems",
+]
+dependencies = ["mcp>=2.0.0"]
+
+[project.scripts]
+vscode-cube-mcp = "cubemx_mcp:main"
+
+[tool.setuptools]
+py-modules = ["cubemx_mcp"]
