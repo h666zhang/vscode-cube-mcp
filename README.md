@@ -2,11 +2,26 @@
 
 > 全部由 deepseek-v4-flash 生成
 
+[![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+- **GitHub**: https://github.com/h666zhang/vscode-cube-mcp
+- **PyPI**: https://pypi.org/project/vscode-cube-mcp/
+
 MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本模式(`-q`),
 让 AI 助手可以直接加载 .ioc 工程、改引脚/外设配置、生成 HAL 代码、导出引脚表。
 
 每次调用:命令序列写入临时脚本 → 启动 `STM32CubeMX -q` → 超时强杀
 → 过滤 log4j 噪音 → 检测 KO 失败标记 → 返回干净输出。
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 语言 | Python >= 3.10 |
+| MCP 框架 | mcp SDK 2.x(官方 Model Context Protocol Python SDK,stdio 传输) |
+| 交互对象 | STM32CubeMX 6.x(-q 脚本模式,外部工具,运行时 subprocess 调用) |
+| 打包发布 | setuptools + build + twine(PyPI) |
+| 测试 | unittest(标准库,零依赖) |
+| 目标平台 | Windows(主);跨平台可用(含 os.name 分支的通用探测) |
 
 ## 功能
 
