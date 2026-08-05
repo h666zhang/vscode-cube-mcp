@@ -21,6 +21,7 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 | 交互对象 | STM32CubeMX 6.x(-q 脚本模式,外部工具,运行时 subprocess 调用) |
 | 打包发布 | setuptools + build + twine(PyPI) |
 | 测试 | unittest(标准库,零依赖) |
+| 配套构建链 | CMake + Ninja + arm-none-eabi-gcc(STM32CubeMX 生成的工程采用 CMakePresets 配置,由 Ninja 构建,arm-none-eabi 工具链链接) |
 | 目标平台 | Windows(主);跨平台可用(含 os.name 分支的通用探测) |
 
 ## 功能
