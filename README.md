@@ -142,5 +142,6 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 
 ## 更多资料
 
+- [`docs/install-claude-code.md`](docs/install-claude-code.md):Claude Code(终端版)安装配置指南
 - [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、借壳法原理
 - [`templates/README.md`](templates/README.md):各外设(GPIO/I2C/TIM/时钟)的配置命令与坑
