@@ -26,3 +26,12 @@ vscode-cube-mcp = "cubemx_mcp:main"
 
 [tool.setuptools]
 py-modules = ["cubemx_mcp"]
+
+[tool.setuptools.data-files]
+# templates/ 模板库必须随包分发(cubemx_new_project 依赖它)
+"templates" = [
+    "templates/README.md",
+    "templates/STM32F103C8T6.ioc",
+    "templates/STM32F103C8T6_tim_template.ioc",
+    "templates/STM32F103C8T6_tim2_internal.ioc",
+]

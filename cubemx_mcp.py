@@ -149,11 +149,19 @@ def _project_template(mcu: str, template: str = "") -> str:
     """
     if template:
         return _ioc_path(template)
-    tpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
-    tpl = os.path.join(tpl_dir, f"{mcu}.ioc")
-    if not os.path.isfile(tpl):
-        raise ValueError(f"未找到模板 {tpl};请将 6.18 原生 .ioc 命名为 {mcu}.ioc 放入 templates/ 目录,或用 template 参数指定")
-    return tpl
+    # 模板查找路径:①源码目录 __file__/templates ②data-files 安装目录(site-packages/templates)
+    search_dirs = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"),
+    ]
+    for tpl_dir in search_dirs:
+        tpl = os.path.join(tpl_dir, f"{mcu}.ioc")
+        if os.path.isfile(tpl):
+            return tpl
+    raise ValueError(
+        f"未找到模板 {mcu}.ioc;请将 6.18 原生 .ioc 命名为 {mcu}.ioc 放入 templates/ 目录,"
+        f"或用 template 参数指定。查找过: {search_dirs}"
+    )
 
 
 def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str) -> None:
