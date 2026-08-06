@@ -128,5 +128,127 @@ class TestRunScript(unittest.TestCase):
         self.assertEqual(before, after)
 
 
+# 构造一个含多外设的最小 .ioc 文本(仿 6.18 格式)
+SAMPLE_IOC = """#MicroXplorer Configuration settings - do not modify
+File.Version=6
+Mcu.IP0=NVIC
+Mcu.IP1=RCC
+Mcu.IP2=SYS
+Mcu.IP3=TIM2
+Mcu.IP4=TIM3
+Mcu.IPNb=5
+Mcu.Pin0=VP_SYS_VS_Systick
+Mcu.Pin1=VP_TIM3_VS_ClockSourceINT
+Mcu.PinsNb=2
+NVIC.TIM3_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true
+ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_GPIO_Init-GPIO-false-HAL-true,3-MX_TIM2_Init-TIM2-false-HAL-true,4-MX_TIM3_Init-TIM3-false-HAL-true
+TIM3.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE
+TIM3.CounterMode=TIM_COUNTERMODE_UP
+TIM3.Period=10000-1
+VP_TIM3_VS_ClockSourceINT.Mode=Internal
+VP_TIM3_VS_ClockSourceINT.Signal=TIM3_VS_ClockSourceINT
+board=custom
+"""
+
+
+class TestRemovePeripheral(unittest.TestCase):
+    def _write_ioc(self, content):
+        fd, path = tempfile.mkstemp(suffix=".ioc")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def setUp(self):
+        self._orig = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = self._orig
+
+    def test_remove_peripheral_cleans_all(self):
+        path = self._write_ioc(SAMPLE_IOC)
+        try:
+            out = cubemx_mcp.cubemx_remove_peripheral(path, "TIM3")
+            self.assertIn("TIM3", out)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            # TIM3 的所有痕迹应消失
+            self.assertNotIn("TIM3", text)
+            # 剩余外设正确重排:NVIC/RCC/SYS/TIM2
+            self.assertIn("Mcu.IP0=NVIC", text)
+            self.assertIn("Mcu.IP3=TIM2", text)
+            self.assertIn("Mcu.IPNb=4", text)
+            # functionlistsort 不再含 TIM3
+            self.assertNotIn("MX_TIM3_Init", text)
+            # NVIC 行应还在(仅 TIM3 的中断被删)
+            self.assertIn("Mcu.IP1=RCC", text)
+        finally:
+            os.remove(path)
+
+    def test_remove_missing_peripheral_raises(self):
+        path = self._write_ioc(SAMPLE_IOC)
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_remove_peripheral(path, "USART1")
+        finally:
+            os.remove(path)
+
+
+class TestAddSource(unittest.TestCase):
+    def _make_project(self):
+        root = tempfile.mkdtemp()
+        cmake_dir = os.path.join(root, "cmake", "stm32cubemx")
+        os.makedirs(cmake_dir)
+        with open(os.path.join(root, "proj.ioc"), "w", encoding="utf-8") as f:
+            f.write("#MicroXplorer Configuration settings - do not modify\n")
+        lists = """set(MX_Application_Src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c
+)
+"""
+        with open(os.path.join(cmake_dir, "CMakeLists.txt"), "w", encoding="utf-8") as f:
+            f.write(lists)
+        return root
+
+    def setUp(self):
+        self._orig = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = self._orig
+
+    def test_add_source_inserts_once_and_idempotent(self):
+        root = self._make_project()
+        try:
+            ioc = os.path.join(root, "proj.ioc")
+            out = cubemx_mcp.cubemx_add_source(ioc, "Core/Src/OLED.c")
+            self.assertIn("OLED.c", out)
+            lists_path = os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt")
+            with open(lists_path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("../../Core/Src/OLED.c", text)
+            self.assertEqual(text.count("OLED.c"), 1)
+            # 幂等:再次调用不重复
+            out2 = cubemx_mcp.cubemx_add_source(ioc, "Core/Src/OLED.c")
+            self.assertIn("已在源列表", out2)
+            with open(lists_path, encoding="utf-8") as f:
+                text2 = f.read()
+            self.assertEqual(text2.count("OLED.c"), 1)
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_source_missing_cmake_raises(self):
+        root = self._make_project()
+        try:
+            os.remove(os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt"))
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,7 @@ Tools:
   cubemx_configure(ioc, cmds)      load + set 命令序列 + saveas(写回 .ioc)
   cubemx_generate(ioc, project_dir) load + project generate
   cubemx_export_pinout(ioc)        csv pinout 导出(只读)
+  cubemx_new_project(name, dir, mcu, cmds) 从零生成新工程(模板+set+generate)
 
 配置(环境变量,不硬编码本机路径):
   ST_CUBEMX_EXE            STM32CubeMX 可执行文件路径;未设置时尝试 PATH 中的
@@ -19,8 +20,8 @@ Tools:
                            未设置时默认仅允许当前工作目录。
   ST_CUBEMX_TIMEOUT        CubeMX 子进程超时秒数,默认 240。
 
-能力边界:本 MCP 不是真正意义上的"从零开始" —— 所有工具都要求先有
-一个 .ioc(CubeMX -q 脚本模式没有 new project 命令),详见 README.md。
+能力边界:CubeMX -q 脚本模式没有 new project 命令,但 cubemx_new_project 通过
+"复制 templates/ 下 6.18 原生模板 + set 命令 + generate"实现从零生成,详见 README.md。
 """
 
 import asyncio
@@ -139,6 +140,33 @@ def _ioc_path(ioc: str) -> str:
     return ap
 
 
+def _project_template(mcu: str, template: str = "") -> str:
+    """解析新建工程的基底 .ioc 模板路径。
+
+    优先用显式 template 参数;否则在 server 同目录 templates/ 下按 mcu 查找
+    (如 templates/STM32F103C8T6.ioc)。模板必须是 6.18 原生生成的 .ioc,
+    否则 CubeMX 6.18 加载可能报错。
+    """
+    if template:
+        return _ioc_path(template)
+    tpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+    tpl = os.path.join(tpl_dir, f"{mcu}.ioc")
+    if not os.path.isfile(tpl):
+        raise ValueError(f"未找到模板 {tpl};请将 6.18 原生 .ioc 命名为 {mcu}.ioc 放入 templates/ 目录,或用 template 参数指定")
+    return tpl
+
+
+def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str) -> None:
+    """把模板 .ioc 复制到目标位置,并改写工程标识(ProjectName/ProjectFileName)。"""
+    os.makedirs(os.path.dirname(ioc_dst), exist_ok=True)
+    with open(ioc_src, encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    text = re.sub(r"^ProjectManager\.ProjectName=.*$", f"ProjectManager.ProjectName={project_name}", text, flags=re.MULTILINE)
+    text = re.sub(r"^ProjectManager\.ProjectFileName=.*$", f"ProjectManager.ProjectFileName={project_name}.ioc", text, flags=re.MULTILINE)
+    with open(ioc_dst, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
 # ------------------------------------------------------------------ tools
 @mcp.tool()
 def cubemx_script(script: str) -> str:
@@ -226,6 +254,158 @@ def cubemx_export_pinout(ioc: str) -> str:
             os.remove(csv)
         except OSError:
             pass
+@mcp.tool()
+def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F103C8T6",
+                       commands: list = None, template: str = "") -> str:
+    """从零生成一个新的 HAL 工程(基于内置模板改造)。
+
+    流程:从 templates/ 选 6.18 原生 .ioc 模板(或显式 template)复制到
+    project_dir,改写工程名,依次执行 set 命令,再 project generate 生成 HAL 代码。
+    这样无需预先手写 .ioc,即"从零开始"。
+
+    参数:
+      project_name: 工程名(将生成 {project_name}.ioc 与同名 HAL 工程)
+      project_dir:  生成目标目录(须在白名单内;已存在目录会直接使用)
+      mcu:          芯片型号,用于匹配 templates/{mcu}.ioc(默认 STM32F103C8T6)
+      commands:     set 命令列表,如 ["set pin PB13 GPIO_Output", "set ip parameters RCC PLLMUL RCC_PLL_MUL9"]
+      template:     可选,直接指定模板 .ioc 路径(优先于 mcu 查找)
+    """
+    if not project_name or not re.fullmatch(r"[A-Za-z0-9_]+", project_name):
+        raise ValueError(f"非法工程名(仅允许字母/数字/下划线): {project_name!r}")
+    pd = _check_path(project_dir)
+    tpl = _project_template(mcu, template)
+    ioc_dst = os.path.join(pd, f"{project_name}.ioc")
+    _patch_ioc_identity(tpl, ioc_dst, project_name)
+
+    lines = [f'config load "{ioc_dst}"']
+    if commands:
+        lines.extend(commands)
+    lines.append(f'config saveas "{ioc_dst}"')
+    lines.append("project generate")
+    r = _run_script("\n".join(lines))
+    # 生成后:若工程被生成到 project_dir 的同级目录(以工程名命名),把 .ioc 移到工程目录,
+    # 保证 .ioc 与 HAL 工程在同一目录(cubemx generate 默认行为)。
+    gen_dir = os.path.join(os.path.dirname(pd), project_name)
+    if os.path.isdir(gen_dir) and os.path.abspath(gen_dir) != os.path.abspath(pd):
+        new_ioc = os.path.join(gen_dir, f"{project_name}.ioc")
+        try:
+            os.replace(ioc_dst, new_ioc)
+            ioc_dst = new_ioc
+            note = f"\n.ioc 已移至工程目录: {gen_dir}"
+        except OSError:
+            note = f"\n注:工程生成于 {gen_dir},但 .ioc 移动失败,仍在 {pd}"
+    else:
+        note = ""
+    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}"
+
+@mcp.tool()
+def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
+    """从 .ioc 中移除一个外设(文本方式)。
+
+    CubeMX 脚本的 `set noparam <IP>` 对部分外设无效(返回 OK 但外设保留),
+    因此本工具直接编辑 .ioc 文本:删除 Mcu.IPx 条目、关联引脚/参数、
+    NVIC 中断、functionlistsort 中的初始化段,并修正 Mcu.IPNb。
+    注意:操作前请自行备份;移除后建议重新 generate 同步代码。
+
+    参数:
+      ioc:         工程 .ioc 文件绝对路径(会被写回)
+      peripheral:  外设名,如 TIM3、I2C1(大小写敏感,匹配 Mcu.IPx=XXX 的精确值)
+    """
+    ap = _ioc_path(ioc)
+    with open(ap, encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+    # 收集要删的行号:精确匹配 Mcu.IPx=<peripheral> 的行
+    ip_line_idx = None
+    for i, ln in enumerate(lines):
+        if re.fullmatch(rf"Mcu\.IP\d+={re.escape(peripheral)}\r?\n", ln):
+            ip_line_idx = i
+            break
+    if ip_line_idx is None:
+        raise ValueError(f".ioc 中未找到外设 {peripheral}(检查大小写,如 TIM3/I2C1)")
+    # 删除规则:先标记要删除的行(保留 Mcu.IPx 供重排)
+    drop = {ip_line_idx}
+    removed = [lines[ip_line_idx].strip()]
+    for i, ln in enumerate(lines):
+        if i == ip_line_idx:
+            continue
+        s = ln.strip()
+        if s.startswith(f"{peripheral}.") or s.startswith(f"VP_{peripheral}") or s.startswith(f"SH.S_{peripheral}"):
+            drop.add(i)
+            removed.append(s)
+        elif re.match(rf"NVIC\.{re.escape(peripheral)}_IRQn=", s):
+            drop.add(i)
+            removed.append(s)
+        elif re.match(rf"Mcu\.Pin\d+=VP_{re.escape(peripheral)}", s):
+            drop.add(i)
+            removed.append(s)
+    # 收集剩余外设(按顺序),用于重排 Mcu.IPx 和修正 Mcu.IPNb
+    keep_ips = []
+    for ln in lines:
+        m = re.match(r"Mcu\.IP(\d+)=(.*)\r?\n", ln)
+        if m and m.group(2).strip() != peripheral:
+            keep_ips.append(m.group(2).strip())
+    # 重写所有行
+    new_out = []
+    ip_counter = 0
+    for i, ln in enumerate(lines):
+        if i in drop:
+            continue  # 跳过被标记删除的行
+        s = ln.strip()
+        if re.match(rf"Mcu\.IP\d+={re.escape(peripheral)}$", s):
+            continue  # 被删的外设行(已在 drop,防御)
+        if re.match(r"Mcu\.IP\d+=", s):
+            # 重排其余外设
+            m = re.match(r"Mcu\.IP(\d+)=(.*)", s)
+            new_out.append(f"Mcu.IP{ip_counter}={m.group(2)}\n")
+            ip_counter += 1
+            continue
+        if re.match(r"Mcu\.IPNb=", s):
+            new_out.append(f"Mcu.IPNb={len(keep_ips)}\n")
+            continue
+        if "functionlistsort" in ln:
+            # 移除包含该外设的初始化段(形如 ,5-MX_TIM3_Init-TIM3-false-HAL-true 或开头段)
+            ln = re.sub(rf",\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-true", "", ln)
+            ln = re.sub(rf"(^|,)\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-true,", r"\1", ln)
+            new_out.append(ln)
+            continue
+        new_out.append(ln)
+    with open(ap, "w", encoding="utf-8", newline="") as f:
+        f.writelines(new_out)
+    return f"已从 {ap} 移除外设 {peripheral}\n删除 {len(removed)} 行相关配置,外设列表已重排(Mcu.IPNb={len(keep_ips)})"
+
+
+@mcp.tool()
+def cubemx_add_source(ioc: str, source_file: str) -> str:
+    """把自定义源文件加入工程的 CMake 源列表(stm32cubemx/CMakeLists.txt)。
+
+    CubeMX 重新 generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,手动加进
+    MX_Application_Src 的自定义源文件会丢失;本工具用于重新添加(幂等,重复调用不重复加)。
+
+    参数:
+      ioc:          工程 .ioc 文件绝对路径(用于定位工程根目录)
+      source_file:  源文件相对工程根的路径,如 Core/Src/OLED.c
+    """
+    ap = _ioc_path(ioc)
+    proj_root = os.path.dirname(ap)
+    cmake_lists = os.path.join(proj_root, "cmake", "stm32cubemx", "CMakeLists.txt")
+    if not os.path.isfile(cmake_lists):
+        raise ValueError(f"找不到 {cmake_lists};请先 project generate 生成工程")
+    sf = source_file.replace("\\", "/")
+    with open(cmake_lists, encoding="utf-8") as f:
+        text = f.read()
+    marker = "${CMAKE_CURRENT_SOURCE_DIR}/../../"
+    entry = f"    {marker}{sf}\n"
+    if f"../../{sf}" in text:
+        return f"{sf} 已在源列表中,无需重复添加"
+    anchor = "    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c"
+    if anchor not in text:
+        # 退而求其次:插到 MX_Application_Src 段的第一个条目前
+        anchor = "    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c"
+    text = text.replace(anchor, entry + anchor, 1)
+    with open(cmake_lists, "w", encoding="utf-8") as f:
+        f.write(text)
+    return f"已将 {sf} 加入 {cmake_lists}"
+
 
 
 def main() -> None:
