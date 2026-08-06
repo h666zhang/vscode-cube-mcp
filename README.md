@@ -189,8 +189,20 @@ cubemx_new_project(
 | 模板文件 | 内容 |
 |----------|------|
 | `STM32F103C8T6.ioc` | F103C8,HSE 8MHz + PLL ×9 = 72MHz,SWD,PB13=LED(GPIO_Output) |
+| `STM32F103C8T6_tim_template.ioc` | 上面全部 + TIM2(ETR 外部时钟,PA0)+ TIM3(内部时钟,1s)+ I2C1(PB8/PB9) |
+| `STM32F103C8T6_tim2_internal.ioc` | 上面全部但 **TIM2 为内部时钟(1s)**,无 TIM3/ETR——需要 TIM2 内部时钟秒表时首选 |
 
 > 新增芯片:把 6.18 原生生成的 .ioc 复制到 `templates/{芯片型号}.ioc` 即可;模板必须是 6.18 原生文件(否则 6.18 加载会报错)。
+
+**配套工具**:
+
+| 工具 | 用途 |
+|------|------|
+| `cubemx_remove_peripheral` | 从 .ioc 移除外设(文本方式,解决 `set noparam` 无效) |
+| `cubemx_add_source` | 把自定义源文件加入 CMake 源列表(generate 覆盖后可重补) |
+
+> **TIM 内部时钟**:首选 `STM32F103C8T6_tim2_internal.ioc` 模板;脚本模式无法把 ETR TIM 改成内部时钟,
+> `cubemx_new_project` 内置借壳法(`_tim_make_internal_clock`)作兜底,详见 [`templates/README.md`](templates/README.md)。
 
 > 📚 **各外设的配置命令、实测状态与坑**:见 [`templates/README.md`](templates/README.md)(GPIO/I2C/TIM/时钟的 set 命令与注意事项)。
 

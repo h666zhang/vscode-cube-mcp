@@ -165,9 +165,140 @@ def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str) -> None:
     text = re.sub(r"^ProjectManager\.ProjectFileName=.*$", f"ProjectManager.ProjectFileName={project_name}.ioc", text, flags=re.MULTILINE)
     with open(ioc_dst, "w", encoding="utf-8") as f:
         f.write(text)
+def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
+    """借壳法:把 .ioc 中目标 TIM(如 TIM2)做成内部时钟。
+
+    若模板里已有另一个原生内部时钟 TIM(如 TIM3,VP_TIM3_VS_ClockSourceINT + 内部参数),
+    把它的表达整体改名给 target_tim,并删掉 target_tim 的 ETR 表达(PA0/SH/ETR 参数)。
+    这样 target_tim 继承了 6.18 信任的原生内部时钟表达,generate 不会清理。
+
+    参数:
+      ioc_path:    .ioc 文件绝对路径(会被改写)
+      target_tim:  目标 TIM 名,如 TIM2
+    返回:描述字符串
+    """
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines(keepends=True)
+
+    # 找可借壳的内部时钟 TIM(有 VP_<TIM>_VS_ClockSourceINT 且 Mode=Internal 的)
+    donor = None
+    for ln in lines:
+        m = re.match(r"VP_(TIM\d+)_VS_ClockSourceINT\.Mode=Internal", ln.strip())
+        if m:
+            donor = m.group(1)
+            break
+    if donor is None:
+        return f"模板中无内部时钟 TIM 可借壳({target_tim} 无法自动改为内部时钟);请用 templates/STM32F103C8T6_tim2_internal.ioc 作模板"
+    if donor == target_tim:
+        return f"{target_tim} 已是内部时钟,无需处理"
+
+    out = []
+    pin_idx = 0
+    seen_nvic = False
+    for ln in lines:
+        s = ln.strip()
+        # 1) 删 target_tim 的 ETR 表达:PA0 相关、SH.S_<target>、<target>. 参数(原 ETR)
+        if s.startswith("SH.S_TIM") and donor not in s:
+            continue  # 删 SH.S_<target_tim> 相关(ETR 信号)
+        # 删 target_tim 的 NVIC 行(改名来的那行会替代它,避免重复)
+        if re.match(rf"^NVIC\.{re.escape(target_tim)}_IRQn=", s):
+            continue
+        if re.match(rf"^Mcu\.Pin\d+=PA0-WKUP$", s):
+            continue  # 删 PA0 引脚条目
+        if s.startswith("PA0-WKUP."):
+            continue  # 删 PA0 参数行
+        if re.match(rf"^{re.escape(target_tim)}\.", s):
+            continue  # 删原 target_tim 的所有参数行(ETR 残留)
+        # 2) donor 的 Mcu.IP 条目删除(它改名给 target_tim)
+        if re.match(rf"^Mcu\.IP\d+={re.escape(donor)}$", s):
+            continue
+        # donor 参数行(TIM3.*)改名保留为 target_tim.*
+        if re.match(rf"^{re.escape(donor)}\.", s):
+            ln = ln.replace(donor, target_tim, 1)
+            out.append(ln)
+            continue
+        # 3) 删 donor 的 VP 引脚条目(VP_TIM3_VS... 将被改名为 VP_TIM2 并重新编号)
+        if re.match(rf"^Mcu\.Pin\d+=VP_{re.escape(donor)}_VS_ClockSourceINT$", s):
+            continue
+        # 4) Mcu.IPx 重排(保留其余)
+        if re.match(r"Mcu\.IP\d+=", s):
+            name = s.split("=", 1)[1]
+            out.append(f"Mcu.IP{pin_idx}={name}\n" if False else ln)
+            continue
+        # 5) Mcu.Pin 重排
+        if re.match(r"Mcu\.Pin\d+=", s):
+            name = s.split("=", 1)[1]
+            out.append(f"Mcu.Pin{pin_idx}={name}\n")
+            pin_idx += 1
+            continue
+        if s.startswith("Mcu.PinsNb="):
+            # 在 PinsNb 前内联 VP 条目(必须在 Mcu.Pin 列表内,否则 CubeMX 不认)
+            out.append(f"Mcu.Pin{pin_idx}=VP_{target_tim}_VS_ClockSourceINT\n")
+            pin_idx += 1
+            out.append(f"Mcu.PinsNb={pin_idx}\n")
+            continue
+        # 6) donor -> target_tim 改名(VP、NVIC、参数、functionlistsort、信号值)
+        if donor in s:
+            # VP 参数行(Mode/Signal)跳过,由追加逻辑统一生成,避免重复
+            if f"VP_{donor}_VS_ClockSourceINT." in s:
+                continue
+            # functionlistsort:删 MX_TIM4_Init 段;TIM3 段改名 TIM2 段(若已有则跳过)
+            if "functionlistsort" in s:
+                ln = ln.replace(",5-MX_TIM4_Init-TIM4-false-HAL-true", "")
+                ln = ln.replace(f",6-MX_{donor}_Init-{donor}-false-HAL-true", "")
+                ln = ln.replace(f",6-MX_{donor}_Init-{donor}-false", "")
+                # 若改名的 TIM3 段和原 TIM2 段重复,只保留一个
+                ln = ln.replace(f"MX_{donor}_Init", f"MX_{target_tim}_Init")
+                ln = ln.replace(f"{donor}-false", f"{target_tim}-false")
+                ln = ln.replace(f"_{donor}_Init", f"_{target_tim}_Init")
+                ln = ln.replace(donor, target_tim)
+                out.append(ln)
+                continue
+            ln = ln.replace(f"VP_{donor}_VS_ClockSourceINT", f"VP_{target_tim}_VS_ClockSourceINT")
+            ln = ln.replace(f"{donor}_VS_ClockSourceINT", f"{target_tim}_VS_ClockSourceINT")
+            # NVIC 去重:改名后的 TIMx_IRQn 若已出现则跳过
+            if "NVIC." in ln and f"NVIC.{target_tim}_IRQn" in ln:
+                if any(f"NVIC.{target_tim}_IRQn" in x for x in out):
+                    continue
+                ln = ln.replace(f"NVIC.{donor}_IRQn", f"NVIC.{target_tim}_IRQn")
+            ln = ln.replace(f"MX_{donor}_Init", f"MX_{target_tim}_Init")
+            ln = ln.replace(f"{donor}-false", f"{target_tim}-false")
+            ln = ln.replace(f"_{donor}_Init", f"_{target_tim}_Init")
+            ln = ln.replace(donor, target_tim)
+            out.append(ln)
+            continue
+        out.append(ln)
+
+    # 追加 VP 内部时钟参数行(在 board=custom 前;Mcu.Pin 条目已内联进列表)
+    insert_before = "board=custom"
+    vp_lines = (
+        f"VP_{target_tim}_VS_ClockSourceINT.Mode=Internal\n"
+        f"VP_{target_tim}_VS_ClockSourceINT.Signal={target_tim}_VS_ClockSourceINT\n"
+    )
+    new_out = []
+    inserted = False
+    for ln in out:
+        if not inserted and ln.strip() == insert_before:
+            new_out.append(vp_lines)
+            inserted = True
+        new_out.append(ln)
+    if not inserted:
+        new_out.append(vp_lines)
+    # 修正 Mcu.IPNb(重新数 Mcu.IPx)
+    final = []
+    ip_count = 0
+    for ln in new_out:
+        if re.match(r"Mcu\.IP\d+=", ln):
+            ip_count += 1
+        if re.match(r"Mcu\.IPNb=", ln):
+            final.append(f"Mcu.IPNb={ip_count}\n")
+            continue
+        final.append(ln)
+    with open(ioc_path, "w", encoding="utf-8", newline="") as f:
+        f.writelines(final)
+    return f"借壳法完成:{donor} 改名 {target_tim},{target_tim} 现为内部时钟"
 
 
-# ------------------------------------------------------------------ tools
 @mcp.tool()
 def cubemx_script(script: str) -> str:
     """执行任意 CubeMX 脚本命令序列(逃生通道,原样传给 -q)。
@@ -281,8 +412,21 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
     if commands:
         lines.extend(commands)
     lines.append(f'config saveas "{ioc_dst}"')
-    lines.append("project generate")
     r = _run_script("\n".join(lines))
+    # 借壳法:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
+    # 自动把该 TIM 做成内部时钟(借用模板原生内部时钟 TIM 改名,见 _tim_make_internal_clock)。
+    tim_notes = []
+    if commands:
+        for cmd in commands:
+            m = re.search(r"set ip parameters (TIM\d+) ClockSource TIM_CLOCKSOURCE_INTERNAL", cmd)
+            if m:
+                tim_notes.append(_tim_make_internal_clock(ioc_dst, m.group(1)))
+    lines = [f'config load "{ioc_dst}"']
+    lines.append("project generate")
+    r2 = _run_script("\n".join(lines))
+    if r2["ok"]:
+        r = r2
+    note_internal = "\n".join(tim_notes) if tim_notes else ""
     # 生成后:若工程被生成到 project_dir 的同级目录(以工程名命名),把 .ioc 移到工程目录,
     # 保证 .ioc 与 HAL 工程在同一目录(cubemx generate 默认行为)。
     gen_dir = os.path.join(os.path.dirname(pd), project_name)
@@ -296,7 +440,7 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
             note = f"\n注:工程生成于 {gen_dir},但 .ioc 移动失败,仍在 {pd}"
     else:
         note = ""
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}"
+    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}{note_internal}"
 
 @mcp.tool()
 def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
