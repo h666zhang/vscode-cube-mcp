@@ -123,6 +123,21 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\MINE\STM32Project"
 > 显式传其他值即覆盖,不会被工具卡死。写 .ioc 时会按默认值补回 `RCC.PLLSourceVirtual=HSE`
 > (CubeMX 的 set RCC 命令可能把该字段弄丢,导致时钟静默降级 HSI);生成后若仍丢失,返回值会附 ⚠ 时钟警告。
 
+## 升级到新版本
+
+升级到 PyPI 最新版:
+
+```powershell
+python -m pip install -U vscode-cube-mcp
+python -m pip show vscode-cube-mcp   # 确认版本号
+```
+
+升级后**必须重启客户端**(Reasonix / VS Code 等),MCP server 进程才会加载新代码;
+若重启后工具参数仍是旧的,等几秒或新开一个会话(host 侧工具快照可能滞后)。
+
+> 维护者发布新版流程(改版本号 → `python -m build` → `twine upload` → `git tag` + push)
+> 见 [`README.dev-notes.md`](README.dev-notes.md)。
+
 ## 常见问题 FAQ
 
 **Q:pip 装上了,但 `python -m cubemx_mcp` 报 `ModuleNotFoundError: No module named 'cubemx_mcp'`**
