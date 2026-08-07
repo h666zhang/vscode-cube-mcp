@@ -11,6 +11,10 @@
 | `STM32F103C8T6_tim_template.ioc` | STM32F103C8T6 | 上面全部 + **TIM2(ETR 外部时钟,PA0)** + **TIM3(内部时钟,1s)** + I2C1(PB8/PB9) |
 | `STM32F103C8T6_tim2_internal.ioc` | STM32F103C8T6 | 上面全部但 **TIM2 为内部时钟(1s)**、无 TIM3、无 ETR(借壳法生成,见下) |
 
+> `cubemx_new_project` 生成时默认:**toolchain=CMake、couple_files=true(外设独立 .c/.h)、
+> 时钟 HSE 72MHz(clock_source="HSE" + pll_mul=9)**——均为"默认值而非强制",
+> 显式传其他值即可覆盖;写 .ioc 时会按默认值补回 `RCC.PLLSourceVirtual=HSE`(防 set RCC 命令把时钟源弄丢)。
+
 > 模板必须来自 6.18 原生生成(手写/非原生 .ioc 会被 6.18 报错)。
 > 新增芯片:用 CubeMX GUI 从空白新建一次该芯片工程,把生成的 .ioc 复制为 `templates/{芯片型号}.ioc`。
 

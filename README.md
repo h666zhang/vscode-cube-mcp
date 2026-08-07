@@ -105,6 +105,24 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\MINE\STM32Project"
 
 内置模板库(`templates/`,按芯片型号命名,如 `STM32F103C8T6.ioc`、`STM32F103C8T6_tim2_internal.ioc`),新增芯片只需把该芯片 6.18 原生 .ioc 放进 `templates/`。
 
+### `cubemx_new_project` 参数(设计原则:默认值而非强制)
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `project_name` | 必填 | 工程名(仅字母/数字/下划线) |
+| `project_dir` | 必填 | 生成目标目录(须在白名单内) |
+| `mcu` | `STM32F103C8T6` | 芯片型号,匹配 `templates/{mcu}.ioc` |
+| `template` | 按 mcu 查找 | 指定模板 .ioc 路径,优先于 mcu |
+| `toolchain` | `"CMake"` | 目标工具链,可覆盖为 `"EWARM V8.32"` / `"MDK-ARM"` / `"STM32CubeIDE"` 等 |
+| `couple_files` | `True` | 每个外设生成独立 `.c/.h`(CubeMX 的 "Generate peripheral initialization as a pair of '.c/.h' files per peripheral");`False` 则全部初始化集中到 main.c |
+| `clock_source` | `"HSE"` | PLL 时钟源,默认外部晶振 72MHz;`"HSI"` 用内部 RC |
+| `pll_mul` | `9` | PLL 倍频(8MHz×9=72MHz),可覆盖(如 HSI 配 16 → 64MHz) |
+| `commands` | 空 | `set` 命令列表,如 `["set pin PB13 GPIO_Output"]` |
+
+> **默认值而非强制**:默认生成 CMake 工具链 + 外设独立 `.c/.h` + 72MHz(HSE×9),
+> 显式传其他值即覆盖,不会被工具卡死。写 .ioc 时会按默认值补回 `RCC.PLLSourceVirtual=HSE`
+> (CubeMX 的 set RCC 命令可能把该字段弄丢,导致时钟静默降级 HSI);生成后若仍丢失,返回值会附 ⚠ 时钟警告。
+
 ## 常见问题 FAQ
 
 **Q:pip 装上了,但 `python -m cubemx_mcp` 报 `ModuleNotFoundError: No module named 'cubemx_mcp'`**

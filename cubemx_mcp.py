@@ -164,13 +164,79 @@ def _project_template(mcu: str, template: str = "") -> str:
     )
 
 
-def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str) -> None:
-    """把模板 .ioc 复制到目标位置,并改写工程标识(ProjectName/ProjectFileName)。"""
+def _ensure_ip_param(text: str, name: str) -> str:
+    """确保 RCC.IPParameters 列表包含 name(CubeMX 只加载列表里声明的字段)。"""
+    m = re.search(r"^RCC\.IPParameters=(.*)$", text, flags=re.MULTILINE)
+    if not m:
+        return text
+    params = [p.strip() for p in m.group(1).split(",") if p.strip()]
+    if name not in params:
+        idx = params.index("PLLMUL") + 1 if "PLLMUL" in params else len(params)
+        params.insert(idx, name)
+        text = text[:m.start()] + f"RCC.IPParameters={','.join(params)}" + text[m.end():]
+    return text
+
+
+def _remove_ip_param(text: str, name: str) -> str:
+    """从 RCC.IPParameters 列表移除 name。"""
+    m = re.search(r"^RCC\.IPParameters=(.*)$", text, flags=re.MULTILINE)
+    if not m:
+        return text
+    params = [p.strip() for p in m.group(1).split(",") if p.strip() and p.strip() != name]
+    return text[:m.start()] + f"RCC.IPParameters={','.join(params)}" + text[m.end():]
+
+
+def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str, toolchain: str = "CMake",
+                       couple_files: bool = True, clock_source: str = "HSE",
+                       pll_mul: int = 9) -> None:
+    """把模板 .ioc 复制到目标位置,并改写工程标识(ProjectName/ProjectFileName)。
+
+    toolchain: 目标工具链,默认 "CMake"(与用户 CMake+ninja+arm-gcc 环境匹配);
+               是"默认值"而非强制,传其他值(如 "EWARM V8.32")即可覆盖。
+    couple_files: 每个外设生成独立 .c/.h(CubeMX 的 "Generate peripheral
+                initialization as a pair of '.c/.h' files per peripheral"),
+                默认 True(勾选);显式传 False 则集中到 main.c。
+    clock_source: PLL 时钟源,默认 "HSE"(外部晶振 8MHz,默认 72MHz);显式传 "HSI"
+                则用内部 RC(HSI/2)——默认值,不强制。
+    pll_mul:      PLL 倍频,默认 9(8MHz×9=72MHz);可显式覆盖(如配 "HSI" 时
+                用 16 → 64MHz)。
+    """
     os.makedirs(os.path.dirname(ioc_dst), exist_ok=True)
     with open(ioc_src, encoding="utf-8", errors="replace") as f:
         text = f.read()
     text = re.sub(r"^ProjectManager\.ProjectName=.*$", f"ProjectManager.ProjectName={project_name}", text, flags=re.MULTILINE)
     text = re.sub(r"^ProjectManager\.ProjectFileName=.*$", f"ProjectManager.ProjectFileName={project_name}.ioc", text, flags=re.MULTILINE)
+    if re.search(r"^ProjectManager\.TargetToolchain=.*$", text, flags=re.MULTILINE):
+        text = re.sub(r"^ProjectManager\.TargetToolchain=.*$", f"ProjectManager.TargetToolchain={toolchain}", text, flags=re.MULTILINE)
+    else:
+        text += f"\nProjectManager.TargetToolchain={toolchain}\n"
+    # 外设独立 .c/.h 选项默认勾选(模板本就是 true,但 CubeMX 生成/set 命令可能把它
+    # 改回 false,导致所有外设初始化挤进 main.c);这里是默认值,显式传 False 可覆盖。
+    couple_val = "true" if couple_files else "false"
+    if re.search(r"^ProjectManager\.CoupleFile=.*$", text, flags=re.MULTILINE):
+        text = re.sub(r"^ProjectManager\.CoupleFile=.*$", f"ProjectManager.CoupleFile={couple_val}", text, flags=re.MULTILINE)
+    else:
+        text += f"\nProjectManager.CoupleFile={couple_val}\n"
+    # 时钟默认值(模板即 HSE 8MHz ×9 = 72MHz;CubeMX set RCC 命令会丢
+    # PLLSourceVirtual,这里按默认值补回;显式传其他值可覆盖,不强制)。
+    src = clock_source.strip().upper()
+    if src not in ("HSE", "HSI"):
+        raise ValueError(f"clock_source 仅支持 HSE/HSI,收到: {clock_source!r}")
+    if not (2 <= pll_mul <= 16):
+        raise ValueError(f"pll_mul 应在 2~16 之间,收到: {pll_mul!r}")
+    if src == "HSE":
+        if re.search(r"^RCC\.PLLSourceVirtual=.*$", text, flags=re.MULTILINE):
+            text = re.sub(r"^RCC\.PLLSourceVirtual=.*$", "RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE", text, flags=re.MULTILINE)
+        else:
+            text += "\nRCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE\n"
+        text = _ensure_ip_param(text, "PLLSourceVirtual")
+    else:  # HSI:PLLSourceVirtual 表达删掉,CubeMX 用默认 HSI(HSI/2)
+        text = re.sub(r"^RCC\.PLLSourceVirtual=.*$\n?", "", text, flags=re.MULTILINE)
+        text = _remove_ip_param(text, "PLLSourceVirtual")
+    if re.search(r"^RCC\.PLLMUL=.*$", text, flags=re.MULTILINE):
+        text = re.sub(r"^RCC\.PLLMUL=.*$", f"RCC.PLLMUL=RCC_PLL_MUL{pll_mul}", text, flags=re.MULTILINE)
+    else:
+        text += f"\nRCC.PLLMUL=RCC_PLL_MUL{pll_mul}\n"
     with open(ioc_dst, "w", encoding="utf-8") as f:
         f.write(text)
 def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
@@ -395,17 +461,35 @@ def cubemx_export_pinout(ioc: str) -> str:
             pass
 @mcp.tool()
 def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F103C8T6",
-                       commands: list = None, template: str = "") -> str:
+                       commands: list = None, template: str = "", toolchain: str = "CMake",
+                       couple_files: bool = True, clock_source: str = "HSE",
+                       pll_mul: int = 9) -> str:
     """从零生成一个新的 HAL 工程(基于内置模板改造)。
 
     流程:从 templates/ 选 6.18 原生 .ioc 模板(或显式 template)复制到
     project_dir,改写工程名,依次执行 set 命令,再 project generate 生成 HAL 代码。
     这样无需预先手写 .ioc,即"从零开始"。
 
+    知识提示(生成前建议先读 templates/README.md):
+      - 模板按 mcu 匹配 templates/{mcu}.ioc;TIM2 等需"内部时钟借壳法"的外设,
+        优先用 templates/STM32F103C8T6_tim2_internal.ioc 或 STM32F103C8T6_tim_template.ioc
+        作 template 参数,否则脚本 set 无法把 TIM2 从 ETR 改成内部时钟。
+      - toolchain 默认 CMake(用户环境为 CMake+ninja+arm-gcc);要其他格式
+        (EWARM V8.32 / MDK-ARM / STM32CubeIDE)显式传 toolchain 参数覆盖,不强制。
+      - 已知坑:对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
+        时钟静默降级为 HSI(如 HSI/2*16=64MHz 而非 72MHz);改时钟请用 GUI 或显式
+        set 时钟源。生成后若检测到 HSE 丢失,返回值会附带时钟警告。
+
     参数:
       project_name: 工程名(将生成 {project_name}.ioc 与同名 HAL 工程)
       project_dir:  生成目标目录(须在白名单内;已存在目录会直接使用)
       mcu:          芯片型号,用于匹配 templates/{mcu}.ioc(默认 STM32F103C8T6)
+      toolchain:    目标工具链,默认 "CMake",可覆盖(如 "EWARM V8.32")
+      couple_files:  每个外设生成独立 .c/.h(CubeMX 的 "Generate peripheral
+                     initialization as a pair of '.c/.h' files per peripheral"),
+                     默认 True(勾选);显式传 False 则集中到 main.c
+      clock_source:  PLL 时钟源,默认 "HSE"(外部晶振,默认 72MHz);显式传 "HSI" 用内部 RC
+      pll_mul:       PLL 倍频,默认 9(8MHz×9=72MHz);可显式覆盖(如 HSI 配 16 → 64MHz)
       commands:     set 命令列表,如 ["set pin PB13 GPIO_Output", "set ip parameters RCC PLLMUL RCC_PLL_MUL9"]
       template:     可选,直接指定模板 .ioc 路径(优先于 mcu 查找)
     """
@@ -414,7 +498,8 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
     pd = _check_path(project_dir)
     tpl = _project_template(mcu, template)
     ioc_dst = os.path.join(pd, f"{project_name}.ioc")
-    _patch_ioc_identity(tpl, ioc_dst, project_name)
+    _patch_ioc_identity(tpl, ioc_dst, project_name, toolchain=toolchain, couple_files=couple_files,
+                        clock_source=clock_source, pll_mul=pll_mul)
 
     lines = [f'config load "{ioc_dst}"']
     if commands:
@@ -448,7 +533,21 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
             note = f"\n注:工程生成于 {gen_dir},但 .ioc 移动失败,仍在 {pd}"
     else:
         note = ""
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}{note_internal}"
+    # 时钟保护(默认值,不强制):模板原本是 HSE 外部晶振而生成后 PLLSourceVirtual 丢失时,
+    # 提醒用户确认时钟(CubeMX set RCC 参数的已知副作用会把 HSE 表达清掉,静默降级 HSI)。
+    clock_note = ""
+    try:
+        with open(ioc_dst, encoding="utf-8", errors="replace") as f:
+            dst_text = f.read()
+        if (clock_source.strip().upper() == "HSE"
+                and "RCC.PLLSourceVirtual" not in dst_text):
+            clock_note = ("\n⚠ 时钟警告:请求的 HSE 外部晶振配置(RCC.PLLSourceVirtual)在生成后丢失,"
+                          "时钟可能已降级为 HSI 内部 RC(如 64MHz 而非 72MHz)。"
+                          "请用 CubeMX GUI 的 Clock Configuration 把 PLL Source 选回 HSE、"
+                          "PLLMUL 设 9 后重新 Generate;或显式 set 时钟源。")
+    except OSError:
+        pass
+    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}{note_internal}{clock_note}"
 
 @mcp.tool()
 def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
