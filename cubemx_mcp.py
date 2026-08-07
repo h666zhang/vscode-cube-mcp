@@ -29,6 +29,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 
@@ -149,10 +150,12 @@ def _project_template(mcu: str, template: str = "") -> str:
     """
     if template:
         return _ioc_path(template)
-    # 模板查找路径:①源码目录 __file__/templates ②data-files 安装目录(site-packages/templates)
+    # 模板查找路径:①源码目录 __file__/templates ②安装版 data-files(site-packages 上级)
+    # ③data-files 实际安装位置 sys.prefix/templates(pip 装 wheel 时相对 sys.prefix)
     search_dirs = [
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"),
+        os.path.join(sys.prefix, "templates"),
     ]
     for tpl_dir in search_dirs:
         tpl = os.path.join(tpl_dir, f"{mcu}.ioc")
