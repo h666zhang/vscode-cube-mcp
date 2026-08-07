@@ -163,3 +163,33 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 - [`docs/install-claude-code.md`](docs/install-claude-code.md):Claude Code(终端版)安装配置指南
 - [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、借壳法原理
 - [`templates/README.md`](templates/README.md):各外设(GPIO/I2C/TIM/时钟)的配置命令与坑
+
+## 更新日志
+
+### 0.3.1(2026-08-07)
+- 修复:pip 安装版 `cubemx_new_project` 找不到模板(`_project_template` 补 `sys.prefix/templates` 查找路径——data-files 安装时把模板放在 `sys.prefix` 下)
+
+### 0.3.0(2026-08-07)
+- 新功能:`cubemx_new_project` 参数化,设计原则 **"默认值而非强制"**:
+  - `toolchain` 默认 `"CMake"`,可覆盖(EWARM V8.32 / MDK-ARM 等)
+  - `couple_files` 默认 `True`(每个外设生成独立 `.c/.h`),可覆盖为 `False` 集中到 main.c
+  - `clock_source` 默认 `"HSE"` + `pll_mul` 默认 `9`(8MHz×9=72MHz),写 .ioc 时按默认值补回 `RCC.PLLSourceVirtual=HSE`;生成后 HSE 仍丢失会返回 ⚠ 时钟警告
+- 文档:README 新增 `cubemx_new_project` 参数说明;`.gitignore` 忽略 `*.bak`
+
+### 0.2.2(2026-08-06)
+- 修复:pyproject 作者元数据(`pip show` 的 Author 字段显示正确)
+
+### 0.2.1(2026-08-06)
+- 文档:README 重写为面向用户的手册;新增 Claude Code 安装指南
+
+### 0.2.0(2026-08-06)
+- 新功能:从零生成 HAL 工程(`cubemx_new_project`,内置模板库)
+- 新功能:外设管理工具(`cubemx_remove_peripheral` / `cubemx_add_source`)
+- 新功能:TIM 内部时钟工程化(借壳法,`templates/STM32F103C8T6_tim2_internal.ioc`)
+- 打包:templates 随 wheel 分发(PyPI 正式发布)
+
+### 0.1.1(2026-08-05)
+- 文档:补充构建链说明(CMake+Ninja)
+
+### 0.1.0(2026-08-05)
+- 首个版本:MCP server 封装 STM32CubeMX 命令行脚本模式(`-q`)
