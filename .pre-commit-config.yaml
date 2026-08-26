@@ -1,0 +1,10 @@
+# pre-commit 钩子:统一代码风格(ruff check + ruff format)
+# 使用前先安装: pip install pre-commit 然后 pre-commit install
+# 单独手动运行: pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

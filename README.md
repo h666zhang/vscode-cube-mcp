@@ -2,6 +2,22 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> **项目定位自白**:这是一个**作者自嗨型项目**,对开源社区的实际意义约等于 0。
+> 它存在的全部意义,是教会作者用 git,并推动作者去学习 STM32F103C8T6 与 MCP。
+
+## 为什么用(用之前 vs 用之后)
+
+**用之前**:配置一个 STM32 工程,你得打开 CubeMX 图形界面——选芯片、拖时钟树、
+点引脚、配外设,每一步都在 GUI 里点,重复劳动多,还容易漏。
+
+**用之后**:在 AI 对话里直接说一句:
+
+> 「用 STM32F103C8T6 建工程,LED 在 PB13,带 I2C1」
+
+工具自动生成整个 HAL 工程;想改配置,继续说就行,全程不用打开 GUI。
+
+<!-- 演示 GIF(待补):10 秒展示「说一句话 → 工程生成完成」;作者暂无录屏环境,欢迎 PR 补充 -->
+
 MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本模式(`-q`),
 让 AI 助手可以直接加载 .ioc 工程、改引脚/外设配置、生成 HAL 代码、导出引脚表,全程无需打开 CubeMX GUI。
 
@@ -177,6 +193,7 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 
 ## 更多资料
 
+- [`examples/`](examples/):真实可复现案例(LED 点灯 / I2C OLED / TIM3 PWM + 输入捕获,指令可直接复制)
 - [`docs/install-claude-code.md`](docs/install-claude-code.md):Claude Code(终端版)安装配置指南
 - [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、TIM 片段注入原理
 

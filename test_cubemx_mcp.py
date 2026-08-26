@@ -18,7 +18,7 @@ class TestCleanup(unittest.TestCase):
             "2026-08-05 12:00:00,123 [INFO] something\n"
             "Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n"
             "log4j:WARN No appenders could be found\n"
-            "config load \"C:/proj.ioc\"\n"
+            'config load "C:/proj.ioc"\n'
             "OK\n"
             "\n"
         )
@@ -128,8 +128,9 @@ class TestRunScript(unittest.TestCase):
         self.assertFalse(r["ok"])
 
     def test_timeout_path(self):
-        with mock.patch("cubemx_mcp.subprocess.Popen",
-                        return_value=_FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))):
+        with mock.patch(
+            "cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))
+        ):
             r = cubemx_mcp._run_script("x")
         self.assertFalse(r["ok"])
         self.assertIn("TIMEOUT", r["output"])
@@ -292,6 +293,7 @@ class TestAddSource(unittest.TestCase):
             self.assertEqual(text2.count("OLED.c"), 1)
         finally:
             import shutil
+
             shutil.rmtree(root, ignore_errors=True)
 
     def test_add_source_missing_cmake_raises(self):
@@ -302,6 +304,7 @@ class TestAddSource(unittest.TestCase):
                 cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
         finally:
             import shutil
+
             shutil.rmtree(root, ignore_errors=True)
 
     def test_add_source_rejects_traversal(self):
@@ -313,6 +316,7 @@ class TestAddSource(unittest.TestCase):
                 cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/../evil.c")
         finally:
             import shutil
+
             shutil.rmtree(root, ignore_errors=True)
 
     def test_add_source_rejects_absolute_and_newline(self):
@@ -324,6 +328,7 @@ class TestAddSource(unittest.TestCase):
                 cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c\nset(OTHER evil)")
         finally:
             import shutil
+
             shutil.rmtree(root, ignore_errors=True)
 
     def test_add_source_no_anchor_raises(self):
@@ -337,6 +342,7 @@ class TestAddSource(unittest.TestCase):
                 cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
         finally:
             import shutil
+
             shutil.rmtree(root, ignore_errors=True)
 
 
@@ -482,8 +488,10 @@ class TestInjectTimInternalClock(unittest.TestCase):
 
     def test_inject_functionlistsort_single_seg(self):
         # functionlistsort 只剩 TIM 段(无 SystemClock_Config)时,注入后不产生重复段
-        ioc = SEED_IOC.replace("ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false",
-                               "ProjectManager.functionlistsort=3-MX_TIM2_Init-TIM2-false-HAL-true")
+        ioc = SEED_IOC.replace(
+            "ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false",
+            "ProjectManager.functionlistsort=3-MX_TIM2_Init-TIM2-false-HAL-true",
+        )
         path = self._write_ioc(ioc)
         try:
             cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
@@ -529,8 +537,7 @@ class TestInjectTimPwm(unittest.TestCase):
     def test_inject_tim3_pwm(self):
         path = self._write_ioc(SEED_IOC)
         try:
-            out = cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1",
-                                              prescaler=72, period=100, pulse=50)
+            out = cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1", prescaler=72, period=100, pulse=50)
             self.assertIn("TIM3", out)
             with open(path, encoding="utf-8") as f:
                 text = f.read()
@@ -601,8 +608,9 @@ class TestInjectTimInputCapture(unittest.TestCase):
     def test_inject_tim2_input_capture(self):
         path = self._write_ioc(SEED_IOC)
         try:
-            out = cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR",
-                                                       prescaler=72, period=65535)
+            out = cubemx_mcp._inject_tim_input_capture(
+                path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR", prescaler=72, period=65535
+            )
             self.assertIn("TIM2", out)
             with open(path, encoding="utf-8") as f:
                 text = f.read()
@@ -665,6 +673,261 @@ class TestInjectTimInputCapture(unittest.TestCase):
                 cubemx_mcp._inject_tim_input_capture(path, "FOO", "PA0-WKUP", "S_TIM2_CH1_ETR")
         finally:
             os.remove(path)
+
+
+# ---------------------------------------------------------------- 工程化补强:覆盖率 71% → ≥80%(纯新增,不改旧测试)
+class TestProjectTemplate(unittest.TestCase):
+    def test_explicit_template_wins(self):
+        with tempfile.TemporaryDirectory() as td:
+            ioc = os.path.join(td, "custom.ioc")
+            with open(ioc, "w", encoding="utf-8") as f:
+                f.write("Mcu.IPNb=0\n")
+            cubemx_mcp.ALLOWED_ROOTS = [td]
+            try:
+                self.assertEqual(cubemx_mcp._project_template("STM32F103C8T6", template=ioc), ioc)
+            finally:
+                cubemx_mcp.ALLOWED_ROOTS = [os.getcwd()]
+
+    def test_mcu_template_found_in_search_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            tpl = os.path.join(td, "STM32F103C8T6.ioc")
+            with open(tpl, "w", encoding="utf-8") as f:
+                f.write("Mcu.IPNb=0\n")
+            with mock.patch.object(cubemx_mcp, "_template_search_dirs", return_value=[td]):
+                self.assertEqual(cubemx_mcp._project_template("STM32F103C8T6"), tpl)
+
+
+class TestPatchIocIdentity(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.src = os.path.join(self._td.name, "tpl.ioc")
+        self.dst = os.path.join(self._td.name, "out", "proj.ioc")
+
+    def _write(self, text):
+        with open(self.src, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def _read_dst(self):
+        with open(self.dst, encoding="utf-8") as f:
+            return f.read()
+
+    def test_all_replaced_hse_inserts_param(self):
+        # 模板已有全部行 → 全部替换;IPParameters 缺 PLLSourceVirtual → 插到 PLLMUL 后
+        self._write(
+            "Mcu.IPNb=0\n"
+            "ProjectManager.ProjectName=TPL\n"
+            "ProjectManager.ProjectFileName=TPL.ioc\n"
+            "ProjectManager.TargetToolchain=EWARM V8.32\n"
+            "ProjectManager.CoupleFile=false\n"
+            "RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE\n"
+            "RCC.IPParameters=PLLMUL\n"
+            "RCC.PLLMUL=RCC_PLL_MUL9\n"
+        )
+        cubemx_mcp._patch_ioc_identity(
+            self.src, self.dst, "MyProj", toolchain="CMake", couple_files=True, clock_source="HSE", pll_mul=9
+        )
+        text = self._read_dst()
+        self.assertIn("ProjectManager.ProjectName=MyProj\n", text)
+        self.assertIn("ProjectManager.ProjectFileName=MyProj.ioc\n", text)
+        self.assertIn("ProjectManager.TargetToolchain=CMake\n", text)
+        self.assertIn("ProjectManager.CoupleFile=true\n", text)
+        self.assertIn("RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE\n", text)
+        self.assertIn("RCC.PLLMUL=RCC_PLL_MUL9\n", text)
+        self.assertIn("RCC.IPParameters=PLLMUL,PLLSourceVirtual\n", text)
+
+    def test_missing_lines_appended(self):
+        # 模板缺 ProjectName/FileName/Toolchain/CoupleFile/IPParameters → 全部补行
+        self._write("Mcu.IPNb=0\n")
+        cubemx_mcp._patch_ioc_identity(self.src, self.dst, "MyProj")
+        text = self._read_dst()
+        self.assertIn("ProjectManager.ProjectName=MyProj\n", text)
+        self.assertIn("ProjectManager.ProjectFileName=MyProj.ioc\n", text)
+        self.assertIn("ProjectManager.TargetToolchain=CMake\n", text)
+        self.assertIn("ProjectManager.CoupleFile=true\n", text)
+        self.assertIn("RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE\n", text)
+        self.assertIn("RCC.PLLMUL=RCC_PLL_MUL9\n", text)
+        self.assertNotIn("RCC.IPParameters=", text)  # 模板无该行时 _ensure_ip_param 不追加
+
+    def test_ip_param_appended_without_pllmul(self):
+        # IPParameters 有值但无 PLLMUL → PLLSourceVirtual 追加到列表末尾
+        self._write(
+            "ProjectManager.ProjectName=TPL\nProjectManager.ProjectFileName=TPL.ioc\nRCC.IPParameters=Prescaler\n"
+        )
+        cubemx_mcp._patch_ioc_identity(self.src, self.dst, "MyProj")
+        self.assertIn("RCC.IPParameters=Prescaler,PLLSourceVirtual\n", self._read_dst())
+
+    def test_hsi_removes_pll_source(self):
+        self._write(
+            "ProjectManager.ProjectName=TPL\nProjectManager.ProjectFileName=TPL.ioc\n"
+            "RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE\n"
+            "RCC.IPParameters=PLLMUL,PLLSourceVirtual\n"
+        )
+        cubemx_mcp._patch_ioc_identity(self.src, self.dst, "MyProj", clock_source="HSI", pll_mul=16)
+        text = self._read_dst()
+        self.assertNotIn("PLLSourceVirtual", text)
+        self.assertIn("RCC.PLLMUL=RCC_PLL_MUL16\n", text)
+
+    def test_invalid_clock_source_raises(self):
+        self._write("ProjectManager.ProjectName=TPL\nProjectManager.ProjectFileName=TPL.ioc\n")
+        with self.assertRaises(ValueError):
+            cubemx_mcp._patch_ioc_identity(self.src, self.dst, "MyProj", clock_source="LSI")
+
+    def test_invalid_pll_mul_raises(self):
+        self._write("ProjectManager.ProjectName=TPL\nProjectManager.ProjectFileName=TPL.ioc\n")
+        with self.assertRaises(ValueError):
+            cubemx_mcp._patch_ioc_identity(self.src, self.dst, "MyProj", pll_mul=1)
+
+
+class TestNewProjectDispatch(unittest.TestCase):
+    """cubemx_new_project 调度层:mock _run_script(不碰 CubeMX),注入器真实执行。"""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.tpl_dir = os.path.join(self._td.name, "templates")
+        os.makedirs(self.tpl_dir)
+        with open(os.path.join(self.tpl_dir, "STM32F103C8T6.ioc"), "w", encoding="utf-8") as f:
+            f.write(
+                "Mcu.IPNb=0\nMcu.PinsNb=0\nboard=custom\n"
+                "ProjectManager.ProjectName=TPL\nProjectManager.ProjectFileName=TPL.ioc\n"
+            )
+        self._orig_search = cubemx_mcp._template_search_dirs
+        cubemx_mcp._template_search_dirs = lambda: [self.tpl_dir]
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+        self.project_dir = os.path.join(self._td.name, "out")
+
+    def tearDown(self):
+        cubemx_mcp._template_search_dirs = self._orig_search
+        cubemx_mcp.ALLOWED_ROOTS = [os.getcwd()]
+
+    def _mock_run(self, ok=True, output="OK", exit_code=0):
+        return mock.patch.object(
+            cubemx_mcp, "_run_script", return_value={"ok": ok, "output": output, "exit_code": exit_code}
+        )
+
+    def test_invalid_name_raises(self):
+        with self.assertRaises(ValueError):
+            cubemx_mcp.cubemx_new_project("Bad-Name!", self.project_dir)
+
+    def test_no_commands_ok(self):
+        with self._mock_run():
+            r = cubemx_mcp.cubemx_new_project("Proj1", self.project_dir)
+        self.assertIn("工程目录", r)
+        self.assertTrue(os.path.isfile(os.path.join(self.project_dir, "Proj1.ioc")))
+
+    def test_tim_internal_clock_command(self):
+        with self._mock_run():
+            r = cubemx_mcp.cubemx_new_project(
+                "Proj2",
+                self.project_dir,
+                commands=["set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL Prescaler 720 Period 1000"],
+            )
+        self.assertIn("TIM2", r)
+        with open(os.path.join(self.project_dir, "Proj2.ioc"), encoding="utf-8") as f:
+            self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", f.read())
+
+    def test_pwm_and_ic_commands(self):
+        with self._mock_run():
+            r = cubemx_mcp.cubemx_new_project(
+                "Proj3",
+                self.project_dir,
+                commands=[
+                    "set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50",
+                    "set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535",
+                ],
+            )
+        self.assertIn("TIM3", r)
+        self.assertIn("TIM2", r)
+        with open(os.path.join(self.project_dir, "Proj3.ioc"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("PA6.Mode=PWM Generation1 CH1", text)
+        self.assertIn("TIM3.OCMode=TIM_OCMODE_PWM1", text)
+        self.assertIn("PA0-WKUP.Mode=Input_Capture1_from_TI1", text)
+
+    def test_first_script_failure_aborts(self):
+        with self._mock_run(ok=False, output="KO", exit_code=1):
+            r = cubemx_mcp.cubemx_new_project("Proj5", self.project_dir)
+        self.assertIn("FAIL", r)
+        self.assertIn("已中止生成", r)
+
+
+class TestToolWrappers(unittest.TestCase):
+    """MCP 工具包装层:mock _run_script(不碰 CubeMX)。"""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("Mcu.IPNb=0\n")
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = [os.getcwd()]
+
+    def test_script_ok(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_script("config load x"))
+
+    def test_script_fail(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": False, "output": "KO", "exit_code": 2}):
+            self.assertIn("[FAIL exit=2]", cubemx_mcp.cubemx_script("config load x"))
+
+    def test_load_ok(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_load(self.ioc))
+
+    def test_configure_passes_commands(self):
+        with mock.patch.object(
+            cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}
+        ) as m:
+            r = cubemx_mcp.cubemx_configure(self.ioc, ["set pin PB13 GPIO_Output"])
+        self.assertIn("[OK", r)
+        script = m.call_args[0][0]
+        self.assertIn("config load", script)
+        self.assertIn("set pin PB13 GPIO_Output", script)
+        self.assertIn("config saveas", script)
+
+    def test_generate_with_project_dir(self):
+        gen_dir = os.path.join(self._td.name, "gen")
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            self.assertIn("[OK", cubemx_mcp.cubemx_generate(self.ioc, project_dir=gen_dir))
+        self.assertTrue(os.path.isdir(gen_dir))
+
+    def test_export_pinout_ok(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            r = cubemx_mcp.cubemx_export_pinout(self.ioc)
+        self.assertIn("[OK]", r)
+        self.assertIn("--- CSV ---", r)
+
+
+class TestHelpTopics(unittest.TestCase):
+    def test_topic_new_project(self):
+        self.assertIn("cubemx_new_project", cubemx_mcp.cubemx_help("new_project"))
+
+    def test_topic_clock_is_rcc_alias(self):
+        self.assertEqual(cubemx_mcp.cubemx_help("clock"), cubemx_mcp.cubemx_help("rcc"))
+
+    def test_topic_remove(self):
+        self.assertIn("cubemx_remove_peripheral", cubemx_mcp.cubemx_help("remove"))
+
+    def test_topic_add_source(self):
+        self.assertIn("cubemx_add_source", cubemx_mcp.cubemx_help("add_source"))
+
+    def test_templates_empty_dir(self):
+        with mock.patch.object(cubemx_mcp, "_available_templates", return_value=[]):
+            self.assertIn("为空或不存在", cubemx_mcp.cubemx_help("templates"))
+
+
+class TestInjectICInvalidSignal(unittest.TestCase):
+    def test_ic_signal_without_channel_raises(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.ioc")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("Mcu.IPNb=0\n")
+            with self.assertRaises(ValueError):
+                cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0", "S_TIM2_ETR")
 
 
 if __name__ == "__main__":
