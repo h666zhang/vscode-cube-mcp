@@ -230,3 +230,31 @@ cubemx_new_project(
 复制 `templates/{芯片型号}.ioc`(6.18 原生种子)→ 改工程名 → set 命令 → generate。
 模板必须是 6.18 原生 .ioc,手写/非原生文件 6.18 会报错;新增芯片需先用 GUI
 从空白建一次该芯片工程,把 .ioc 存入 templates/ 后即可脚本化复用。
+
+---
+
+## 0.4.0 规划:薄种子 + 外设片段(2026-08-26 实测)
+
+**背景**:模板"整机配置"模式会按 芯片×配置组合 爆炸(每新组合手动 GUI 配一遍再存模板),
+不符合"配置应现配、模板应少而薄"的方向。
+
+**实测结论(6.18-RC3,真实 CubeMX 验证)**:
+- 构造 420 字节 / 15 行"激进最小种子":仅 `File.Version` + `Mcu.CPN/Family/Name/Package/UserName`
+  + `MxCube.Version` + `MxDb.Version` + 基本 ProjectManager,**IPNb=0、PinsNb=0,无任何外设/时钟/引脚**
+- `config load` → **OK**;`project generate` → **OK**,生成完整空白 HAL 工程
+  (main.c / stm32f1xx_it / hal_msp / hal_conf、HAL 驱动 + CMSIS、CMake 工具链)
+- 结论:**6.18 接受极简 .ioc,薄种子路线完全可行**;load 不会改写种子文件(saveas 前原样)
+
+**改造方向(0.4.0)**:
+1. **种子化**:模板从"整机配置"减为"芯片标识"文件(每芯片 ~15 行),数量按芯片线性增长;
+   种子可从现有模板程序化剥离,或 GUI 新建一次取标识段
+2. **外设 set 现配**:GPIO / I2C / USART 等可靠外设全部由 `commands` set 配置(已验证)
+3. **TIM 内部时钟片段注入**:把借壳法验证过的表达(VP 条目内联进 Mcu.Pin 列表、
+   NVIC 去重、IPNb/PinsNb 修正)规则化为"外设片段",按需注入;通用化后**可退役借壳法**
+4. **`cubemx_new_project` 流程**:最小种子 → set 现配 → 片段注入(仅 set 不可靠的外设)→ generate
+
+**借壳法退役条件**:片段注入通用化 + 实测通过后,删除 `_tim_make_internal_clock` 及调用链。
+
+**遗留坑(与种子无关)**:
+- CubeMX `project path` 参数有路径拼接 bug(gen 时 sysmem/syscalls 报 FileNotFoundException),
+  generate 尽量用默认行为(.ioc 同目录生成),别依赖 project path 重定向。
