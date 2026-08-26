@@ -255,6 +255,11 @@ def _patch_ioc_identity(ioc_src: str, ioc_dst: str, project_name: str, toolchain
         text = f.read()
     text = re.sub(r"^ProjectManager\.ProjectName=.*$", f"ProjectManager.ProjectName={project_name}", text, flags=re.MULTILINE)
     text = re.sub(r"^ProjectManager\.ProjectFileName=.*$", f"ProjectManager.ProjectFileName={project_name}.ioc", text, flags=re.MULTILINE)
+    # 防御:模板缺 ProjectName/FileName 行时补上(否则 CubeMX 用模板默认名)
+    if not re.search(r"^ProjectManager\.ProjectName=", text, flags=re.MULTILINE):
+        text += f"\nProjectManager.ProjectName={project_name}\n"
+    if not re.search(r"^ProjectManager\.ProjectFileName=", text, flags=re.MULTILINE):
+        text += f"\nProjectManager.ProjectFileName={project_name}.ioc\n"
     if re.search(r"^ProjectManager\.TargetToolchain=.*$", text, flags=re.MULTILINE):
         text = re.sub(r"^ProjectManager\.TargetToolchain=.*$", f"ProjectManager.TargetToolchain={toolchain}", text, flags=re.MULTILINE)
     else:
@@ -325,10 +330,10 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
     ip_entries = []
     pin_entries = []
     for ln in lines:
-        m = re.match(r"Mcu\.IP\d+=(.+)\r?\n", ln)
+        m = re.match(r"Mcu\.IP\d+=(.+)", ln)
         if m:
             ip_entries.append(m.group(1).strip())
-        m = re.match(r"Mcu\.Pin\d+=(.+)\r?\n", ln)
+        m = re.match(r"Mcu\.Pin\d+=(.+)", ln)
         if m:
             pin_entries.append(m.group(1).strip())
     ip_entries = [n for n in ip_entries if n != tim]
@@ -350,6 +355,8 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
 
     out = []
     inserted_params = False
+    ipnb_seen = False
+    pinsnb_seen = False
     for ln in lines:
         s = ln.strip()
         # 删除旧 TIM 表达(参数/VP/SH/NVIC 行;IP/Pin 行在下方统一重建)
@@ -361,22 +368,24 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
         if re.match(r"Mcu\.IP\d+=", s) or re.match(r"Mcu\.Pin\d+=", s):
             continue
         if re.match(r"Mcu\.IPNb=", s):
+            ipnb_seen = True
             for i, name in enumerate(new_ips):
                 out.append(f"Mcu.IP{i}={name}\n")
             out.append(f"Mcu.IPNb={len(new_ips)}\n")
             continue
         if re.match(r"Mcu\.PinsNb=", s):
+            pinsnb_seen = True
             for i, name in enumerate(new_pins):
                 out.append(f"Mcu.Pin{i}={name}\n")
             out.append(f"Mcu.PinsNb={len(new_pins)}\n")
             continue
         if s.startswith("ProjectManager.functionlistsort="):
-            # 删旧 {tim} 段,再追加新段
-            ln = re.sub(rf",\d+-MX_{re.escape(tim)}_Init-{re.escape(tim)}-false-HAL-(?:true|false)", "", ln)
-            ln = re.sub(rf"(?:^|,)\d+-MX_{re.escape(tim)}_Init-{re.escape(tim)}-false-HAL-(?:true|false),", "", ln)
+            # 按段拆分,剔除旧 {tim} 段(任意序号/flag),再追加新段
             segs = [x for x in ln.split("=", 1)[1].split(",") if x.strip()]
-            ln = ln.rstrip("\r\n") + f",{len(segs) + 1}-MX_{tim}_Init-{tim}-false-HAL-true\n"
-            out.append(ln)
+            segs = [x for x in segs
+                    if not re.search(rf"MX_{re.escape(tim)}_Init-{re.escape(tim)}-false-HAL-(?:true|false)$", x)]
+            segs.append(f"{len(segs) + 1}-MX_{tim}_Init-{tim}-false-HAL-true")
+            out.append(ln.split("=", 1)[0] + "=" + ",".join(segs) + "\n")
             continue
         if s == "board=custom":
             if not inserted_params:
@@ -385,6 +394,15 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
             out.append(ln)
             continue
         out.append(ln)
+    # 防御:非标准 .ioc 缺失 IPNb/PinsNb 行时,在末尾补全(否则上面的重建会丢数据)
+    if not ipnb_seen:
+        for i, name in enumerate(new_ips):
+            out.append(f"Mcu.IP{i}={name}\n")
+        out.append(f"Mcu.IPNb={len(new_ips)}\n")
+    if not pinsnb_seen:
+        for i, name in enumerate(new_pins):
+            out.append(f"Mcu.Pin{i}={name}\n")
+        out.append(f"Mcu.PinsNb={len(new_pins)}\n")
     if not inserted_params:
         out.append(tim_params)
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
@@ -487,10 +505,6 @@ _PERIPHERAL_HELP = {
   set ip parameters RCC PLLMUL RCC_PLL_MUL9
   set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK
   set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2""",
-    "clock": """【时钟(同 rcc)】
-模板默认 72MHz(HSE 8M × PLL9)。改时钟用 cubemx_new_project 的
-clock_source("HSE"/"HSI")与 pll_mul 参数;set RCC 命令有把
-PLLSourceVirtual=HSE 弄丢的坑,详见 cubemx_help(topic="rcc")。""",
 }
 
 _REMOVE_HELP = """【移除外设(cubemx_remove_peripheral)】
@@ -539,6 +553,8 @@ def cubemx_help(topic: str = "") -> str:
         return _NEW_PROJECT_HELP
     if t in _PERIPHERAL_HELP:
         return _PERIPHERAL_HELP[t]
+    if t == "clock":
+        return _PERIPHERAL_HELP["rcc"]  # clock 是 rcc 的别名,避免重复维护
     if t == "remove":
         return _REMOVE_HELP
     if t == "add_source":
@@ -686,12 +702,19 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
                 f"set 命令序列执行失败,已中止生成(避免产出残缺工程)。.ioc 保留在: {ioc_dst}")
     # TIM 内部时钟片段注入:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
     # 自动把该 TIM 做成内部时钟(标准表达直接注入,见 _inject_tim_internal_clock)。
+    # 命令里可附 Prescaler/Period 覆盖默认 1s 参数(默认值而非强制),如
+    # "set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL Prescaler 720 Period 1000"。
     tim_notes = []
     if commands:
         for cmd in commands:
             m = re.search(r"set ip parameters (TIM\d+) ClockSource TIM_CLOCKSOURCE_INTERNAL", cmd)
             if m:
-                tim_notes.append(_inject_tim_internal_clock(ioc_dst, m.group(1)))
+                pm = re.search(r"\bPrescaler (\d+)", cmd)
+                pd_m = re.search(r"\bPeriod (\d+)", cmd)
+                tim_notes.append(_inject_tim_internal_clock(
+                    ioc_dst, m.group(1),
+                    prescaler=int(pm.group(1)) if pm else 7200,
+                    period=int(pd_m.group(1)) if pd_m else 10000))
     lines = [f'config load "{ioc_dst}"']
     lines.append("project generate")
     r2 = _run_script("\n".join(lines))
@@ -748,7 +771,7 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
     # 收集要删的行号:精确匹配 Mcu.IPx=<peripheral> 的行
     ip_line_idx = None
     for i, ln in enumerate(lines):
-        if re.fullmatch(rf"Mcu\.IP\d+={re.escape(peripheral)}\r?\n", ln):
+        if re.fullmatch(rf"Mcu\.IP\d+={re.escape(peripheral)}\s*", ln):
             ip_line_idx = i
             break
     if ip_line_idx is None:
@@ -772,7 +795,7 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
     # 收集剩余外设(按顺序),用于重排 Mcu.IPx 和修正 Mcu.IPNb
     keep_ips = []
     for ln in lines:
-        m = re.match(r"Mcu\.IP(\d+)=(.*)\r?\n", ln)
+        m = re.match(r"Mcu\.IP(\d+)=(.*)", ln)
         if m and m.group(2).strip() != peripheral:
             keep_ips.append(m.group(2).strip())
     # 重写所有行

@@ -237,6 +237,18 @@ class TestRemovePeripheral(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_remove_peripheral_ip_last_line_no_newline(self):
+        # 外设 IP 条目是文件最后一行且无换行时,仍能定位并删除
+        path = self._write_ioc(SAMPLE_IOC + "Mcu.IP5=USART1")
+        try:
+            cubemx_mcp.cubemx_remove_peripheral(path, "USART1")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("USART1", text)
+            self.assertIn("Mcu.IPNb=5", text)
+        finally:
+            os.remove(path)
+
 
 class TestAddSource(unittest.TestCase):
     def _make_project(self):
@@ -465,6 +477,34 @@ class TestInjectTimInternalClock(unittest.TestCase):
         try:
             with self.assertRaises(ValueError):
                 cubemx_mcp._inject_tim_internal_clock(path, "FOO")
+        finally:
+            os.remove(path)
+
+    def test_inject_functionlistsort_single_seg(self):
+        # functionlistsort 只剩 TIM 段(无 SystemClock_Config)时,注入后不产生重复段
+        ioc = SEED_IOC.replace("ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false",
+                               "ProjectManager.functionlistsort=3-MX_TIM2_Init-TIM2-false-HAL-true")
+        path = self._write_ioc(ioc)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertEqual(text.count("MX_TIM2_Init"), 1)
+        finally:
+            os.remove(path)
+
+    def test_inject_missing_ipnb_pinsnb(self):
+        # 非标准 .ioc 缺 IPNb/PinsNb 行时,注入不丢数据(末尾补全)
+        ioc = SEED_IOC.replace("Mcu.IPNb=3\n", "").replace("Mcu.PinsNb=2\n", "")
+        path = self._write_ioc(ioc)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("Mcu.IP3=TIM2", text)
+            self.assertIn("Mcu.IPNb=4", text)
+            self.assertIn("Mcu.Pin2=VP_TIM2_VS_ClockSourceINT", text)
+            self.assertIn("Mcu.PinsNb=3", text)
         finally:
             os.remove(path)
 
