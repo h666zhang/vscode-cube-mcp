@@ -200,9 +200,10 @@ cubemx_new_project(
 | `cubemx_add_source` | 把自定义源文件加入 CMake 源列表(generate 覆盖后可重补) |
 
 > **TIM 内部时钟**:命令含 `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 时,
-> server 自动注入 6.18 验证过的内部时钟标准表达(片段注入,0.4.0 起),详见 [`templates/README.md`](templates/README.md)。
+> server 自动注入 6.18 验证过的内部时钟标准表达(片段注入,0.4.0 起),详见下文「TIM 标准写法与实测坑」。
 
-> 📚 **各外设的配置命令、实测状态与坑**:见 [`templates/README.md`](templates/README.md)(GPIO/I2C/TIM/时钟的 set 命令与注意事项)。
+> 📚 **各外设的配置命令、实测状态与坑**:调 `cubemx_help(topic="gpio"/"i2c"/"tim"/"rcc")` 获取;
+> 详细实测结论见下文「TIM 标准写法与实测坑」与「能力边界」。
 
 ## 能力边界:已验证范围与未验证外设
 
@@ -285,3 +286,62 @@ cubemx_new_project(
   (完整指南 vs 定向查询),保留;README.dev-notes.md 无重复章节;模板删除后引用已全部清理
 - 新增 3 个回归测试(单段 functionlistsort 不重复、缺 IPNb/PinsNb 不丢数据、
   最后一行无换行的外设可删除),测试 37 → **40 全绿**
+
+## TIM 标准写法与实测坑(2026-08-26 自 templates/README.md 迁移,原文件已删)
+
+> templates/README.md 已删除(与 cubemx_help/主 README 大量重复);以下为其**独有知识**。
+
+**TIM 内部时钟标准写法**(6.18 GUI 原生形态,`_inject_tim_internal_clock` 注入的正是此表达):
+
+```
+Mcu.IP4=TIM2
+Mcu.Pin8=VP_TIM2_VS_ClockSourceINT
+NVIC.TIM2_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
+TIM2.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE
+TIM2.IPParameters=Period,AutoReloadPreload,Prescaler      ← 无 ClockFilter/ClockPolarity/CounterMode
+TIM2.Period=10000-1
+TIM2.Prescaler=7200-1
+VP_TIM2_VS_ClockSourceINT.Mode=Internal
+VP_TIM2_VS_ClockSourceINT.Signal=TIM2_VS_ClockSourceINT
+```
+
+- 1s 中断参数:72MHz 下 `Prescaler=7200-1` + `Period=10000-1`(`72-1`/`1000-1` = 1ms,常见错误!)
+- TIM3 默认参数版:只写 `Mcu.IP5=TIM3` + `Mcu.Pin9=VP_TIM3_VS_ClockSourceINT` + `NVIC.TIM3_IRQn` +
+  `VP_TIM3_VS_ClockSourceINT.Mode=Internal/Signal`,**无 Prescaler/Period/IPParameters 行** = 默认 0/65535
+
+**TIM2 外部引脚(ETR)写法**(GUI 原生形态,仅供参考;外部时钟**无 VP_TIM2**):
+
+```
+Mcu.IP4=TIM2
+Mcu.Pin2=PA0-WKUP                          ← 物理引脚
+PA0-WKUP.Signal=S_TIM2_CH1_ETR             ← 引脚绑定信号
+SH.S_TIM2_CH1_ETR.0=TIM2_ETR,ClockSourceETR_Mode2   ← 信号句柄:ETR 模式
+SH.S_TIM2_CH1_ETR.ConfNb=1
+NVIC.TIM2_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
+TIM2.IPParameters=Period,AutoReloadPreload,Prescaler
+TIM2.Period=10000-1
+TIM2.Prescaler=7200-1
+```
+
+> 生成代码含 `ClockSource=TIM_CLOCKSOURCE_ETRMODE2` + PA0 配置为 TIM2_ETR 输入;
+> ClockPolarity/ClockPrescaler/ClockFilter 用默认值(NONINVERTED/DIV1/0),.ioc 不写这些行。
+> PWM 方式待验证。
+
+**启动 TIM 中断前清标志位(实测,2026-08-06)**:用 `HAL_TIM_Base_Start_IT()` 前**必须手动清除
+UPDATE 标志位**,否则启动前残留的标志会立刻触发一次中断(表现为显示/计数提前出现一次):
+
+```c
+__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);  /* 先清标志 */
+HAL_TIM_Base_Start_IT(&htim2);                  /* 再开中断 */
+```
+
+参考实例:`C:\MINE\STM32Project\STM32VScode\TIM2\Core\Src\main.c`。
+
+**坑速查**(其余命令见 cubemx_help 各 topic):
+| 坑 | 说明 |
+|----|------|
+| `set rcc` 不存在 | RCC 参数用 `set ip parameters RCC ...`;HSE 靠 PD0-OSC_IN/PD1-OSC_OUT 引脚,`RCC.HSEState` 键会被静默删除 |
+| `set mode TIMx` 无效 | 一律 KO,TIM 靠片段注入/原生模板激活 |
+| `set ip parameters TIMx` 未激活时静默忽略 | 不报错也不生效,先激活再设参 |
+| `set noparam TIMx` 删除无效 | 返回 OK 但外设仍在,需用 cubemx_remove_peripheral 文本移除 |
+| 重新 generate 覆盖 CMakeLists | `cmake/stm32cubemx/CMakeLists.txt` 被重写,手动加的源文件需重新 cubemx_add_source |

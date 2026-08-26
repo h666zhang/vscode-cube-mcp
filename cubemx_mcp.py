@@ -659,7 +659,7 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
     project_dir,改写工程名,依次执行 set 命令,再 project generate 生成 HAL 代码。
     这样无需预先手写 .ioc,即"从零开始"。
 
-    知识提示(生成前建议先读 templates/README.md):
+    知识提示(生成前建议先调 cubemx_help 查看指南与坑):
       - 模板按 mcu 匹配 templates/{mcu}.ioc(薄种子:仅芯片标识+基础时钟
         72MHz/SWD/SysTick,无外设);外设全部由 commands set 现配。
       - TIM 内部时钟:命令含 "set ip parameters TIMx ClockSource
