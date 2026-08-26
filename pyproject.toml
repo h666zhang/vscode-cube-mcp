@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vscode-cube-mcp"
-version = "0.3.1"
+version = "0.4.1"
 description = "MCP server 封装 STM32CubeMX 命令行,通过 MCP 工具配置引脚/外设并生成 HAL 工程"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,8 +33,5 @@ py-modules = ["cubemx_mcp"]
 [tool.setuptools.data-files]
 # templates/ 模板库必须随包分发(cubemx_new_project 依赖它)
 "templates" = [
-    "templates/README.md",
     "templates/STM32F103C8T6.ioc",
-    "templates/STM32F103C8T6_tim_template.ioc",
-    "templates/STM32F103C8T6_tim2_internal.ioc",
 ]
