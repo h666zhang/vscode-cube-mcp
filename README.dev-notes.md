@@ -188,9 +188,7 @@ cubemx_new_project(
 
 | 模板文件 | 内容 |
 |----------|------|
-| `STM32F103C8T6.ioc` | F103C8,HSE 8MHz + PLL ×9 = 72MHz,SWD,PB13=LED(GPIO_Output) |
-| `STM32F103C8T6_tim_template.ioc` | 上面全部 + TIM2(ETR 外部时钟,PA0)+ TIM3(内部时钟,1s)+ I2C1(PB8/PB9) |
-| `STM32F103C8T6_tim2_internal.ioc` | 上面全部但 **TIM2 为内部时钟(1s)**,无 TIM3/ETR——需要 TIM2 内部时钟秒表时首选 |
+| `STM32F103C8T6.ioc` | **薄种子**:F103C8,HSE 8MHz + PLL ×9 = 72MHz,SWD,SysTick,**无外设**(外设由 commands 现配) |
 
 > 新增芯片:把 6.18 原生生成的 .ioc 复制到 `templates/{芯片型号}.ioc` 即可;模板必须是 6.18 原生文件(否则 6.18 加载会报错)。
 
@@ -254,7 +252,7 @@ cubemx_new_project(
 
 **借壳法已退役(2026-08-26)**:`_tim_make_internal_clock` 删除,替换为 `_inject_tim_internal_clock`;
 基础种子 + TIM2 片段注入经真实 CubeMX 验证(load/generate OK,
-`sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL`)。`tim_template.ioc`/`tim2_internal.ioc` 兼容保留。
+`sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL`)。旧组合模板 `tim_template.ioc`/`tim2_internal.ioc` 已从 templates/ 移除。
 
 **遗留坑(与种子无关)**:
 - CubeMX `project path` 参数有路径拼接 bug(gen 时 sysmem/syscalls 报 FileNotFoundException),

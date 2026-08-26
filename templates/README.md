@@ -8,8 +8,6 @@
 | 文件 | 芯片 | 内容 |
 |------|------|------|
 | `STM32F103C8T6.ioc` | STM32F103C8T6 | **薄种子**:72MHz 时钟(HSE 8M + PLL ×9)、SWD(PA13/PA14)、SysTick,**无任何外设**(外设由 commands 现配) |
-| `STM32F103C8T6_tim_template.ioc` | STM32F103C8T6 | 旧组合模板(兼容保留):TIM2 ETR + TIM3 内部时钟 + I2C1;新用法见下方"TIM 片段注入" |
-| `STM32F103C8T6_tim2_internal.ioc` | STM32F103C8T6 | 旧组合模板(兼容保留):TIM2 内部时钟 1s;新用法见下方"TIM 片段注入" |
 
 > `cubemx_new_project` 生成时默认:**toolchain=CMake、couple_files=true(外设独立 .c/.h)、
 > 时钟 HSE 72MHz(clock_source="HSE" + pll_mul=9)**——均为"默认值而非强制",
@@ -58,9 +56,10 @@ set mode I2C1 I2C
 
 **关键教训(2026-08-06 实测)**:`set mode TIM2 <mode>` 一律 KO;`set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL`
 **只改参数、不改 SH/VP 表达**,CubeMX GUI 仍显示 ETR;**手写 VP_TIMx_VS_ClockSourceINT 表达会被 generate 静默清理 TIM**。
-**唯一可靠方式:用 CubeMX GUI 生成标准 .ioc 作模板**,再 `cubemx_new_project` 复用。
+**唯一可靠方式:用 CubeMX GUI 生成标准 .ioc 作模板**,再 `cubemx_new_project` 复用
+(0.4.0 起 TIM 内部时钟另有片段注入自动方式,见下)。
 
-**TIM2 内部时钟标准写法**(GUI 生成,参考 `templates/STM32F103C8T6_tim_template.ioc` 中 TIM3 的写法原理):
+**TIM2 内部时钟标准写法**(6.18 GUI 原生形态;`_inject_tim_internal_clock` 注入的正是此表达):
 
 ```
 Mcu.IP4=TIM2
@@ -76,7 +75,7 @@ VP_TIM2_VS_ClockSourceINT.Signal=TIM2_VS_ClockSourceINT
 
 1s 中断参数:72MHz 下 `Prescaler=7200-1` + `Period=10000-1`(`72-1`/`1000-1` = 1ms,常见错误!)。
 
-**TIM3 内部时钟标准写法**(GUI 生成,默认参数版,即 `templates/STM32F103C8T6_tim_template.ioc` 中 TIM3 的原生写法):
+**TIM3 内部时钟标准写法**(6.18 GUI 原生形态,默认参数版):
 
 ```
 Mcu.IP5=TIM3
@@ -102,8 +101,8 @@ IPNb/PinsNb 同步、NVIC 中断、functionlistsort 段),**不依赖任何特殊
 main.c 调用 `MX_TIM2_Init()`,`TIM2_IRQHandler` 生成。
 
 **历史(2026-08-06,已被片段注入取代)**:借壳法(`_tim_make_internal_clock`)借用模板中
-原生内部时钟 TIM 整体改名,产物固化为 `templates/STM32F103C8T6_tim2_internal.ioc`;
-借壳法已退役删除,`tim_template.ioc` / `tim2_internal.ioc` 兼容保留。
+原生内部时钟 TIM 整体改名,产物曾固化为 `templates/STM32F103C8T6_tim2_internal.ioc`;
+借壳法已退役删除,旧组合模板 `tim_template.ioc` / `tim2_internal.ioc` 已从 templates/ 移除。
 
 **两种 TIM 内部时钟对比**:
 
@@ -116,7 +115,7 @@ main.c 调用 `MX_TIM2_Init()`,`TIM2_IRQHandler` 生成。
 | 参数行 | `IPParameters=Period,AutoReloadPreload,Prescaler` + `Period/Prescaler` 值 | 无(默认 0/65535) |
 | NVIC | `NVIC.TIM2_IRQn=...` | `NVIC.TIM3_IRQn=...` |
 
-**TIM2 外部引脚(ETR)写法**(GUI 生成,即 `templates/STM32F103C8T6_tim_template.ioc` 中 TIM2 的原生写法):
+**TIM2 外部引脚(ETR)写法**(6.18 GUI 原生形态,仅供参考):
 
 ```
 Mcu.IP4=TIM2
@@ -220,10 +219,10 @@ NewProjTest/),工具会自动把 .ioc 移到工程目录,保证 .ioc 与 HAL 工
 
 ## TIM 激活方法(正确顺序)
 
-1. **选模板**:`templates/` 已内置带 TIM 的模板 `STM32F103C8T6_tim_template.ioc`(TIM2 ETR + TIM3 内部时钟),
-   用 `template="<mcp>/templates/STM32F103C8T6_tim_template.ioc"` 生成,不要引用外部工程路径(不可移植);
-2. **再设参**:激活后 `set ip parameters TIM2 ...` 才生效(未激活时静默忽略);
-3. **时钟源切换的真相**:脚本模式**无法可靠**把 TIM 从 ETR 改为内部时钟(`set ip parameters TIM2 ClockSource ...`
-   只改参数不改 SH/VP 表达,手写 VP 会被 generate 清理)。需要内部时钟 TIM 时,用 GUI 生成标准 .ioc 作模板,
-   标准写法见上文「TIM2 内部时钟标准写法」;
-4. **清理寄生外设**:模板自带的 TIM3/多余引脚,用 `cubemx_remove_peripheral` 移除。
+1. **TIM 内部时钟(推荐)**:commands 含 `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL`,
+   server 自动注入标准表达(见上文「TIM 内部时钟:片段注入」),无需专门模板;
+2. **TIM 外部时钟/其它配置**:先 `set pin` 激活再 `set ip parameters`,未激活时参数被静默忽略;
+3. **时钟源切换的真相**:脚本模式无法可靠把 TIM 从 ETR 改成内部时钟(`set ip parameters TIM2 ClockSource ...`
+   只改参数不改 SH/VP 表达,手写 VP 会被 generate 清理)——片段注入绕过了这一点,直接写 6.18 验证过的
+   标准表达;标准写法见上文「TIM2 内部时钟标准写法」;
+4. **清理多余外设**:生成后如有多余外设,用 `cubemx_remove_peripheral` 移除。

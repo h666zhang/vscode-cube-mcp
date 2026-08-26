@@ -295,7 +295,7 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
                                irq: bool = True) -> str:
     """把目标 TIM(如 TIM2)做成内部时钟:标准表达直接注入(替代借壳法)。
 
-    6.18 验证过的原生表达(参考 templates/STM32F103C8T6_tim2_internal.ioc):
+    6.18 验证过的原生表达(GUI 生成的标准形态):
       - Mcu.IPx=TIM2 追加,IPNb 同步
       - Mcu.Pin{N}=VP_TIM2_VS_ClockSourceINT 必须内联进 Mcu.Pin 列表,PinsNb 同步
       - TIM2.* 参数 + VP_TIM2_VS_ClockSourceINT.Mode=Internal/Signal + NVIC 行
@@ -429,8 +429,7 @@ _GUIDE = """Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
 - TIM 内部时钟(重要):脚本 set mode TIM2 一律 KO;set ip parameters TIM2
   ClockSource TIM_CLOCKSOURCE_INTERNAL 只改参数不改 SH/VP 表达(GUI 仍显示
   ETR)。可靠做法:new_project 命令含 "set ip parameters TIMx ClockSource
-  TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达;或
-  直接用 template=".../STM32F103C8T6_tim2_internal.ioc"
+  TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达
 - 时钟坑:对 RCC 执行 set 命令(如 PLLMUL)会丢 RCC.PLLSourceVirtual=HSE,
   时钟静默降级 HSI(64MHz 而非 72MHz);改时钟优先用 new_project 的
   clock_source/pll_mul 参数
@@ -474,11 +473,9 @@ _PERIPHERAL_HELP = {
 - set mode TIM2 一律 KO;set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL
   只改参数、不改 SH/VP 表达,CubeMX GUI 仍显示 ETR;手写 VP_TIMx 表达会被
   generate 静默清理。
-- 可靠做法①:new_project 的 commands 里含
+- 可靠做法:new_project 的 commands 里含
   "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
   server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
-- 可靠做法②:直接 template=".../STM32F103C8T6_tim2_internal.ioc"(已固化的
-  TIM2 内部时钟 1s 模板)。
 - 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。""",
     "rcc": """【时钟(RCC,有坑)】
 - 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
@@ -531,9 +528,7 @@ def cubemx_help(topic: str = "") -> str:
         if not avail:
             return "templates/ 目录为空或不存在;请放入 6.18 原生 .ioc 模板"
         desc = {
-            "STM32F103C8T6.ioc": "72MHz(HSE+PLL×9)、SWD(PA13/14)、PB13=LED",
-            "STM32F103C8T6_tim2_internal.ioc": "上者 + TIM2 内部时钟(1s 中断)",
-            "STM32F103C8T6_tim_template.ioc": "上者 + TIM2(ETR)+ TIM3(内部时钟)+ I2C1(PB8/PB9)",
+            "STM32F103C8T6.ioc": "薄种子:72MHz(HSE+PLL×9)、SWD(PA13/14)、SysTick,无外设",
         }
         lines = ["【可用模板(动态扫描 templates/)】"]
         lines += [f"  {n}  {desc.get(n, '(无描述)')}" for n in avail]
@@ -653,7 +648,7 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
         72MHz/SWD/SysTick,无外设);外设全部由 commands set 现配。
       - TIM 内部时钟:命令含 "set ip parameters TIMx ClockSource
         TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达,
-        无需专门模板;也可用 tim2_internal 模板作 template。
+        无需专门模板。
       - toolchain 默认 CMake(用户环境为 CMake+ninja+arm-gcc);要其他格式
         (EWARM V8.32 / MDK-ARM / STM32CubeIDE)显式传 toolchain 参数覆盖,不强制。
       - 已知坑:对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
