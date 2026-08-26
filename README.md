@@ -182,6 +182,26 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 
 ## 更新日志
 
+### 0.4.0(2026-08-26)
+- **架构:薄种子 + 外设片段注入**——模板从"整机配置"精简为每芯片 1 个基础种子
+  (`STM32F103C8T6.ioc` = 芯片标识 + 72MHz/SWD/SysTick,**无外设**),外设全部由
+  `cubemx_new_project` 的 `commands` set 现配,模板数量不再随配置组合爆炸
+- 新功能:`cubemx_help` 自述工具(第 9 个工具)——完整指南 + templates/ 动态扫描 +
+  分主题(gpio/i2c/tim/rcc/remove/add_source),陌生 agent 接入后第一件事调用它
+- TIM 内部时钟:片段注入(`_inject_tim_internal_clock`)替代借壳法——命令含
+  `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 时自动注入 6.18 验证过的
+  标准表达(任意 TIM/芯片,可附 `Prescaler`/`Period` 自定义);**借壳法退役删除**
+- 模板库精简:删除旧组合模板 `tim_template.ioc` / `tim2_internal.ioc` 与 `templates/README.md`
+  (知识迁入 README.dev-notes.md);缺芯片模板时报错带可用模板清单与生成指引
+- 修复(三遍迭代 + 自我迭代 3 轮):
+  - 安全:`_check_path` 白名单前缀绕过漏洞;`cubemx_add_source` 输入校验(拒绝路径穿越/绝对路径/换行注入)
+  - `cubemx_add_source` 锚点找不到时静默假成功 → 改抛错
+  - `cubemx_remove_peripheral` 补 `Mcu.Pin` 重排与 `Mcu.PinsNb` 修正;functionlistsort 段删除泛化
+  - `_run_script` 超时后强杀 CubeMX 进程树(防残留 Java 进程占工程文件锁)
+  - `cubemx_new_project` set 命令失败立即中止;支持 `Prescaler`/`Period` 自定义
+  - 注入器/移除器的行尾换行匹配、IPNb/PinsNb 缺失防御等健壮性修复
+- 测试:20 → **40 个**(新增回归测试覆盖上述修复)
+
 ### 0.3.1(2026-08-07)
 - 修复:pip 安装版 `cubemx_new_project` 找不到模板(`_project_template` 补 `sys.prefix/templates` 查找路径——data-files 安装时把模板放在 `sys.prefix` 下)
 
