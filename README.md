@@ -182,6 +182,28 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 
 ## 更新日志
 
+### 0.4.1(2026-08-27)
+- **新功能:TIM PWM 注入器**(`_inject_tim_pwm`)——命令
+  `set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]`
+  例:`set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50` → 10kHz / 50%
+- **新功能:TIM 输入捕获注入器**(`_inject_tim_input_capture`)——命令
+  `set ip parameters TIM2 InputCapture <pin> <signal> [Prescaler n] [Period n]`
+  例:`set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535`
+  自动配 IC1 上升沿 + IC2 下降沿参数,TIM2 中断自动启用
+- 注入器复用公共骨架 `_rebuild_ioc_lines` / `_finish_ioc_write`(IP/Pin 重建、
+  IPNb/PinsNb 同步、functionlistsort 段、幂等),与 `_inject_tim_internal_clock` 同款机制
+- 权威枚举名固化(6.18 实测):`PWM Generation1 CH1` / `Input_Capture1_from_TI1`
+  (GUI 名 ≠ .ioc 内部名,写错会被 CubeMX load 时静默丢弃);PA0 信号名是组合名
+  `S_TIM2_CH1_ETR`;PWM 模式名空格转义 `\ `;Channel 键值 `TIM_CHANNEL_N`
+- 已知限制(实测):CubeMX 只生成 IC1 的 `sConfigIC`,测占空比的 IC2 需在 main.c
+  手动 `HAL_TIM_IC_ConfigChannel` 补齐(示例见 `cubemx_help(topic="tim")`)
+- 文档:`cubemx_help` tim topic 补充 PWM/输入捕获命令、F103 引脚→信号映射表、
+  IC2 补配示例;README.dev-notes.md 新增「0.4.1」实测记录(黄金样本逐行对齐)
+- 测试:40 → **47 个**(新增 PWM/输入捕获注入器回归:幂等、替换、非法参数、Channel 键)
+- 真机验证:注入 .ioc 经 6.18 generate 后与黄金样本(`PWM_IC_OLED.ioc`)逐行一致,
+  生成 tim.c 参数正确(PWM 10kHz/50% + IC RISING)
+- 版本规划:0.5.0 预留给"完善所有外设"里程碑;全部外设完善前,功能迭代走 0.4.x
+
 ### 0.4.0(2026-08-26)
 - **架构:薄种子 + 外设片段注入**——模板从"整机配置"精简为每芯片 1 个基础种子
   (`STM32F103C8T6.ioc` = 芯片标识 + 72MHz/SWD/SysTick,**无外设**),外设全部由
