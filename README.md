@@ -9,6 +9,7 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 
 | 工具 | 说明 |
 |------|------|
+| `cubemx_help` | **server 自述指南**:工具清单、可用模板、外设配置方法(陌生 agent 建议先调用) |
 | `cubemx_load` | 加载 .ioc 并回读关键配置(只读) |
 | `cubemx_configure` | 加载 .ioc,执行 `set` 命令序列并写回 |
 | `cubemx_generate` | 加载 .ioc 并生成 HAL 工程 |
@@ -97,8 +98,9 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\MINE\STM32Project"
 
 ## 使用示例
 
-让 AI 助手做的事情都会通过上述 8 个工具完成,例如:
+让 AI 助手做的事情都会通过上述 9 个工具完成,例如:
 
+- 「第一次用你,先看看你能干什么、有哪些芯片模板」→ `cubemx_help`(陌生 agent 建议第一个调用)
 - 「加载 `D:\proj\Blink.ioc`,把 PB13 改成 GPIO_Output 并加标签 LED」→ `cubemx_configure`
 - 「用 STM32F103C8T6 从零建一个工程,LED 在 PB13,带 I2C1」→ `cubemx_new_project`
 - 「把 OLED.c 加进编译,重新 generate 后也保留」→ `cubemx_add_source`

@@ -48,6 +48,11 @@ class TestCheckPath(unittest.TestCase):
         ap = cubemx_mcp._check_path(r"c:\mine\projects\X\Y.ioc")
         self.assertTrue(ap.lower().endswith("y.ioc"))
 
+    def test_prefix_sibling_rejected(self):
+        # C:\MINE\ProjectsX 不应通过 C:\MINE\Projects 白名单(前缀绕过漏洞回归)
+        with self.assertRaises(ValueError):
+            cubemx_mcp._check_path(r"C:\MINE\ProjectsX\evil.ioc")
+
 
 class TestIocPath(unittest.TestCase):
     def test_missing_file_raises(self):
@@ -91,38 +96,54 @@ class TestConfig(unittest.TestCase):
 
 
 class _FakeProc:
-    def __init__(self, returncode=0, stdout="", stderr=""):
+    """模拟 Popen:communicate(timeout) 返回 (stdout, stderr),带 returncode;可配置超时异常。"""
+
+    def __init__(self, returncode=0, stdout="", stderr="", timeout_error=None):
         self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
+        self._stdout = stdout
+        self._stderr = stderr
+        self._timeout_error = timeout_error
+
+    def communicate(self, timeout=None):
+        if self._timeout_error is not None:
+            raise self._timeout_error
+        return self._stdout, self._stderr
 
 
 class TestRunScript(unittest.TestCase):
     def test_ok_output(self):
-        with mock.patch("cubemx_mcp.subprocess.run", return_value=_FakeProc(0, "OK\noutput\n")):
+        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\noutput\n")):
             r = cubemx_mcp._run_script("config load x")
         self.assertTrue(r["ok"])
         self.assertIn("output", r["output"])
 
     def test_ko_marker_detected(self):
-        with mock.patch("cubemx_mcp.subprocess.run", return_value=_FakeProc(0, "OK\nKO\n")):
+        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\nKO\n")):
             r = cubemx_mcp._run_script("set bad")
         self.assertFalse(r["ok"])
 
     def test_nonzero_exit_detected(self):
-        with mock.patch("cubemx_mcp.subprocess.run", return_value=_FakeProc(1, "boom")):
+        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(1, "boom")):
             r = cubemx_mcp._run_script("x")
         self.assertFalse(r["ok"])
 
     def test_timeout_path(self):
-        with mock.patch("cubemx_mcp.subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 1)):
+        with mock.patch("cubemx_mcp.subprocess.Popen",
+                        return_value=_FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))):
             r = cubemx_mcp._run_script("x")
         self.assertFalse(r["ok"])
         self.assertIn("TIMEOUT", r["output"])
 
+    def test_timeout_kills_process_tree(self):
+        fake = _FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))
+        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=fake):
+            with mock.patch("cubemx_mcp._kill_process_tree") as kill:
+                cubemx_mcp._run_script("x")
+        kill.assert_called_once_with(fake)
+
     def test_temp_script_cleaned(self):
         before = set(os.listdir(tempfile.gettempdir()))
-        with mock.patch("cubemx_mcp.subprocess.run", return_value=_FakeProc(0, "OK\n")):
+        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\n")):
             cubemx_mcp._run_script("config load x")
         after = set(os.listdir(tempfile.gettempdir()))
         self.assertEqual(before, after)
@@ -194,6 +215,28 @@ class TestRemovePeripheral(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_remove_peripheral_updates_pinsnb(self):
+        # 删外设后其 VP 引脚必须移除,Mcu.Pin 重排、Mcu.PinsNb 修正
+        path = self._write_ioc(SAMPLE_IOC)
+        try:
+            cubemx_mcp.cubemx_remove_peripheral(path, "TIM3")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("Mcu.Pin0=VP_SYS_VS_Systick", text)
+            self.assertNotIn("VP_TIM3", text)
+            self.assertIn("Mcu.PinsNb=1", text)
+            self.assertNotIn("Mcu.Pin1=", text)  # 引脚序号已重排,无残留 Pin1
+        finally:
+            os.remove(path)
+
+    def test_remove_invalid_peripheral_name_raises(self):
+        path = self._write_ioc(SAMPLE_IOC)
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_remove_peripheral(path, "TIM3;DROP")
+        finally:
+            os.remove(path)
+
 
 class TestAddSource(unittest.TestCase):
     def _make_project(self):
@@ -248,6 +291,74 @@ class TestAddSource(unittest.TestCase):
         finally:
             import shutil
             shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_source_rejects_traversal(self):
+        root = self._make_project()
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "../outside.c")
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/../evil.c")
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_source_rejects_absolute_and_newline(self):
+        root = self._make_project()
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), r"C:\evil\OLED.c")
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c\nset(OTHER evil)")
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_add_source_no_anchor_raises(self):
+        # 两个锚点(main.c/stm32f1xx_it.c)都不存在时必须报错,不能静默假成功
+        root = self._make_project()
+        try:
+            lists_path = os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt")
+            with open(lists_path, "w", encoding="utf-8") as f:
+                f.write("set(MX_Application_Src\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/other.c\n)\n")
+            with self.assertRaises(ValueError):
+                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
+
+
+class TestHelp(unittest.TestCase):
+    def test_help_returns_full_guide(self):
+        out = cubemx_mcp.cubemx_help()
+        self.assertIn("cubemx_new_project", out)
+        self.assertIn("从零生成工程", out)
+        self.assertIn("已知坑", out)
+
+    def test_help_templates_lists_available(self):
+        # 副本 templates/ 下有 3 个 F103 模板,动态扫描应列出
+        out = cubemx_mcp.cubemx_help(topic="templates")
+        self.assertIn("可用模板", out)
+        self.assertIn("STM32F103C8T6.ioc", out)
+
+    def test_help_topics_case_insensitive(self):
+        out = cubemx_mcp.cubemx_help(topic="TIM")
+        self.assertIn("借壳法", out)
+        out2 = cubemx_mcp.cubemx_help(topic="gpio")
+        self.assertIn("set pin PB13 GPIO_Output", out2)
+
+    def test_help_unknown_topic_returns_full_guide(self):
+        out = cubemx_mcp.cubemx_help(topic="bogus")
+        self.assertIn("工具一览", out)
+
+    def test_missing_template_error_lists_available(self):
+        # 请求不存在的芯片模板时,错误信息应列出可用模板并给自举指引
+        with self.assertRaises(ValueError) as ctx:
+            cubemx_mcp._project_template("STM32F407VGT6")
+        msg = str(ctx.exception)
+        self.assertIn("可用模板", msg)
+        self.assertIn("STM32F103C8T6.ioc", msg)
+        self.assertIn("cubemx_help", msg)
 
 
 if __name__ == "__main__":

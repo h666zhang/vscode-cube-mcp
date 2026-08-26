@@ -6,12 +6,15 @@
 -> 过滤 log4j 噪音 -> 检测 KO 失败标记 -> 返回干净输出。
 
 Tools:
+  cubemx_help(topic)               自述指南/可用模板(陌生 agent 建议先调用)
   cubemx_script(script)            任意脚本(逃生通道)
   cubemx_load(ioc)                 config load + 回读配置(只读)
   cubemx_configure(ioc, cmds)      load + set 命令序列 + saveas(写回 .ioc)
   cubemx_generate(ioc, project_dir) load + project generate
   cubemx_export_pinout(ioc)        csv pinout 导出(只读)
   cubemx_new_project(name, dir, mcu, cmds) 从零生成新工程(模板+set+generate)
+  cubemx_remove_peripheral(ioc, peripheral) 文本方式移除外设
+  cubemx_add_source(ioc, source_file) 自定义源文件加入 CMake 源列表
 
 配置(环境变量,不硬编码本机路径):
   ST_CUBEMX_EXE            STM32CubeMX 可执行文件路径;未设置时尝试 PATH 中的
@@ -82,10 +85,11 @@ mcp = MCPServer("Vscode_cube_mcp")
 
 # ---------------------------------------------------------------- helpers
 def _check_path(p: str) -> str:
-    """校验路径在允许根目录下,返回绝对路径。"""
+    """校验路径在允许根目录下(等值或 root 后紧跟分隔符,防 ProjectsX 前缀绕过),返回绝对路径。"""
     ap = os.path.abspath(p)
     for root in ALLOWED_ROOTS:
-        if ap.lower().startswith(os.path.abspath(root).lower()):
+        rp = os.path.abspath(root).rstrip(os.sep) or os.sep
+        if ap.lower() == rp.lower() or ap.lower().startswith(rp.lower() + os.sep):
             return ap
     raise ValueError(f"路径不在白名单内(仅允许 {ALLOWED_ROOTS}): {p}")
 
@@ -101,32 +105,55 @@ def _cleanup(raw: str) -> str:
     return "\n".join(lines)
 
 
+def _kill_process_tree(proc) -> None:
+    """强杀进程树:Windows 用 taskkill /T /F(CubeMX 是 Java 启动器,直接 kill 会留子进程),其它平台 SIGKILL。"""
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                capture_output=True, text=True, timeout=30,
+            )
+        else:
+            proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 def _run_script(script: str) -> dict:
-    """执行 CubeMX 脚本,返回 {ok, output, exit_code}。"""
+    """执行 CubeMX 脚本,返回 {ok, output, exit_code}。超时会强杀进程树,防残留 Java 进程占工程文件锁。"""
     fd, tmp = tempfile.mkstemp(prefix="cubemx_mcp_", suffix=".txt")
+    proc = None
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(script.strip() + "\n")
             f.write("exit\n")
         with _LOCK:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 [CUBEMX_EXE, "-q", tmp],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=TIMEOUT_SECONDS,
                 cwd=os.path.dirname(CUBEMX_EXE) if os.path.dirname(CUBEMX_EXE) else None,
             )
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "output": f"TIMEOUT: CubeMX 子进程超过 {TIMEOUT_SECONDS}s 被终止", "exit_code": None}
+            try:
+                stdout, stderr = proc.communicate(timeout=TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                _kill_process_tree(proc)
+                return {"ok": False,
+                        "output": f"TIMEOUT: CubeMX 子进程超过 {TIMEOUT_SECONDS}s 被终止(已强杀进程树)",
+                        "exit_code": None}
     finally:
         try:
             os.remove(tmp)
         except OSError:
             pass
 
-    raw = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    raw = (stdout or "") + "\n" + (stderr or "")
     output = _cleanup(raw)
     ok = proc.returncode == 0 and not any(line.strip() == "KO" for line in output.splitlines())
     return {"ok": ok, "output": output, "exit_code": proc.returncode}
@@ -141,6 +168,28 @@ def _ioc_path(ioc: str) -> str:
     return ap
 
 
+def _template_search_dirs() -> list:
+    """模板查找路径:①源码目录 __file__/templates ②安装版 data-files(site-packages 上级)
+    ③data-files 实际安装位置 sys.prefix/templates(pip 装 wheel 时相对 sys.prefix)。"""
+    return [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"),
+        os.path.join(sys.prefix, "templates"),
+    ]
+
+
+def _available_templates() -> list:
+    """扫描所有模板目录,返回已存在的 .ioc 模板 basename 列表(去重,保持顺序)。"""
+    seen = []
+    for d in _template_search_dirs():
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if name.lower().endswith(".ioc") and name not in seen:
+                seen.append(name)
+    return seen
+
+
 def _project_template(mcu: str, template: str = "") -> str:
     """解析新建工程的基底 .ioc 模板路径。
 
@@ -150,20 +199,17 @@ def _project_template(mcu: str, template: str = "") -> str:
     """
     if template:
         return _ioc_path(template)
-    # 模板查找路径:①源码目录 __file__/templates ②安装版 data-files(site-packages 上级)
-    # ③data-files 实际安装位置 sys.prefix/templates(pip 装 wheel 时相对 sys.prefix)
-    search_dirs = [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"),
-        os.path.join(sys.prefix, "templates"),
-    ]
+    search_dirs = _template_search_dirs()
     for tpl_dir in search_dirs:
         tpl = os.path.join(tpl_dir, f"{mcu}.ioc")
         if os.path.isfile(tpl):
             return tpl
+    available = _available_templates()
     raise ValueError(
-        f"未找到模板 {mcu}.ioc;请将 6.18 原生 .ioc 命名为 {mcu}.ioc 放入 templates/ 目录,"
-        f"或用 template 参数指定。查找过: {search_dirs}"
+        f"未找到模板 {mcu}.ioc。\n"
+        f"可用模板: {', '.join(available) if available else '(无)'}\n"
+        f"新芯片模板生成方法:用 STM32CubeMX GUI 新建该芯片工程后保存为 templates/{mcu}.ioc;"
+        f"或先调 cubemx_help(topic=\"templates\") 查看模板说明。查找过: {search_dirs}"
     )
 
 
@@ -270,8 +316,8 @@ def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
         return f"{target_tim} 已是内部时钟,无需处理"
 
     out = []
+    ip_idx = 0
     pin_idx = 0
-    seen_nvic = False
     for ln in lines:
         s = ln.strip()
         # 1) 删 target_tim 的 ETR 表达:PA0 相关、SH.S_<target>、<target>. 参数(原 ETR)
@@ -297,10 +343,11 @@ def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
         # 3) 删 donor 的 VP 引脚条目(VP_TIM3_VS... 将被改名为 VP_TIM2 并重新编号)
         if re.match(rf"^Mcu\.Pin\d+=VP_{re.escape(donor)}_VS_ClockSourceINT$", s):
             continue
-        # 4) Mcu.IPx 重排(保留其余)
+        # 4) Mcu.IPx 重排(保留其余,donor 的 Mcu.IPx 已在上方删除,序号需连续)
         if re.match(r"Mcu\.IP\d+=", s):
             name = s.split("=", 1)[1]
-            out.append(f"Mcu.IP{pin_idx}={name}\n" if False else ln)
+            out.append(f"Mcu.IP{ip_idx}={name}\n")
+            ip_idx += 1
             continue
         # 5) Mcu.Pin 重排
         if re.match(r"Mcu\.Pin\d+=", s):
@@ -319,11 +366,11 @@ def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
             # VP 参数行(Mode/Signal)跳过,由追加逻辑统一生成,避免重复
             if f"VP_{donor}_VS_ClockSourceINT." in s:
                 continue
-            # functionlistsort:删 MX_TIM4_Init 段;TIM3 段改名 TIM2 段(若已有则跳过)
+            # functionlistsort:删 MX_TIM3_Init 段(donor);TIM3 段改名 TIM2 段(若已有则跳过)
             if "functionlistsort" in s:
-                ln = ln.replace(",5-MX_TIM4_Init-TIM4-false-HAL-true", "")
-                ln = ln.replace(f",6-MX_{donor}_Init-{donor}-false-HAL-true", "")
-                ln = ln.replace(f",6-MX_{donor}_Init-{donor}-false", "")
+                # 删 donor 原初始化段(通用匹配任意序号与 HAL flag,不硬编码序号)
+                ln = re.sub(rf",\d+-MX_{re.escape(donor)}_Init-{re.escape(donor)}-false-HAL-(?:true|false)", "", ln)
+                ln = re.sub(rf"^\d+-MX_{re.escape(donor)}_Init-{re.escape(donor)}-false-HAL-(?:true|false),", "", ln)
                 # 若改名的 TIM3 段和原 TIM2 段重复,只保留一个
                 ln = ln.replace(f"MX_{donor}_Init", f"MX_{target_tim}_Init")
                 ln = ln.replace(f"{donor}-false", f"{target_tim}-false")
@@ -374,6 +421,164 @@ def _tim_make_internal_clock(ioc_path: str, target_tim: str) -> str:
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
         f.writelines(final)
     return f"借壳法完成:{donor} 改名 {target_tim},{target_tim} 现为内部时钟"
+
+
+# ---------------------------------------------------------------- help 指南
+_GUIDE = """Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
+=============================================================
+【工具一览(9 个)】
+  cubemx_help                本指南(当前)
+  cubemx_new_project         从零生成 HAL 工程(首选入口)
+  cubemx_load                加载 .ioc 回读配置(只读)
+  cubemx_configure           加载 .ioc,执行 set 命令序列并写回
+  cubemx_generate            加载 .ioc 生成 HAL 代码
+  cubemx_export_pinout       导出引脚配置 CSV(只读)
+  cubemx_remove_peripheral   从 .ioc 移除外设
+  cubemx_add_source          把自定义源文件加入 CMake 源列表
+  cubemx_script              任意 CubeMX 脚本命令(逃生通道)
+
+【从零生成工程(标准流程)】
+1) 调 cubemx_help(topic="templates") 查看可用芯片模板
+2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
+   mcu="STM32F103C8T6",
+   commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+3) 工程生成后,自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
+
+【cubemx_new_project 参数(默认值而非强制)】
+  mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
+  toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
+  couple_files  默认 True(每个外设生成独立 .c/.h);False 则集中到 main.c
+  clock_source  默认 "HSE"(外部晶振,72MHz);"HSI" 用内部 RC
+  pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
+  commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+  template      指定模板路径,优先于 mcu 查找
+
+【外设配置命令与已知坑】
+- GPIO:set pin PB13 GPIO_Output;set gpio parameters PB13 GPIO_Label LED
+- I2C:set pin PB8 I2C1_SCL;set pin PB9 I2C1_SDA;set mode I2C1 I2C
+- TIM 内部时钟(重要):脚本 set mode TIM2 一律 KO;set ip parameters TIM2
+  ClockSource TIM_CLOCKSOURCE_INTERNAL 只改参数不改 SH/VP 表达(GUI 仍显示
+  ETR)。可靠做法:new_project 命令含 "set ip parameters TIMx ClockSource
+  TIM_CLOCKSOURCE_INTERNAL" 时 server 自动用借壳法;或直接传
+  template=".../STM32F103C8T6_tim2_internal.ioc"
+- 时钟坑:对 RCC 执行 set 命令(如 PLLMUL)会丢 RCC.PLLSourceVirtual=HSE,
+  时钟静默降级 HSI(64MHz 而非 72MHz);改时钟优先用 new_project 的
+  clock_source/pll_mul 参数
+- generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,自定义源文件需重新
+  cubemx_add_source
+
+【约束】
+- 所有 .ioc / 生成路径必须在 ST_CUBEMX_ALLOWED_ROOTS 白名单内
+- 工程名仅字母/数字/下划线;路径写绝对路径(Windows 建议 C:/ 正斜杠)"""
+
+_NEW_PROJECT_HELP = """【从零生成工程(cubemx_new_project)】
+流程:
+1) 先调 cubemx_help(topic="templates") 查看可用芯片模板
+2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
+   mcu="STM32F103C8T6",
+   commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+3) 自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
+
+参数(默认值而非强制):
+  mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
+  toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
+  couple_files  默认 True(每个外设独立 .c/.h);False 则集中到 main.c
+  clock_source  默认 "HSE"(72MHz);"HSI" 用内部 RC
+  pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
+  commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+  template      指定模板路径,优先于 mcu 查找
+
+注意:找不到 {mcu}.ioc 模板时错误信息会列出可用模板,并按指引生成新芯片模板。"""
+
+_PERIPHERAL_HELP = {
+    "gpio": """【GPIO(已验证)】
+  set pin PB13 GPIO_Output
+  set gpio parameters PB13 GPIO_Label LED
+示例:LED 在 PB13 → 命令序列如上。""",
+    "i2c": """【I2C(已验证)】
+  set pin PB8 I2C1_SCL
+  set pin PB9 I2C1_SDA
+  set mode I2C1 I2C
+生成 i2c.c + main.c 调用 MX_I2C1_Init。""",
+    "tim": """【TIM 内部时钟(重要,有坑)】
+- set mode TIM2 一律 KO;set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL
+  只改参数、不改 SH/VP 表达,CubeMX GUI 仍显示 ETR;手写 VP_TIMx 表达会被
+  generate 静默清理。
+- 可靠做法①:new_project 的 commands 里含
+  "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
+  server 自动用借壳法(借用模板原生内部时钟 TIM 改名)。
+- 可靠做法②:直接 template=".../STM32F103C8T6_tim2_internal.ioc"(已固化的
+  TIM2 内部时钟 1s 模板)。
+- 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。""",
+    "rcc": """【时钟(RCC,有坑)】
+- 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
+- 对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
+  时钟静默降级 HSI(如 64MHz 而非 72MHz)。
+- 改频率优先用 cubemx_new_project 的 clock_source/pll_mul 参数;
+  需要手动 set 时同时补:
+  set ip parameters RCC PLLSourceVirtual RCC_PLLSOURCE_HSE
+  set ip parameters RCC PLLMUL RCC_PLL_MUL9
+  set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK
+  set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2""",
+    "clock": """【时钟(同 rcc)】
+模板默认 72MHz(HSE 8M × PLL9)。改时钟用 cubemx_new_project 的
+clock_source("HSE"/"HSI")与 pll_mul 参数;set RCC 命令有把
+PLLSourceVirtual=HSE 弄丢的坑,详见 cubemx_help(topic="rcc")。""",
+}
+
+_REMOVE_HELP = """【移除外设(cubemx_remove_peripheral)】
+- 用法:cubemx_remove_peripheral(ioc, peripheral)
+  如 cubemx_remove_peripheral("C:/proj/Demo.ioc", "TIM3")
+- 直接编辑 .ioc 文本(脚本 set noparam 对部分外设无效):删除 Mcu.IPx、
+  关联引脚/参数、NVIC、functionlistsort 段,并重排序号。
+- 注意:操作前自行备份;移除后建议重新 generate 同步代码。"""
+
+_ADDSOURCE_HELP = """【自定义源文件加入编译(cubemx_add_source)】
+- 用法:cubemx_add_source(ioc, source_file)
+  如 cubemx_add_source("C:/proj/Demo.ioc", "Core/Src/OLED.c")
+- 背景:CubeMX 重新 generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,
+  手动加的自定义源文件会丢失;本工具用于重新添加(幂等)。
+- source_file 必须相对工程根,如 Core/Src/OLED.c(拒绝 ../、绝对路径)。"""
+
+
+@mcp.tool()
+def cubemx_help(topic: str = "") -> str:
+    """MCP 自述:返回本 server 的使用指南、可用模板与各外设配置方法。
+
+    陌生环境(第一次接入本 MCP 的 agent)建议先调用本工具,再开始建工程。
+    不传 topic 返回完整指南;传 topic 返回该主题详细说明。
+
+    可用 topic(大小写不敏感):
+      new_project  从零生成工程的流程与参数
+      templates    可用芯片模板列表与各自内容
+      gpio / i2c / tim / rcc / clock  外设配置命令与已知坑
+      remove       移除外设
+      add_source   自定义源文件加入 CMake 源列表
+    """
+    t = topic.strip().lower()
+    if t == "templates":
+        avail = _available_templates()
+        if not avail:
+            return "templates/ 目录为空或不存在;请放入 6.18 原生 .ioc 模板"
+        desc = {
+            "STM32F103C8T6.ioc": "72MHz(HSE+PLL×9)、SWD(PA13/14)、PB13=LED",
+            "STM32F103C8T6_tim2_internal.ioc": "上者 + TIM2 内部时钟(1s 中断)",
+            "STM32F103C8T6_tim_template.ioc": "上者 + TIM2(ETR)+ TIM3(内部时钟)+ I2C1(PB8/PB9)",
+        }
+        lines = ["【可用模板(动态扫描 templates/)】"]
+        lines += [f"  {n}  {desc.get(n, '(无描述)')}" for n in avail]
+        lines.append("【新增芯片】用 CubeMX GUI File→New Project 选芯片,"
+                     "保存为 templates/{mcu}.ioc 后即可用 cubemx_new_project")
+        return "\n".join(lines)
+    if t == "new_project":
+        return _NEW_PROJECT_HELP
+    if t in _PERIPHERAL_HELP:
+        return _PERIPHERAL_HELP[t]
+    if t == "remove":
+        return _REMOVE_HELP
+    if t == "add_source":
+        return _ADDSOURCE_HELP
+    return _GUIDE
 
 
 @mcp.tool()
@@ -509,6 +714,9 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
         lines.extend(commands)
     lines.append(f'config saveas "{ioc_dst}"')
     r = _run_script("\n".join(lines))
+    if not r["ok"]:
+        return (f"[FAIL exit={r['exit_code']}]\n{r['output']}\n"
+                f"set 命令序列执行失败,已中止生成(避免产出残缺工程)。.ioc 保留在: {ioc_dst}")
     # 借壳法:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
     # 自动把该 TIM 做成内部时钟(借用模板原生内部时钟 TIM 改名,见 _tim_make_internal_clock)。
     tim_notes = []
@@ -566,6 +774,8 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
       peripheral:  外设名,如 TIM3、I2C1(大小写敏感,匹配 Mcu.IPx=XXX 的精确值)
     """
     ap = _ioc_path(ioc)
+    if not re.fullmatch(r"[A-Za-z0-9_]+", peripheral):
+        raise ValueError(f"非法外设名(仅允许字母/数字/下划线,如 TIM3/I2C1): {peripheral!r}")
     with open(ap, encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
     # 收集要删的行号:精确匹配 Mcu.IPx=<peripheral> 的行
@@ -601,6 +811,7 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
     # 重写所有行
     new_out = []
     ip_counter = 0
+    pin_counter = 0
     for i, ln in enumerate(lines):
         if i in drop:
             continue  # 跳过被标记删除的行
@@ -616,10 +827,19 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
         if re.match(r"Mcu\.IPNb=", s):
             new_out.append(f"Mcu.IPNb={len(keep_ips)}\n")
             continue
+        if re.match(r"Mcu\.Pin\d+=", s):
+            # 重排剩余引脚(被删外设的 VP 引脚已在 drop 中跳过),并修正 PinsNb
+            m = re.match(r"Mcu\.Pin(\d+)=(.*)", s)
+            new_out.append(f"Mcu.Pin{pin_counter}={m.group(2)}\n")
+            pin_counter += 1
+            continue
+        if re.match(r"Mcu\.PinsNb=", s):
+            new_out.append(f"Mcu.PinsNb={pin_counter}\n")
+            continue
         if "functionlistsort" in ln:
-            # 移除包含该外设的初始化段(形如 ,5-MX_TIM3_Init-TIM3-false-HAL-true 或开头段)
-            ln = re.sub(rf",\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-true", "", ln)
-            ln = re.sub(rf"(^|,)\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-true,", r"\1", ln)
+            # 移除包含该外设的初始化段(段形如 ,N-MX_TIM3_Init-TIM3-false-HAL-true;HAL 使能位可 true/false)
+            ln = re.sub(rf",\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-(?:true|false)", "", ln)
+            ln = re.sub(rf"(^|,)\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-(?:true|false),", r"\1", ln)
             new_out.append(ln)
             continue
         new_out.append(ln)
@@ -644,18 +864,31 @@ def cubemx_add_source(ioc: str, source_file: str) -> str:
     cmake_lists = os.path.join(proj_root, "cmake", "stm32cubemx", "CMakeLists.txt")
     if not os.path.isfile(cmake_lists):
         raise ValueError(f"找不到 {cmake_lists};请先 project generate 生成工程")
-    sf = source_file.replace("\\", "/")
+    sf = source_file.replace("\\", "/").strip()
+    # 输入校验:必须是相对工程根的普通路径——拒绝绝对路径、盘符、路径穿越(../)、换行注入
+    if (not sf or sf.startswith("/") or re.match(r"^[A-Za-z]:", sf)
+            or sf.startswith("../") or "/../" in sf or sf.endswith("/..")
+            or "\n" in sf or "\r" in sf):
+        raise ValueError(f"非法 source_file(须为相对工程根的路径,如 Core/Src/OLED.c): {source_file!r}")
     with open(cmake_lists, encoding="utf-8") as f:
         text = f.read()
     marker = "${CMAKE_CURRENT_SOURCE_DIR}/../../"
     entry = f"    {marker}{sf}\n"
-    if f"../../{sf}" in text:
+    # 幂等:已含该条目标记(大小写不敏感,Windows 文件系统)则直接返回
+    if (marker + sf).lower() in text.lower():
         return f"{sf} 已在源列表中,无需重复添加"
-    anchor = "    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c"
-    if anchor not in text:
-        # 退而求其次:插到 MX_Application_Src 段的第一个条目前
-        anchor = "    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c"
-    text = text.replace(anchor, entry + anchor, 1)
+    # 选插入锚点:优先 stm32f1xx_it.c(接近列表尾部),退而求其次 main.c(列表首项)
+    anchors = [
+        f"    {marker}Core/Src/stm32f1xx_it.c",
+        f"    {marker}Core/Src/main.c",
+    ]
+    hit = next((a for a in anchors if a in text), None)
+    if hit is None:
+        raise ValueError(
+            f"无法在 {cmake_lists} 中找到插入锚点(MX_Application_Src 中 main.c/stm32f1xx_it.c "
+            f"条目均不存在);请检查工程 CMakeLists.txt 结构"
+        )
+    text = text.replace(hit, entry + hit, 1)
     with open(cmake_lists, "w", encoding="utf-8") as f:
         f.write(text)
     return f"已将 {sf} 加入 {cmake_lists}"
