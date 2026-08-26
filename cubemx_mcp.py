@@ -411,6 +411,197 @@ def _inject_tim_internal_clock(ioc_path: str, target_tim: str,
             f"NVIC={'开' if irq else '关'});IPNb={len(new_ips)}, PinsNb={len(new_pins)}")
 
 
+# ---------------------------------------------------------------- 公共:IP/Pin/functionlistsort 重建
+def _rebuild_ioc_lines(lines, tim, extra_ips=(), extra_pins=(), drop_prefixes=(),
+                       keep_extra_tims=()):
+    """通用 .ioc 重建骨架(供各注入器复用):
+      - 剔除 {tim} 的旧参数/SH/NVIC/VP 行,以及 drop_prefixes 命中的行
+      - 重建 Mcu.IPx / Mcu.Pinx 列表(追加 extra_ips / extra_pins,IP 追加到 keep_extra_tims 之后)
+      - 重建 functionlistsort(剔除旧 {tim} 段,追加 MX_{tim}_Init 段)
+    返回 (out_lines, new_ips, new_pins, inserted_params);非标准 .ioc 缺失 IPNb/PinsNb 由调用方补全。
+    """
+    ip_entries, pin_entries = [], []
+    for ln in lines:
+        m = re.match(r"Mcu\.IP\d+=(.+)", ln)
+        if m:
+            ip_entries.append(m.group(1).strip())
+        m = re.match(r"Mcu\.Pin\d+=(.+)", ln)
+        if m:
+            pin_entries.append(m.group(1).strip())
+
+    ip_entries = [n for n in ip_entries if n != tim]
+    pin_entries = [p for p in pin_entries
+                   if not p.startswith(f"VP_{tim}_VS_ClockSourceINT")
+                   and not any(p.startswith(d) for d in drop_prefixes)]
+    new_ips = ip_entries + [n for n in keep_extra_tims if n not in ip_entries] + list(extra_ips)
+    new_pins = pin_entries + [p for p in extra_pins if p not in pin_entries]
+
+    out = []
+    ipnb_seen = pinsnb_seen = inserted = False
+    for ln in lines:
+        s = ln.strip()
+        if (s.startswith(f"{tim}.")
+                or s.startswith(f"SH.S_{tim}")
+                or re.match(rf"^NVIC\.{re.escape(tim)}_IRQn=", s)
+                or re.match(rf"^VP_{re.escape(tim)}_VS_ClockSourceINT", s)
+                or any(s.startswith(d) for d in drop_prefixes)):
+            continue
+        if re.match(r"Mcu\.IP\d+=", s) or re.match(r"Mcu\.Pin\d+=", s):
+            continue
+        if re.match(r"Mcu\.IPNb=", s):
+            ipnb_seen = True
+            for i, name in enumerate(new_ips):
+                out.append(f"Mcu.IP{i}={name}\n")
+            out.append(f"Mcu.IPNb={len(new_ips)}\n")
+            continue
+        if re.match(r"Mcu\.PinsNb=", s):
+            pinsnb_seen = True
+            for i, name in enumerate(new_pins):
+                out.append(f"Mcu.Pin{i}={name}\n")
+            out.append(f"Mcu.PinsNb={len(new_pins)}\n")
+            continue
+        if s.startswith("ProjectManager.functionlistsort="):
+            segs = [x for x in ln.split("=", 1)[1].split(",") if x.strip()]
+            segs = [x for x in segs
+                    if not re.search(rf"MX_{re.escape(tim)}_Init-{re.escape(tim)}-false-HAL-(?:true|false)$", x)]
+            segs.append(f"{len(segs) + 1}-MX_{tim}_Init-{tim}-false-HAL-true")
+            out.append(ln.split("=", 1)[0] + "=" + ",".join(segs) + "\n")
+            continue
+        if s == "board=custom":
+            out.append(ln)
+            continue
+        out.append(ln)
+    return out, new_ips, new_pins, (ipnb_seen, pinsnb_seen)
+
+
+def _finish_ioc_write(ioc_path, out_lines, new_ips, new_pins, counts, params_block):
+    """通用收尾:补全缺失的 IPNb/PinsNb、把 params_block 插到 board=custom 之前,写回文件。"""
+    ipnb_seen, pinsnb_seen = counts
+    if not ipnb_seen:
+        for i, name in enumerate(new_ips):
+            out_lines.append(f"Mcu.IP{i}={name}\n")
+        out_lines.append(f"Mcu.IPNb={len(new_ips)}\n")
+    if not pinsnb_seen:
+        for i, name in enumerate(new_pins):
+            out_lines.append(f"Mcu.Pin{i}={name}\n")
+        out_lines.append(f"Mcu.PinsNb={len(new_pins)}\n")
+    if params_block:
+        # 插到 board=custom 之前(与 _inject_tim_internal_clock 一致,键序更接近原生)
+        for i, ln in enumerate(out_lines):
+            if ln.strip() == "board=custom":
+                out_lines[i:i] = [params_block]
+                break
+        else:
+            out_lines.append(params_block)
+    with open(ioc_path, "w", encoding="utf-8", newline="") as f:
+        f.writelines(out_lines)
+
+
+def _inject_tim_pwm(ioc_path: str, target_tim: str, pin: str, signal: str,
+                    prescaler: int = 7200, period: int = 10000, pulse: int = 5000) -> str:
+    """把目标 TIM 配成 PWM 输出(6.18 标准表达,权威枚举名见 README.dev-notes.md)。
+
+    注入的 6.18 原生形态(与 _inject_tim_internal_clock 同款骨架):
+      Mcu.IPx=TIM3 / Mcu.Pin{N}=PA6
+      PA6.Mode=PWM Generation1 CH1        ← 内部名(带序号),GUI 名是 "PWM Generation CH1"
+      PA6.Signal=S_TIM3_CH1
+      SH.S_TIM3_CH1.0=TIM3_CH1,PWM Generation1 CH1
+      SH.S_TIM3_CH1.ConfNb=1
+      TIM3.IPParameters=Prescaler,Period,OCMode,Pulse
+      TIM3.OCMode=TIM_OCMODE_PWM1 / Period={period}-1 / Prescaler={prescaler}-1 / Pulse={pulse}
+    引脚由调用方显式给出(pin + signal),如 PA6 / S_TIM3_CH1;本函数不猜引脚。
+    若该 TIM 已有 PWM 表达则先删除再注入(幂等)。
+    """
+    tim = target_tim.strip().upper()
+    if not re.fullmatch(r"TIM\d+", tim):
+        raise ValueError(f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
+    ch = re.search(r"CH(\d)", signal)
+    if not ch:
+        raise ValueError(f"无法从信号名解析通道: {signal!r}(应为 S_TIM3_CH1 形式)")
+    mode_name = f"PWM Generation{ch.group(1)} CH{ch.group(1)}"
+    sig_body = signal[2:] if signal.startswith("S_") else signal  # S_TIM3_CH1 -> TIM3_CH1
+
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines(keepends=True)
+    # 幂等:已有同信号 PWM 表达
+    if any(re.match(rf"^SH\.{re.escape(signal)}\.0={re.escape(sig_body)},{re.escape(mode_name)}$", ln.strip())
+           for ln in lines):
+        return f"{tim} 已注入 PWM 表达,无需重复注入"
+
+    out, new_ips, new_pins, counts = _rebuild_ioc_lines(
+        lines, tim, extra_ips=[tim], extra_pins=[pin],
+        drop_prefixes=(f"{pin}.Mode", f"{pin}.Signal", f"SH.{signal}"))
+    params = (
+        f"{pin}.Mode={mode_name}\n"
+        f"{pin}.Signal={signal}\n"
+        f"SH.{signal}.0={sig_body},{mode_name}\n"
+        f"SH.{signal}.ConfNb=1\n"
+        f"{tim}.Channel-{mode_name.replace(' ', '\\ ')}=TIM_CHANNEL_{ch.group(1)}\n"
+        f"{tim}.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-{mode_name}\n"
+        f"{tim}.OCMode=TIM_OCMODE_PWM1\n"
+        f"{tim}.Period={period}-1\n"
+        f"{tim}.Prescaler={prescaler}-1\n"
+        f"{tim}.Pulse={pulse}\n"
+    )
+    _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
+    return (f"{tim} 已注入 PWM 标准表达(引脚 {pin}/{signal},Prescaler={prescaler}-1, "
+            f"Period={period}-1, Pulse={pulse});IPNb={len(new_ips)}, PinsNb={len(new_pins)}")
+
+
+def _inject_tim_input_capture(ioc_path: str, target_tim: str, pin: str, signal: str,
+                              prescaler: int = 72, period: int = 65535) -> str:
+    """把目标 TIM 配成输入捕获(6.18 标准表达,IC1 上升沿 + IC2 下降沿)。
+
+    PA0 在 .ioc 里信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1);
+    IC1 用 Input_Capture1_from_TI1(direct,带 Channel 键);
+    IC2 是同一信号的下降沿捕获(IC2Polarity=FALLING + IC2Selection=INDIRECTTI 参数行,
+    无独立模式/Channel 键——实测黄金样本即此形态)。
+    CubeMX 据此生成 IC1+IC2 两个 sConfigIC,无需再手动补 IC2。
+    """
+    tim = target_tim.strip().upper()
+    if not re.fullmatch(r"TIM\d+", tim):
+        raise ValueError(f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
+    ch = re.search(r"CH(\d)", signal)
+    if not ch:
+        raise ValueError(f"无法从信号名解析通道: {signal!r}(应为 S_TIM2_CH1_ETR 形式)")
+    n = ch.group(1)
+    sig_body = signal[2:] if signal.startswith("S_") else signal  # S_TIM2_CH1_ETR -> TIM2_CH1_ETR
+    sig_body = re.sub(r"_ETR$", "", sig_body)                     # TIM2_CH1_ETR -> TIM2_CH1
+    mode1 = f"Input_Capture1_from_TI{n}"
+
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines(keepends=True)
+    if any(re.match(rf"^SH\.{re.escape(signal)}\.0={re.escape(sig_body)},{re.escape(mode1)}$", ln.strip())
+           for ln in lines):
+        return f"{tim} 已注入输入捕获表达,无需重复注入"
+
+    out, new_ips, new_pins, counts = _rebuild_ioc_lines(
+        lines, tim, extra_ips=[tim], extra_pins=[pin],
+        drop_prefixes=(f"{pin}.Mode", f"{pin}.Signal", f"SH.{signal}"))
+    params = (
+        f"{pin}.Mode={mode1}\n"
+        f"{pin}.Signal={signal}\n"
+        f"SH.{signal}.0={sig_body},{mode1}\n"
+        f"SH.{signal}.ConfNb=1\n"
+        f"NVIC.{tim}_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true\n"
+        f"{tim}.IC1Filter=0\n"
+        f"{tim}.IC1Polarity=TIM_ICPOLARITY_RISING\n"
+        f"{tim}.IC1Prescaler=TIM_ICPSC_DIV1\n"
+        f"{tim}.IC1Selection=TIM_ICSELECTION_DIRECTTI\n"
+        f"{tim}.IC2Filter=0\n"
+        f"{tim}.IC2Polarity=TIM_ICPOLARITY_FALLING\n"
+        f"{tim}.IC2Prescaler=TIM_ICPSC_DIV1\n"
+        f"{tim}.IC2Selection=TIM_ICSELECTION_INDIRECTTI\n"
+        f"{tim}.IPParameters=Prescaler,Period,IC1Polarity,IC1Selection,IC1Prescaler,IC1Filter,IC2Polarity,IC2Selection,IC2Prescaler,IC2Filter,Channel-{mode1}\n"
+        f"{tim}.Period={period}-1\n"
+        f"{tim}.Prescaler={prescaler}-1\n"
+        f"{tim}.Channel-{mode1}=TIM_CHANNEL_{n}\n"
+    )
+    _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
+    return (f"{tim} 已注入输入捕获标准表达(引脚 {pin}/{signal},IC1 上升沿 + IC2 下降沿,"
+            f"Prescaler={prescaler}-1, Period={period}-1);IPNb={len(new_ips)}, PinsNb={len(new_pins)}")
+
+
 # ---------------------------------------------------------------- help 指南
 _GUIDE = """Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
 =============================================================
@@ -494,7 +685,32 @@ _PERIPHERAL_HELP = {
 - 可靠做法:new_project 的 commands 里含
   "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
   server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
-- 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。""",
+- 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。
+
+【TIM PWM(6.18 标准表达注入,0.4.1 起)】
+- 命令:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
+  例:set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50
+     → 72MHz/72/100 = 10kHz,占空比 50/100 = 50%
+- 常用引脚→信号(STM32F103):PA6→S_TIM3_CH1、PA7→S_TIM3_CH2、PB0→S_TIM3_CH3、
+  PB1→S_TIM3_CH4;PA0-WKUP→S_TIM2_CH1_ETR、PA1→S_TIM2_CH2。
+- .ioc 内部枚举名带序号:"PWM Generation1 CH1"(GUI 名 "PWM Generation CH1"),
+  写错会被 CubeMX 静默丢弃(实测:整个 TIM 从 IP 列表消失)。
+
+【TIM 输入捕获(6.18 标准表达注入,0.4.1 起)】
+- 命令:set ip parameters TIM2 InputCapture <pin> <signal> [Prescaler n] [Period n]
+  例:set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535
+- 自动配 IC1 上升沿(direct)+ IC2 下降沿参数(IC2Polarity=FALLING/IC2Selection=INDIRECTTI),
+  TIM2 中断自动启用。
+- 已知限制(实测):CubeMX 只生成 IC1 的 sConfigIC;测占空比需在 main.c 手动补 IC2:
+    TIM_IC_InitTypeDef ic2 = {0};
+    ic2.ICPolarity  = TIM_INPUTCHANNELPOLARITY_FALLING;
+    ic2.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+    ic2.ICPrescaler = TIM_ICPSC_DIV1;
+    ic2.ICFilter    = 0;
+    HAL_TIM_IC_ConfigChannel(&htim2, &ic2, TIM_CHANNEL_2);
+    HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+- PA0 的 .ioc 信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1)。
+- .ioc 内部枚举名:Input_Capture1_from_TI1(GUI 名 "Input Capture direct mode")。""",
     "rcc": """【时钟(RCC,有坑)】
 - 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
 - 对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
@@ -715,6 +931,30 @@ def cubemx_new_project(project_name: str, project_dir: str, mcu: str = "STM32F10
                     ioc_dst, m.group(1),
                     prescaler=int(pm.group(1)) if pm else 7200,
                     period=int(pd_m.group(1)) if pd_m else 10000))
+                continue
+            # PWM 注入:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
+            # 例:set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50
+            m = re.search(r"set ip parameters (TIM\d+) PWM (\S+) (\S+)", cmd)
+            if m:
+                pm = re.search(r"\bPrescaler (\d+)", cmd)
+                pd_m = re.search(r"\bPeriod (\d+)", cmd)
+                pu_m = re.search(r"\bPulse (\d+)", cmd)
+                tim_notes.append(_inject_tim_pwm(
+                    ioc_dst, m.group(1), m.group(2), m.group(3),
+                    prescaler=int(pm.group(1)) if pm else 7200,
+                    period=int(pd_m.group(1)) if pd_m else 10000,
+                    pulse=int(pu_m.group(1)) if pu_m else 5000))
+                continue
+            # 输入捕获注入:set ip parameters TIM2 InputCapture <pin> <signal> [Prescaler n] [Period n]
+            # 例:set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535
+            m = re.search(r"set ip parameters (TIM\d+) InputCapture (\S+) (\S+)", cmd)
+            if m:
+                pm = re.search(r"\bPrescaler (\d+)", cmd)
+                pd_m = re.search(r"\bPeriod (\d+)", cmd)
+                tim_notes.append(_inject_tim_input_capture(
+                    ioc_dst, m.group(1), m.group(2), m.group(3),
+                    prescaler=int(pm.group(1)) if pm else 72,
+                    period=int(pd_m.group(1)) if pd_m else 65535))
     lines = [f'config load "{ioc_dst}"']
     lines.append("project generate")
     r2 = _run_script("\n".join(lines))

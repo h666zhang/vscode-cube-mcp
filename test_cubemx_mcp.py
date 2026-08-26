@@ -509,5 +509,163 @@ class TestInjectTimInternalClock(unittest.TestCase):
             os.remove(path)
 
 
+class TestInjectTimPwm(unittest.TestCase):
+    """PWM 注入器回归测试(0.4.1)。"""
+
+    def _write_ioc(self, content):
+        fd, path = tempfile.mkstemp(suffix=".ioc")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def setUp(self):
+        self._orig = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = self._orig
+
+    def test_inject_tim3_pwm(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            out = cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1",
+                                              prescaler=72, period=100, pulse=50)
+            self.assertIn("TIM3", out)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            # IP 追加 + IPNb 同步
+            self.assertIn("Mcu.IP3=TIM3", text)
+            self.assertIn("Mcu.IPNb=4", text)
+            # 引脚 + 信号 + SH 行(权威枚举名带序号)
+            self.assertIn("Mcu.Pin2=PA6", text)
+            self.assertIn("Mcu.PinsNb=3", text)
+            self.assertIn("PA6.Mode=PWM Generation1 CH1", text)
+            self.assertIn("PA6.Signal=S_TIM3_CH1", text)
+            self.assertIn("SH.S_TIM3_CH1.0=TIM3_CH1,PWM Generation1 CH1", text)
+            self.assertIn("SH.S_TIM3_CH1.ConfNb=1", text)
+            # 参数
+            self.assertIn("TIM3.OCMode=TIM_OCMODE_PWM1", text)
+            self.assertIn("TIM3.Period=100-1", text)
+            self.assertIn("TIM3.Prescaler=72-1", text)
+            self.assertIn("TIM3.Pulse=50", text)
+            # Channel 键(黄金样本:空格转义 \ ,值 TIM_CHANNEL_1)
+            self.assertIn("TIM3.Channel-PWM\\ Generation1\\ CH1=TIM_CHANNEL_1", text)
+            self.assertIn("IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1", text)
+            # functionlistsort 追加段
+            self.assertIn("2-MX_TIM3_Init-TIM3-false-HAL-true", text)
+        finally:
+            os.remove(path)
+
+    def test_inject_pwm_idempotent(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1")
+            out2 = cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1")
+            self.assertIn("无需重复注入", out2)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertEqual(text.count("TIM3.IPParameters"), 1)
+            self.assertEqual(text.count("PA6.Mode"), 1)
+        finally:
+            os.remove(path)
+
+    def test_inject_pwm_invalid_tim_raises(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp._inject_tim_pwm(path, "FOO", "PA6", "S_TIM3_CH1")
+            with self.assertRaises(ValueError):
+                cubemx_mcp._inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_XX")
+        finally:
+            os.remove(path)
+
+
+class TestInjectTimInputCapture(unittest.TestCase):
+    """输入捕获注入器回归测试(0.4.1)。"""
+
+    def _write_ioc(self, content):
+        fd, path = tempfile.mkstemp(suffix=".ioc")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def setUp(self):
+        self._orig = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = self._orig
+
+    def test_inject_tim2_input_capture(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            out = cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR",
+                                                       prescaler=72, period=65535)
+            self.assertIn("TIM2", out)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            # IP / Pin
+            self.assertIn("Mcu.IP3=TIM2", text)
+            self.assertIn("Mcu.IPNb=4", text)
+            self.assertIn("Mcu.Pin2=PA0-WKUP", text)
+            self.assertIn("Mcu.PinsNb=3", text)
+            # PA0 组合信号名 + 权威枚举名
+            self.assertIn("PA0-WKUP.Mode=Input_Capture1_from_TI1", text)
+            self.assertIn("PA0-WKUP.Signal=S_TIM2_CH1_ETR", text)
+            self.assertIn("SH.S_TIM2_CH1_ETR.0=TIM2_CH1,Input_Capture1_from_TI1", text)
+            # IC1 上升沿 direct + IC2 下降沿 indirect
+            self.assertIn("TIM2.IC1Polarity=TIM_ICPOLARITY_RISING", text)
+            self.assertIn("TIM2.IC1Selection=TIM_ICSELECTION_DIRECTTI", text)
+            self.assertIn("TIM2.IC2Polarity=TIM_ICPOLARITY_FALLING", text)
+            self.assertIn("TIM2.IC2Selection=TIM_ICSELECTION_INDIRECTTI", text)
+            self.assertIn("TIM2.Period=65535-1", text)
+            self.assertIn("TIM2.Prescaler=72-1", text)
+            # Channel 键(黄金样本) + ConfNb=1
+            self.assertIn("TIM2.Channel-Input_Capture1_from_TI1=TIM_CHANNEL_1", text)
+            self.assertIn("SH.S_TIM2_CH1_ETR.ConfNb=1", text)
+            # NVIC + functionlistsort
+            self.assertIn("NVIC.TIM2_IRQn=", text)
+            self.assertIn("2-MX_TIM2_Init-TIM2-false-HAL-true", text)
+        finally:
+            os.remove(path)
+
+    def test_inject_ic_idempotent(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR")
+            out2 = cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR")
+            self.assertIn("无需重复注入", out2)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertEqual(text.count("TIM2.IPParameters"), 1)
+            self.assertEqual(text.count("PA0-WKUP.Mode"), 1)
+        finally:
+            os.remove(path)
+
+    def test_inject_ic_replaces_existing_internal(self):
+        # 先注入内部时钟,再注入输入捕获:旧 VP 表达应被清理,不留残留
+        path = self._write_ioc(SEED_IOC)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            cubemx_mcp._inject_tim_input_capture(path, "TIM2", "PA0-WKUP", "S_TIM2_CH1_ETR")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("VP_TIM2_VS_ClockSourceINT", text)
+            self.assertIn("SH.S_TIM2_CH1_ETR.0=TIM2_CH1,Input_Capture1_from_TI1", text)
+            self.assertEqual(text.count("Mcu.IP3=TIM2"), 1)
+        finally:
+            os.remove(path)
+
+    def test_inject_ic_invalid_tim_raises(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp._inject_tim_input_capture(path, "FOO", "PA0-WKUP", "S_TIM2_CH1_ETR")
+        finally:
+            os.remove(path)
+
+
 if __name__ == "__main__":
     unittest.main()
