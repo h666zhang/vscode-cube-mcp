@@ -28,7 +28,7 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 
 | 工具 | 说明 |
 |------|------|
-| `cubemx_script` | 任意 CubeMX 脚本命令序列(逃生通道) |
+| `cubemx_script` | 任意 CubeMX 脚本命令序列(原始脚本接口) |
 | `cubemx_load` | 加载 .ioc 并回读关键配置(只读) |
 | `cubemx_configure` | 加载 .ioc,执行 `set` 命令序列,`saveas` 写回 |
 | `cubemx_generate` | 加载 .ioc 并 `project generate` 生成 HAL 工程 |
@@ -188,7 +188,7 @@ cubemx_new_project(
 
 | 模板文件 | 内容 |
 |----------|------|
-| `STM32F103C8T6.ioc` | **薄种子**:F103C8,HSE 8MHz + PLL ×9 = 72MHz,SWD,SysTick,**无外设**(外设由 commands 现配) |
+| `STM32F103C8T6.ioc` | **最小模板**:F103C8,HSE 8MHz + PLL ×9 = 72MHz,SWD,SysTick,**无外设**(外设由 commands 现配) |
 
 > 新增芯片:把 6.18 原生生成的 .ioc 复制到 `templates/{芯片型号}.ioc` 即可;模板必须是 6.18 原生文件(否则 6.18 加载会报错)。
 
@@ -200,7 +200,7 @@ cubemx_new_project(
 | `cubemx_add_source` | 把自定义源文件加入 CMake 源列表(generate 覆盖后可重补) |
 
 > **TIM 内部时钟**:命令含 `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 时,
-> server 自动注入 6.18 验证过的内部时钟标准表达(片段注入,0.4.0 起),详见下文「TIM 标准写法与实测坑」。
+> server 自动注入 6.18 验证过的内部时钟标准表达(配置补丁,0.4.0 起),详见下文「TIM 标准写法与实测坑」。
 
 > 📚 **各外设的配置命令、实测状态与坑**:调 `cubemx_help(topic="gpio"/"i2c"/"tim"/"rcc")` 获取;
 > 详细实测结论见下文「TIM 标准写法与实测坑」与「能力边界」。
@@ -232,7 +232,7 @@ cubemx_new_project(
 
 ---
 
-## 0.4.0 规划:薄种子 + 外设片段(2026-08-26 实测)
+## 0.4.0 规划:最小模板 + 外设配置补丁(2026-08-26 实测)
 
 **背景**:模板"整机配置"模式会按 芯片×配置组合 爆炸(每新组合手动 GUI 配一遍再存模板),
 不符合"配置应现配、模板应少而薄"的方向。
@@ -242,17 +242,17 @@ cubemx_new_project(
   + `MxCube.Version` + `MxDb.Version` + 基本 ProjectManager,**IPNb=0、PinsNb=0,无任何外设/时钟/引脚**
 - `config load` → **OK**;`project generate` → **OK**,生成完整空白 HAL 工程
   (main.c / stm32f1xx_it / hal_msp / hal_conf、HAL 驱动 + CMSIS、CMake 工具链)
-- 结论:**6.18 接受极简 .ioc,薄种子路线完全可行**;load 不会改写种子文件(saveas 前原样)
+- 结论:**6.18 接受极简 .ioc,最小模板路线完全可行**;load 不会改写种子文件(saveas 前原样)
 
 **改造方向(0.4.0)**:
 1. **种子化**:模板从"整机配置"减为"芯片标识 + 基础时钟"文件(每芯片 1 个),数量按芯片线性增长
 2. **外设 set 现配**:GPIO / I2C / USART 等可靠外设全部由 `commands` set 配置(已验证)
-3. **TIM 内部时钟片段注入**:标准表达直接注入(VP 内联 Mcu.Pin 列表、IPNb/PinsNb 同步、
+3. **TIM 内部时钟配置补丁**:标准表达直接写入(VP 内联 Mcu.Pin 列表、IPNb/PinsNb 同步、
    functionlistsort 段),已实现并实测通过(见下)
-4. **`cubemx_new_project` 流程**:薄种子 → set 现配 → 片段注入(仅 set 不可靠的外设)→ generate
+4. **`cubemx_new_project` 流程**:最小模板 → set 现配 → 配置补丁(仅 set 不可靠的外设)→ generate
 
 **借壳法已退役(2026-08-26)**:`_tim_make_internal_clock` 删除,替换为 `_inject_tim_internal_clock`;
-基础种子 + TIM2 片段注入经真实 CubeMX 验证(load/generate OK,
+基础模板 + TIM2 配置补丁经真实 CubeMX 验证(load/generate OK,
 `sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL`)。旧组合模板 `tim_template.ioc`/`tim2_internal.ioc` 已从 templates/ 移除。
 
 **遗留坑(与种子无关)**:
@@ -261,7 +261,7 @@ cubemx_new_project(
 
 ## 自我迭代日志(2026-08-26,3 轮,针对 0.4.0 代码)
 
-对 cubemx_mcp.py(0.4.0:薄种子 + TIM 片段注入)做了 3 轮自查修复:
+对 cubemx_mcp.py(0.4.0:最小模板 + TIM 配置补丁)做了 3 轮自查修复:
 
 **第 1 轮 — 逻辑与能力**:
 - `_inject_tim_internal_clock` 的 functionlistsort 段删除改为**按段重组**(原来用两个 re.sub,
@@ -273,7 +273,7 @@ cubemx_new_project(
   默认值而非强制)
 
 **第 2 轮 — 边界/健壮性**:
-- 修复 4 处**行尾 `\r?\n` 匹配遗漏**:`.ioc` 最后一行无换行符时,注入器的 IP/Pin 收集、
+- 修复 4 处**行尾 `\r?\n` 匹配遗漏**:`.ioc` 最后一行无换行符时,配置生成逻辑的 IP/Pin 收集、
   `cubemx_remove_peripheral` 的外设定位(`fullmatch` 带 `\r?\n`)与 keep_ips 收集都会漏匹配
   → 改为不依赖行尾换行(`\s*` / 裸 `(.*)`)
 - `_patch_ioc_identity` 补 ProjectName/ProjectFileName 缺失防御(模板缺行时追加,
@@ -341,16 +341,26 @@ HAL_TIM_Base_Start_IT(&htim2);                  /* 再开中断 */
 | 坑 | 说明 |
 |----|------|
 | `set rcc` 不存在 | RCC 参数用 `set ip parameters RCC ...`;HSE 靠 PD0-OSC_IN/PD1-OSC_OUT 引脚,`RCC.HSEState` 键会被静默删除 |
-| `set mode TIMx` 无效 | 一律 KO,TIM 靠片段注入/原生模板激活 |
+| `set mode TIMx` 无效 | 一律 KO,TIM 靠配置补丁/原生模板激活 |
 | `set ip parameters TIMx` 未激活时静默忽略 | 不报错也不生效,先激活再设参 |
 | `set noparam TIMx` 删除无效 | 返回 OK 但外设仍在,需用 cubemx_remove_peripheral 文本移除 |
 | 重新 generate 覆盖 CMakeLists | `cmake/stm32cubemx/CMakeLists.txt` 被重写,手动加的源文件需重新 cubemx_add_source |
 
-## 0.4.1:PWM + 输入捕获注入器(2026-08-27,PWM_IC_OLED 实测)
+## 0.4.2:工程化补强(2026-08-27)
+
+非功能迭代,为「全外设完善」(0.5.0)铺路:
+
+- **CI**:`.github/workflows/ci.yml` —— windows-latest,Python 3.10-3.13 矩阵;步骤 = `ruff check .` + `ruff format --check .` + `python -m pytest`(pyproject 的 `[tool.pytest.ini_options]` 带 `--cov=cubemx_mcp --cov-fail-under=80`)。测试不依赖 CubeMX 实体,CI 可全自动跑。
+- **测试**:47 → 72 个,覆盖率 71% → 94.9%。新增:模板补丁全分支、`cubemx_new_project` 调度层(mock `_run_script`)、工具包装层、help topics、输入捕获非法信号等。
+- **代码质量**:`[tool.ruff]`(line-length 120,select E4/E7/E9/F/I/UP)+ `.pre-commit-config.yaml`;TIM 枚举名抽为 `_TIM_*` 常量对照表;顺带修复 py3.10/3.11 f-string 反斜杠语法错误(F841 未用变量一并清掉)。
+- **术语统一**:薄种子→最小模板、片段注入→配置补丁、注入器→配置生成逻辑、权威枚举名→.ioc 内部枚举名对照表、黄金样本→基准样本、逃生通道→原始脚本接口、自述→内置帮助(借壳法保留,仅历史记录);README/examples/dev-notes/cubemx_help 同步。
+- **文档**:README 增加项目定位自白(自嗨型项目声明)与「用之前 vs 用之后」示例;中文标点全角化。
+
+## 0.4.1:PWM + 输入捕获配置生成(2026-08-27,PWM_IC_OLED 实测)
 
 > 版本规划:0.5.0 预留给"完善所有外设"里程碑;在全部外设完善前,功能迭代一律走 0.4.x。
 
-**背景**:0.4.0 只注入 TIM 内部时钟;TIM3 PWM / TIM2 输入捕获此前需手写 .ioc,且 GUI 名 ≠ 6.18 .ioc 枚举名(写错会被 CubeMX load 时静默丢弃)。本次把实测验证过的表达固化成注入器。
+**背景**:0.4.0 只注入 TIM 内部时钟;TIM3 PWM / TIM2 输入捕获此前需手写 .ioc,且 GUI 名 ≠ 6.18 .ioc 枚举名(写错会被 CubeMX load 时静默丢弃)。本次把实测验证过的表达固化成配置生成逻辑。
 
 **新增命令**(cubemx_new_project 的 commands 里):
 ```
@@ -362,14 +372,14 @@ set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 
 
 **新增函数**:`_inject_tim_pwm` / `_inject_tim_input_capture`,公共骨架 `_rebuild_ioc_lines` / `_finish_ioc_write`(IP/Pin 重建、IPNb/PinsNb 同步、functionlistsort 段、幂等)。
 
-**权威枚举名(6.18,F103)**:来源 `C:\MINE\STM\STM\db\mcu\IP\TIM1_8F1-gptimer2_v1_x_Cube_Modes.xml`:
+**.ioc 内部枚举名(6.18,F103)**:来源 `C:\MINE\STM\STM\db\mcu\IP\TIM1_8F1-gptimer2_v1_x_Cube_Modes.xml`:
 | 功能 | .ioc 内部名(Name) | GUI 名(UserName) |
 |------|------|------|
 | PWM CH1 | `PWM Generation1 CH1`(带序号) | `PWM Generation CH1` |
 | 输入捕获 IC1 | `Input_Capture1_from_TI1` | `Input Capture direct mode` |
 | 输入捕获 IC2(间接) | 无独立模式,用参数行 | `Input Capture indirect mode` |
 
-**黄金样本(实测)**:`C:\MINE\STM32Project\STM32VScode\PWM_IC_OLED\PWM_IC_OLED.ioc`(手写注入 + 6.18 generate 后保留的规范化形态),关键行:
+**基准样本(实测)**:`C:\MINE\STM32Project\STM32VScode\PWM_IC_OLED\PWM_IC_OLED.ioc`(手写注入 + 6.18 generate 后保留的规范化形态),关键行:
 ```
 SH.S_TIM2_CH1_ETR.0=TIM2_CH1,Input_Capture1_from_TI1
 SH.S_TIM2_CH1_ETR.ConfNb=1
@@ -385,6 +395,6 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 - SH 键 = `SH.` + 信号全名(`SH.S_TIM3_CH1`),SH 值第一段 = 信号本体去 `S_` 前缀(ETR 还要去 `_ETR` 后缀,如 `TIM2_CH1`);
 - Channel 键值用 HAL 枚举 `TIM_CHANNEL_1`(不带 TIM 编号前缀);
 - **CubeMX 只生成 IC1 的 sConfigIC**(`HAL_TIM_IC_ConfigChannel` 仅 1 次);测占空比的 IC2 需 main.c 手动补 `HAL_TIM_IC_ConfigChannel(&htim2, ic2, TIM_CHANNEL_2)`(示例见 cubemx_help tim topic);
-- 注入后的 .ioc 经 6.18 load+generate 后与黄金样本逐行一致,生成 tim.c 参数正确(PWM 10kHz/50% + IC RISING)。
+- 注入后的 .ioc 经 6.18 load+generate 后与基准样本逐行一致,生成 tim.c 参数正确(PWM 10kHz/50% + IC RISING)。
 
 **MCP 开发模式配置坑(2026-08-27)**:config.toml 的 `[[plugins]]` 用 `command = python.exe` + `args = ["-m", "cubemx_mcp"]` 时,server 从 site-packages 导入,**cwd 字段不被 MCP 启动器支持(静默忽略)**;可靠写法是 `args = ['C:\MINE\STM32Project\Vscode_cube_mcp\cubemx_mcp.py']` 直接执行开发目录脚本。改配置需重启会话生效。

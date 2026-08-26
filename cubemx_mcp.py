@@ -5,8 +5,8 @@
 -> 过滤 log4j 噪音 -> 检测 KO 失败标记 -> 返回干净输出。
 
 Tools:
-  cubemx_help(topic)               自述指南/可用模板(陌生 agent 建议先调用)
-  cubemx_script(script)            任意脚本(逃生通道)
+  cubemx_help(topic)               内置帮助/可用模板(陌生 agent 建议先调用)
+  cubemx_script(script)            任意脚本(原始脚本接口)
   cubemx_load(ioc)                 config load + 回读配置(只读)
   cubemx_configure(ioc, cmds)      load + set 命令序列 + saveas(写回 .ioc)
   cubemx_generate(ioc, project_dir) load + project generate
@@ -320,9 +320,9 @@ def _patch_ioc_identity(
         f.write(text)
 
 
-# ---------------------------------------------------------------- TIM 注入:6.18 权威枚举名(实测固化)
+# ---------------------------------------------------------------- TIM 配置补丁:6.18 内部枚举名对照表(实测)
 # CubeMX GUI 名 ≠ .ioc 内部枚举名,写错会被 load 时静默丢弃(实测:整个 TIM 从 IP 列表消失)。
-# 来源:6.18 原生 .ioc 黄金样本逐行比对(2026-08-27 实测,详见 README.dev-notes.md)。
+# 来源:6.18 原生 .ioc 基准样本逐行比对(2026-08-27 实测,详见 README.dev-notes.md)。
 # 注意:这些值是对 CubeMX 行为的对齐数据,升级 CubeMX 版本后需重新实测确认,勿凭猜测改动。
 _TIM_AUTORELOAD_PRELOAD_ENABLE = "TIM_AUTORELOAD_PRELOAD_ENABLE"
 _TIM_COUNTERMODE_UP = "TIM_COUNTERMODE_UP"
@@ -461,7 +461,7 @@ def _inject_tim_internal_clock(
 
 # ---------------------------------------------------------------- 公共:IP/Pin/functionlistsort 重建
 def _rebuild_ioc_lines(lines, tim, extra_ips=(), extra_pins=(), drop_prefixes=(), keep_extra_tims=()):
-    """通用 .ioc 重建骨架(供各注入器复用):
+    """通用 .ioc 重建骨架(供各 TIM 配置生成逻辑复用):
       - 剔除 {tim} 的旧参数/SH/NVIC/VP 行,以及 drop_prefixes 命中的行
       - 重建 Mcu.IPx / Mcu.Pinx 列表(追加 extra_ips / extra_pins,IP 追加到 keep_extra_tims 之后)
       - 重建 functionlistsort(剔除旧 {tim} 段,追加 MX_{tim}_Init 段)
@@ -554,7 +554,7 @@ def _finish_ioc_write(ioc_path, out_lines, new_ips, new_pins, counts, params_blo
 def _inject_tim_pwm(
     ioc_path: str, target_tim: str, pin: str, signal: str, prescaler: int = 7200, period: int = 10000, pulse: int = 5000
 ) -> str:
-    """把目标 TIM 配成 PWM 输出(6.18 标准表达,权威枚举名见 README.dev-notes.md)。
+    """把目标 TIM 配成 PWM 输出(6.18 标准表达,内部枚举名对照见 README.dev-notes.md)。
 
     注入的 6.18 原生形态(与 _inject_tim_internal_clock 同款骨架):
       Mcu.IPx=TIM3 / Mcu.Pin{N}=PA6
@@ -616,7 +616,7 @@ def _inject_tim_input_capture(
     PA0 在 .ioc 里信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1);
     IC1 用 Input_Capture1_from_TI1(direct,带 Channel 键);
     IC2 是同一信号的下降沿捕获(IC2Polarity=FALLING + IC2Selection=INDIRECTTI 参数行,
-    无独立模式/Channel 键——实测黄金样本即此形态)。
+    无独立模式/Channel 键——实测基准样本即此形态)。
     CubeMX 据此生成 IC1+IC2 两个 sConfigIC,无需再手动补 IC2。
     """
     tim = target_tim.strip().upper()
@@ -678,7 +678,7 @@ _GUIDE = """Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
   cubemx_export_pinout       导出引脚配置 CSV(只读)
   cubemx_remove_peripheral   从 .ioc 移除外设
   cubemx_add_source          把自定义源文件加入 CMake 源列表
-  cubemx_script              任意 CubeMX 脚本命令(逃生通道)
+  cubemx_script              任意 CubeMX 脚本命令(原始脚本接口)
 
 【从零生成工程(标准流程)】
 1) 调 cubemx_help(topic="templates") 查看可用芯片模板
@@ -804,7 +804,7 @@ _ADDSOURCE_HELP = """【自定义源文件加入编译(cubemx_add_source)】
 
 @mcp.tool()
 def cubemx_help(topic: str = "") -> str:
-    """MCP 自述:返回本 server 的使用指南、可用模板与各外设配置方法。
+    """内置帮助:返回本 server 的使用指南、可用模板与各外设配置方法。
 
     陌生环境(第一次接入本 MCP 的 agent)建议先调用本工具,再开始建工程。
     不传 topic 返回完整指南;传 topic 返回该主题详细说明。
@@ -822,7 +822,7 @@ def cubemx_help(topic: str = "") -> str:
         if not avail:
             return "templates/ 目录为空或不存在;请放入 6.18 原生 .ioc 模板"
         desc = {
-            "STM32F103C8T6.ioc": "薄种子:72MHz(HSE+PLL×9)、SWD(PA13/14)、SysTick,无外设",
+            "STM32F103C8T6.ioc": "最小模板:72MHz(HSE+PLL×9)、SWD(PA13/14)、SysTick,无外设",
         }
         lines = ["【可用模板(动态扫描 templates/)】"]
         lines += [f"  {n}  {desc.get(n, '(无描述)')}" for n in avail]
@@ -845,7 +845,7 @@ def cubemx_help(topic: str = "") -> str:
 
 @mcp.tool()
 def cubemx_script(script: str) -> str:
-    """执行任意 CubeMX 脚本命令序列(逃生通道,原样传给 -q)。
+    """执行任意 CubeMX 脚本命令序列(原始脚本接口,原样传给 -q)。
 
     常用命令示例:
       config load "C:/path/proj.ioc"
@@ -950,7 +950,7 @@ def cubemx_new_project(
     这样无需预先手写 .ioc,即"从零开始"。
 
     知识提示(生成前建议先调 cubemx_help 查看指南与坑):
-      - 模板按 mcu 匹配 templates/{mcu}.ioc(薄种子:仅芯片标识+基础时钟
+      - 模板按 mcu 匹配 templates/{mcu}.ioc(最小模板:仅芯片标识+基础时钟
         72MHz/SWD/SysTick,无外设);外设全部由 commands set 现配。
       - TIM 内部时钟:命令含 "set ip parameters TIMx ClockSource
         TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达,
@@ -999,7 +999,7 @@ def cubemx_new_project(
             f"[FAIL exit={r['exit_code']}]\n{r['output']}\n"
             f"set 命令序列执行失败,已中止生成(避免产出残缺工程)。.ioc 保留在: {ioc_dst}"
         )
-    # TIM 内部时钟片段注入:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
+    # TIM 内部时钟配置补丁:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
     # 自动把该 TIM 做成内部时钟(标准表达直接注入,见 _inject_tim_internal_clock)。
     # 命令里可附 Prescaler/Period 覆盖默认 1s 参数(默认值而非强制),如
     # "set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL Prescaler 720 Period 1000"。
