@@ -343,7 +343,7 @@ class TestHelp(unittest.TestCase):
 
     def test_help_topics_case_insensitive(self):
         out = cubemx_mcp.cubemx_help(topic="TIM")
-        self.assertIn("借壳法", out)
+        self.assertIn("内部时钟标准表达", out)
         out2 = cubemx_mcp.cubemx_help(topic="gpio")
         self.assertIn("set pin PB13 GPIO_Output", out2)
 
@@ -359,6 +359,114 @@ class TestHelp(unittest.TestCase):
         self.assertIn("可用模板", msg)
         self.assertIn("STM32F103C8T6.ioc", msg)
         self.assertIn("cubemx_help", msg)
+
+
+# 薄种子 + TIM 内部时钟片段注入测试(0.4.0)
+SEED_IOC = """#MicroXplorer Configuration settings - do not modify
+File.Version=6
+Mcu.CPN=STM32F103C8T6
+Mcu.Family=STM32F1
+Mcu.IP0=NVIC
+Mcu.IP1=RCC
+Mcu.IP2=SYS
+Mcu.IPNb=3
+Mcu.Name=STM32F103C(8-B)Tx
+Mcu.Package=LQFP48
+Mcu.Pin0=PA13
+Mcu.Pin1=VP_SYS_VS_Systick
+Mcu.PinsNb=2
+Mcu.UserName=STM32F103C8Tx
+MxCube.Version=6.18.0
+MxDb.Version=DB.6.0.180
+ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false
+board=custom
+"""
+
+
+class TestInjectTimInternalClock(unittest.TestCase):
+    def _write_ioc(self, content):
+        fd, path = tempfile.mkstemp(suffix=".ioc")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def setUp(self):
+        self._orig = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
+
+    def tearDown(self):
+        cubemx_mcp.ALLOWED_ROOTS = self._orig
+
+    def test_inject_tim2_internal_clock(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            out = cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            self.assertIn("TIM2", out)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            # IP 追加 + IPNb 同步
+            self.assertIn("Mcu.IP3=TIM2", text)
+            self.assertIn("Mcu.IPNb=4", text)
+            # VP 条目内联进 Pin 列表 + PinsNb 同步
+            self.assertIn("Mcu.Pin2=VP_TIM2_VS_ClockSourceINT", text)
+            self.assertIn("Mcu.PinsNb=3", text)
+            # 参数 + VP 表达 + NVIC
+            self.assertIn("TIM2.Prescaler=7200-1", text)
+            self.assertIn("TIM2.Period=10000-1", text)
+            self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", text)
+            self.assertIn("NVIC.TIM2_IRQn=", text)
+            # functionlistsort 追加段
+            self.assertIn("2-MX_TIM2_Init-TIM2-false-HAL-true", text)
+        finally:
+            os.remove(path)
+
+    def test_inject_idempotent(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            out2 = cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            self.assertIn("无需注入", out2)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertEqual(text.count("TIM2.IPParameters"), 1)
+        finally:
+            os.remove(path)
+
+    def test_inject_replaces_existing_etr(self):
+        # 已有 ETR 表达(SH/TIM2.* 参数)时,注入应替换而非叠加
+        etr = SEED_IOC + "SH.S_TIM2_CH1_ETR.0=TIM2_ETR,ClockSourceETR_Mode2\nTIM2.ClockFilter=0x0f\n"
+        path = self._write_ioc(etr)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM2")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("SH.S_TIM2", text)
+            self.assertNotIn("ClockFilter", text)
+            self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", text)
+        finally:
+            os.remove(path)
+
+    def test_inject_custom_prescaler_period_no_irq(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            cubemx_mcp._inject_tim_internal_clock(path, "TIM3", prescaler=72, period=1000, irq=False)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("Mcu.IP3=TIM3", text)
+            self.assertIn("TIM3.Prescaler=72-1", text)
+            self.assertIn("TIM3.Period=1000-1", text)
+            self.assertNotIn("NVIC.TIM3_IRQn", text)
+        finally:
+            os.remove(path)
+
+    def test_inject_invalid_tim_raises(self):
+        path = self._write_ioc(SEED_IOC)
+        try:
+            with self.assertRaises(ValueError):
+                cubemx_mcp._inject_tim_internal_clock(path, "FOO")
+        finally:
+            os.remove(path)
 
 
 if __name__ == "__main__":

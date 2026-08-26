@@ -201,8 +201,8 @@ cubemx_new_project(
 | `cubemx_remove_peripheral` | 从 .ioc 移除外设(文本方式,解决 `set noparam` 无效) |
 | `cubemx_add_source` | 把自定义源文件加入 CMake 源列表(generate 覆盖后可重补) |
 
-> **TIM 内部时钟**:首选 `STM32F103C8T6_tim2_internal.ioc` 模板;脚本模式无法把 ETR TIM 改成内部时钟,
-> `cubemx_new_project` 内置借壳法(`_tim_make_internal_clock`)作兜底,详见 [`templates/README.md`](templates/README.md)。
+> **TIM 内部时钟**:命令含 `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 时,
+> server 自动注入 6.18 验证过的内部时钟标准表达(片段注入,0.4.0 起),详见 [`templates/README.md`](templates/README.md)。
 
 > 📚 **各外设的配置命令、实测状态与坑**:见 [`templates/README.md`](templates/README.md)(GPIO/I2C/TIM/时钟的 set 命令与注意事项)。
 
@@ -246,14 +246,15 @@ cubemx_new_project(
 - 结论:**6.18 接受极简 .ioc,薄种子路线完全可行**;load 不会改写种子文件(saveas 前原样)
 
 **改造方向(0.4.0)**:
-1. **种子化**:模板从"整机配置"减为"芯片标识"文件(每芯片 ~15 行),数量按芯片线性增长;
-   种子可从现有模板程序化剥离,或 GUI 新建一次取标识段
+1. **种子化**:模板从"整机配置"减为"芯片标识 + 基础时钟"文件(每芯片 1 个),数量按芯片线性增长
 2. **外设 set 现配**:GPIO / I2C / USART 等可靠外设全部由 `commands` set 配置(已验证)
-3. **TIM 内部时钟片段注入**:把借壳法验证过的表达(VP 条目内联进 Mcu.Pin 列表、
-   NVIC 去重、IPNb/PinsNb 修正)规则化为"外设片段",按需注入;通用化后**可退役借壳法**
-4. **`cubemx_new_project` 流程**:最小种子 → set 现配 → 片段注入(仅 set 不可靠的外设)→ generate
+3. **TIM 内部时钟片段注入**:标准表达直接注入(VP 内联 Mcu.Pin 列表、IPNb/PinsNb 同步、
+   functionlistsort 段),已实现并实测通过(见下)
+4. **`cubemx_new_project` 流程**:薄种子 → set 现配 → 片段注入(仅 set 不可靠的外设)→ generate
 
-**借壳法退役条件**:片段注入通用化 + 实测通过后,删除 `_tim_make_internal_clock` 及调用链。
+**借壳法已退役(2026-08-26)**:`_tim_make_internal_clock` 删除,替换为 `_inject_tim_internal_clock`;
+基础种子 + TIM2 片段注入经真实 CubeMX 验证(load/generate OK,
+`sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL`)。`tim_template.ioc`/`tim2_internal.ioc` 兼容保留。
 
 **遗留坑(与种子无关)**:
 - CubeMX `project path` 参数有路径拼接 bug(gen 时 sysmem/syscalls 报 FileNotFoundException),

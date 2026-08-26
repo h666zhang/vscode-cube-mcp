@@ -105,7 +105,7 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\MINE\STM32Project"
 - 「用 STM32F103C8T6 从零建一个工程,LED 在 PB13,带 I2C1」→ `cubemx_new_project`
 - 「把 OLED.c 加进编译,重新 generate 后也保留」→ `cubemx_add_source`
 
-内置模板库(`templates/`,按芯片型号命名,如 `STM32F103C8T6.ioc`、`STM32F103C8T6_tim2_internal.ioc`),新增芯片只需把该芯片 6.18 原生 .ioc 放进 `templates/`。
+内置模板库(`templates/`,按芯片型号命名的**薄种子**:仅芯片标识 + 基础时钟 72MHz/SWD/SysTick,**无外设**,如 `STM32F103C8T6.ioc`);外设全部由 `cubemx_new_project` 的 `commands` set 命令现配,TIM 内部时钟由片段注入自动处理。新增芯片只需把该芯片 6.18 原生 .ioc 放进 `templates/`。
 
 ### `cubemx_new_project` 参数(设计原则:默认值而非强制)
 
@@ -178,7 +178,7 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 ## 更多资料
 
 - [`docs/install-claude-code.md`](docs/install-claude-code.md):Claude Code(终端版)安装配置指南
-- [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、借壳法原理
+- [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、TIM 片段注入原理
 - [`templates/README.md`](templates/README.md):各外设(GPIO/I2C/TIM/时钟)的配置命令与坑
 
 ## 更新日志

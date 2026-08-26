@@ -14,7 +14,7 @@
 - `templates/` — 从零生成工程的基底模板(6.18 原生 .ioc,按芯片命名,如 `STM32F103C8T6.ioc`;新增芯片用 CubeMX GUI 新建后存为 `templates/{mcu}.ioc`)
 - `test_cubemx_mcp.py` — 单元测试(不依赖 CubeMX)
 - `README.md` — 面向用户的手册(安装/配置/FAQ)
-- `README.dev-notes.md` — 开发笔记(借壳法原理、外设实测、发布流程)
+- `README.dev-notes.md` — 开发笔记(片段注入原理、外设实测、发布流程)
 
 ## 工具一览(9 个)
 
