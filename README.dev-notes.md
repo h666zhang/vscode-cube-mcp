@@ -259,11 +259,11 @@ cubemx_new_project(
 - CubeMX `project path` 参数有路径拼接 bug(gen 时 sysmem/syscalls 报 FileNotFoundException),
   generate 尽量用默认行为(.ioc 同目录生成),别依赖 project path 重定向。
 
-## 自我迭代日志(2026-08-26,3 轮,针对 0.4.0 代码)
+## 迭代日志(2026-08-26,针对 0.4.0 代码)
 
 对 cubemx_mcp.py(0.4.0:最小模板 + TIM 配置补丁)做了 3 轮自查修复:
 
-**第 1 轮 — 逻辑与能力**:
+**逻辑与能力**:
 - `_inject_tim_internal_clock` 的 functionlistsort 段删除改为**按段重组**(原来用两个 re.sub,
   当 functionlistsort 只剩 TIM 单段时删除失败 → 注入后出现重复 MX_TIMx_Init 段)
 - 增加 IPNb/PinsNb 缺失防御:非标准 .ioc 没有这两行时,原逻辑会丢弃全部 IP/Pin 行(数据丢失),
@@ -272,14 +272,14 @@ cubemx_new_project(
   (例:`set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL Prescaler 720 Period 1000`,
   默认值而非强制)
 
-**第 2 轮 — 边界/健壮性**:
+**边界/健壮性**:
 - 修复 4 处**行尾 `\r?\n` 匹配遗漏**:`.ioc` 最后一行无换行符时,配置生成逻辑的 IP/Pin 收集、
   `cubemx_remove_peripheral` 的外设定位(`fullmatch` 带 `\r?\n`)与 keep_ips 收集都会漏匹配
   → 改为不依赖行尾换行(`\s*` / 裸 `(.*)`)
 - `_patch_ioc_identity` 补 ProjectName/ProjectFileName 缺失防御(模板缺行时追加,
   否则 CubeMX 用模板默认工程名)
 
-**第 3 轮 — 冗余清理 + 回归测试**:
+**冗余清理 + 回归测试**:
 - help 冗余:`_PERIPHERAL_HELP` 的 `clock` key 与 `rcc` 内容重复 → 删除 `clock` key,
   `cubemx_help(topic="clock")` 改为返回 rcc 内容(别名,单一维护点)
 - 冗余检查结论:`_GUIDE` 与 `_NEW_PROJECT_HELP` 的流程/参数表存在**有意的主题重复**

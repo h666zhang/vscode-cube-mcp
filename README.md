@@ -213,7 +213,7 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
   - 测试:47 → **72 个**,覆盖率 71% → **94.9%**(新增模板补丁、新建工程调度层、工具包装层、help topics 等测试;覆盖率 <80% 即失败)
   - 代码质量:配置 Ruff(保守规则集)+ pre-commit 钩子;TIM 注入器硬编码枚举抽为 `_TIM_*` 常量对照表(6.18 实测来源);**修复 Python 3.10/3.11 的 f-string 反斜杠语法兼容问题**(此前低版本无法导入)
   - 新目录 [`examples/`](examples/):3 个可复现案例(LED 点灯 / I2C OLED / TIM3 PWM + 输入捕获)
-  - 文档:README 增加「项目定位自白」与「用之前 vs 用之后」说明;**明确能力边界**(只做 .ioc 配置与 HAL 骨架,应用业务代码由用户编写);术语统一为通用说法(最小模板 / 配置补丁 / 内置帮助 / 基准样本等);中文标点全角化
+  - 文档:README 增加「项目定位自白」与「用之前 vs 用之后」说明;**明确能力边界**(只做 .ioc 配置与 HAL 骨架,应用业务代码由用户编写);术语统一为通用说法(最小模板 / 配置补丁 / 内置帮助 / 基准样本等);
 
 ### 0.4.1(2026-08-27)
 - **新功能:TIM PWM 配置生成**(`_inject_tim_pwm`)——命令
@@ -248,7 +248,7 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
   标准表达(任意 TIM/芯片,可附 `Prescaler`/`Period` 自定义);**借壳法退役删除**
 - 模板库精简:删除旧组合模板 `tim_template.ioc` / `tim2_internal.ioc` 与 `templates/README.md`
   (知识迁入 README.dev-notes.md);缺芯片模板时报错带可用模板清单与生成指引
-- 修复(三遍迭代 + 自我迭代 3 轮):
+- 修复:
   - 安全:`_check_path` 白名单前缀绕过漏洞;`cubemx_add_source` 输入校验(拒绝路径穿越/绝对路径/换行注入)
   - `cubemx_add_source` 锚点找不到时静默假成功 → 改抛错
   - `cubemx_remove_peripheral` 补 `Mcu.Pin` 重排与 `Mcu.PinsNb` 修正;functionlistsort 段删除泛化
