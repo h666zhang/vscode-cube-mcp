@@ -35,6 +35,10 @@ py-modules = ["cubemx_mcp"]
 "templates" = [
     "templates/STM32F103C8T6.ioc",
 ]
+# AGENTS.md(agent 工作守则)随包分发到 site-packages 上级目录
+"." = [
+    "AGENTS.md",
+]
 
 [tool.pytest.ini_options]
 # 覆盖率门槛:核心逻辑 <80% 视为失败(本地与 CI 同一配置)
