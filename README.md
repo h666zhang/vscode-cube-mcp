@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **项目定位自白**：这是一个**作者自嗨型项目**，对开源社区的实际意义约等于 0。
+> **项目定位**：对开源社区的实际意义约等于0。
 > 它存在的全部意义，是教会作者用 git，并推动作者去学习 STM32F103C8T6 与 MCP。
 > 我说实话在GUI上点几下怎么你了，就要用AI生成了。我的本意是让他生成框架，
 > 但是AI实在是太强大了提示词给的稍微精确一点AI就自己生成完了。
@@ -15,9 +15,9 @@
 **用之后**：在 AI 对话里直接说一句：
 
 > 「使用 vscode-cube-mcp 的内置 Tool，参考 SPL_OLED 工程下的文件；
-> 用 STM32F103C8T6 生成一个工程：PB14 反转电平、延迟 1s 点亮 LED；
-> PB8 做 SCL、PB9 做 SDA，用 I2C 与 OLED 屏通信，第一行显示 Hello MCP!
-> 第二行用 TIM2 内部时钟，每秒计数加 1。」
+> 用 STM32F103C8T6 生成一个工程：PB14 配成 GPIO 输出（接 LED）、
+> PB8 做 SCL、PB9 做 SDA 配 I2C1、TIM2 配内部时钟（1s 周期）。
+> 配置到 HAL 骨架为止，LED 闪烁和 OLED 显示的业务代码我自己写。」
 
 工具自动生成整个 HAL 工程；想改配置，继续说就行，全程不用打开 GUI。
 
@@ -25,6 +25,9 @@
 
 MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本模式(`-q`),
 让 AI 助手可以直接加载 .ioc 工程、改引脚/外设配置、生成 HAL 代码、导出引脚表,全程无需打开 CubeMX GUI。
+
+> **能力边界**：本工具只生成**工程配置与 HAL 骨架**（引脚、外设、时钟、工具链），
+> 不负责应用逻辑代码（LED 闪烁、OLED 显示内容、传感器驱动等）——业务代码请在生成后的工程里自己写。
 
 ## 功能一览
 
@@ -210,7 +213,7 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
   - 测试:47 → **72 个**,覆盖率 71% → **94.9%**(新增模板补丁、新建工程调度层、工具包装层、help topics 等测试;覆盖率 <80% 即失败)
   - 代码质量:配置 Ruff(保守规则集)+ pre-commit 钩子;TIM 注入器硬编码枚举抽为 `_TIM_*` 常量对照表(6.18 实测来源);**修复 Python 3.10/3.11 的 f-string 反斜杠语法兼容问题**(此前低版本无法导入)
   - 新目录 [`examples/`](examples/):3 个可复现案例(LED 点灯 / I2C OLED / TIM3 PWM + 输入捕获)
-  - 文档:README 增加「项目定位自白」与「用之前 vs 用之后」说明;术语统一为通用说法(最小模板 / 配置补丁 / 内置帮助 / 基准样本等);中文标点全角化
+  - 文档:README 增加「项目定位自白」与「用之前 vs 用之后」说明;**明确能力边界**(只做 .ioc 配置与 HAL 骨架,应用业务代码由用户编写);术语统一为通用说法(最小模板 / 配置补丁 / 内置帮助 / 基准样本等);中文标点全角化
 
 ### 0.4.1(2026-08-27)
 - **新功能:TIM PWM 配置生成**(`_inject_tim_pwm`)——命令
