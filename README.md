@@ -2,10 +2,8 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **项目定位**：对开源社区的实际意义约等于0。
-> 它存在的全部意义，是教会作者用 git，并推动作者去学习 STM32F103C8T6 与 MCP。
-> 我说实话在GUI上点几下怎么你了，就要用AI生成了。我的本意是让他生成框架，
-> 但是AI实在是太强大了提示词给的稍微精确一点AI就自己生成完了。
+> **项目定位**：对于48脚的芯片来说，就算打开GUI界面配置端口，也消耗不了多长时间。
+>但是对于100脚甚至144脚的芯片来说，此项目就能提供方便。
 
 ## 为什么用(用之前 vs 用之后)
 
