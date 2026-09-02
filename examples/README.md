@@ -5,9 +5,7 @@
 
 | 案例 | 覆盖能力 |
 |------|----------|
-| [01-blink-led](01-blink-led/) | 从零建工程 + GPIO（LED 点灯），最简入门 |
-| [02-i2c-oled](02-i2c-oled/) | I2C1 + 自定义源文件（OLED）加入 CMake 源列表 |
-| [03-tim-pwm-input-capture](03-tim-pwm-input-capture/) | TIM3 PWM 输出 + TIM2 输入捕获（0.4.1 配置生成） |
+| [01-tim-pwm-input-capture](01-tim-pwm-input-capture/) | TIM3 PWM 输出 + TIM2 输入捕获（0.4.1 配置生成） |
 
 约定：
 

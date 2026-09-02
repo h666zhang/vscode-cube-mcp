@@ -1,11 +1,11 @@
 # 案例 3：TIM3 PWM + TIM2 输入捕获（0.4.1 配置生成）
 
 **场景**：从零建工程，TIM3_CH1（PA6）输出 10kHz / 50% PWM；TIM2_CH1（PA0-WKUP）输入捕获测外部信号频率/占空比。
-这是 0.4.1 的「TIM PWM / 输入捕获配置生成」实测用例（基准样本 `PWM_IC_OLED2`）。
+这是 0.4.1 的「TIM PWM / 输入捕获配置生成」。
 
 ## 给 AI 的指令（直接复制）
 
-> 用 STM32F103C8T6 从零建一个工程到 `C:\MINE\STM32Project\examples\Demo3`，工程名 Demo3，
+> 用 STM32F103C8T6 从零建一个工程到 `C:\MINE\STM32Project\examples\Demo1`，工程名 Demo1，
 > TIM3 的 PA6 输出 PWM（Prescaler 72、Period 100、Pulse 50），
 > TIM2 的 PA0-WKUP 做输入捕获（Prescaler 72、Period 65535）。
 
@@ -13,8 +13,8 @@
 
 ```
 cubemx_new_project(
-  project_name="Demo3",
-  project_dir="C:/MINE/STM32Project/examples/Demo3",
+  project_name="Demo1",
+  project_dir="C:/MINE/STM32Project/examples/Demo1",
   mcu="STM32F103C8T6",
   commands=[
     "set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50",
