@@ -1,6 +1,9 @@
 # Vscode_cube_mcp
 
-[![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> ## ⚠️ 已废弃(Deprecated)
+> 本项目已停止维护、存在已知缺陷,不建议使用;待作者补齐 MCP 开发能力后再考虑继续。详见 [DEPRECATED.md](DEPRECATED.md)。
+
+[![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **项目定位**：对于48脚的芯片来说，就算打开GUI界面配置端口，也消耗不了多长时间。
 >但是对于100脚甚至144脚的芯片来说，此项目就能提供方便。
