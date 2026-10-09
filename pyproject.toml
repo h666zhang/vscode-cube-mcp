@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vscode-cube-mcp"
-version = "0.4.3"
+version = "0.4.4"
 description = "MCP server 封装 STM32CubeMX 命令行,通过 MCP 工具配置引脚/外设并生成 HAL 工程"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,11 @@ classifiers = [
     "Topic :: Software Development :: Embedded Systems",
 ]
 dependencies = ["mcp>=2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/h666zhang/vscode-cube-mcp"
+Repository = "https://github.com/h666zhang/vscode-cube-mcp"
+Issues = "https://github.com/h666zhang/vscode-cube-mcp/issues"
 
 [project.scripts]
 vscode-cube-mcp = "cubemx_mcp:main"
