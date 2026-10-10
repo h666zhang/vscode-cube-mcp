@@ -147,11 +147,6 @@ def pin_signals(pin: str, mcu: str = "") -> list:
     return list(item.get("signals") or [])
 
 
-def chip_info(mcu: str = "") -> dict:
-    """芯片属性(型号、封装、主频、Flash/RAM 等)。"""
-    return mcu_pins(mcu).get("chip") or {}
-
-
 # ------------------------------------------------------------------ db 事实(ip/)
 
 
