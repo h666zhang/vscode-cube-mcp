@@ -1,0 +1,257 @@
+name: RTC
+version: rtc1_v1_1_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: RTC
+  AutoPrediv:
+    comment: Auto Predivider Calculation
+    type: list
+    default: RTC_AUTO_1_SECOND
+    group: General
+  AsynchPrediv:
+    comment: Asynchronous Predivider value
+    type: list
+    default: RTC_AUTO_1_SECOND
+    group: General
+  OutPut:
+    comment: Output
+    type: list
+    default: RTC_OUTPUTSOURCE_NONE
+    group: General
+  Format:
+    comment: Data Format
+    type: list
+    default: RTC_FORMAT_BCD
+    group: Calendar Time
+  Hours:
+    comment: Hours
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '23'
+    group: Calendar Time
+  HoursARG:
+    comment: Hours
+    type: string
+    default: +0x+Hours
+    group: Calendar Time
+  Minutes:
+    comment: Minutes
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '59'
+    group: Calendar Time
+  MinutesARG:
+    comment: Minutes
+    type: string
+    default: +0x+Minutes
+    group: Calendar Time
+  Seconds:
+    comment: Seconds
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '59'
+    group: Calendar Time
+  SecondsARG:
+    comment: Seconds
+    type: string
+    default: +0x+Seconds
+    group: Calendar Time
+  WeekDay:
+    comment: Week Day
+    type: list
+    default: RTC_WEEKDAY_MONDAY
+    group: Calendar Date
+  Month:
+    comment: Month
+    type: list
+    default: RTC_MONTH_JANUARY
+    group: Calendar Date
+  Date:
+    comment: Date
+    type: decimal
+    default: '1'
+    min: '1'
+    max: '29'
+    group: Calendar Date
+  DateARG:
+    comment: Date
+    type: string
+    default: +0x+Date
+    group: Calendar Date
+  Year:
+    comment: Year
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '99'
+    group: Calendar Date
+  YearARG:
+    comment: Year
+    type: string
+    default: +0x+Year
+    group: Calendar Date
+  Hours_A:
+    comment: Hours
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '23'
+    group: Alarm A
+  HoursARG_A:
+    comment: Hours
+    type: string
+    default: +0x+Hours_A
+    group: Alarm A
+  Minutes_A:
+    comment: Minutes
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '59'
+    group: Alarm A
+  MinutesARG_A:
+    comment: Minutes
+    type: string
+    default: +0x+Minutes_A
+    group: Alarm A
+  Seconds_A:
+    comment: Seconds
+    type: decimal
+    default: '0'
+    min: '0'
+    max: '59'
+    group: Alarm A
+  SecondsARG_A:
+    comment: Seconds
+    type: string
+    default: +0x+Seconds_A
+    group: Alarm A
+  Alarm_A:
+    comment: Alarm
+    type: list
+    default: RTC_ALARM_A
+    group: Alarm A
+  Tamper:
+    comment: Tamper
+    type: list
+    default: RTC_TAMPER_1
+    group: Tamper
+  Trigger:
+    comment: Tamper Trigger
+    type: list
+    default: RTC_TAMPERTRIGGER_LOWLEVEL
+    group: Tamper
+signals:
+  TAMPER:
+    io_mode: System
+  OUT:
+    io_mode: System
+  VS_RTC_Activate: {}
+  VS_RTC_Calendar: {}
+  No_RTC_Output: {}
+  VS_RTC_Alarm_A_Intern: {}
+modes:
+- name: RTC_Enabled
+  hal_mode: RTC
+  parameters:
+  - Format
+  - AutoPrediv
+  - AsynchPrediv
+  - OutPut
+- name: RTC_Calendar
+  hal_mode: RTC
+  parameters:
+  - AutoPrediv
+  - AsynchPrediv
+  - OutPut
+  - Format
+  - Hours
+  - Minutes
+  - Seconds
+  - WeekDay
+  - Month
+  - Date
+  - Year
+- name: RTC_Init_And_Calender_Settings
+  hal_mode: RTC
+  parameters:
+  - AutoPrediv
+  - AsynchPrediv
+  - OutPut
+  - Format
+  - Hours
+  - Minutes
+  - Seconds
+  - WeekDay
+  - Month
+  - Date
+  - Year
+- name: Tamper_basic
+  hal_mode: RTC
+  parameters:
+  - AutoPrediv
+  - AsynchPrediv
+  - OutPut
+- name: Date
+  hal_mode: RTC
+  parameters:
+  - WeekDay
+  - Month
+  - Date
+  - Year
+- name: Tamper
+  hal_mode: RTC
+  base_mode: Tamper_basic
+  parameters:
+  - Tamper
+  - Trigger
+  possible_values:
+    Tamper:
+    - RTC_TAMPER_1
+- name: Tamper
+  hal_mode: RTC
+  base_mode: Tamper_basic
+  parameters:
+  - Tamper
+  - Trigger
+  possible_values:
+    Tamper:
+    - RTC_TAMPER_1
+- name: RTC OUT
+  hal_mode: RTC
+  base_mode: RTC_Init_And_Calender_Settings
+  parameters:
+  - Alarm_A
+  - Hours_A
+  - Minutes_A
+  - Seconds_A
+- name: RTC OUT
+  hal_mode: RTC
+  base_mode: RTC_Init_And_Calender_Settings
+  parameters:
+  - Alarm_A
+  - Hours_A
+  - Minutes_A
+  - Seconds_A
+- name: RTC_OUT_NO
+  hal_mode: RTC
+  base_mode: RTC_Init_And_Calender_Settings
+  parameters:
+  - Alarm_A
+  - Hours_A
+  - Minutes_A
+  - Seconds_A
+- name: RTC_OUT_NO
+  hal_mode: RTC
+  base_mode: RTC_Init_And_Calender_Settings
+  parameters:
+  - Alarm_A
+  - Hours_A
+  - Minutes_A
+  - Seconds_A
+source: db/mcu/IP/RTC-rtc1_v1_1_Cube_Modes.xml
+instance: RTC

@@ -1,0 +1,1126 @@
+name: USB_DEVICE
+version: v2.0_Cube
+parameters:
+  USBD_MAX_NUM_CONFIGURATION:
+    comment: USBD_MAX_NUM_CONFIGURATION (Maximum number of supported configuration)
+    type: integer
+    default: '1'
+    min: '1'
+    max: '255'
+    group: Basic Parameters
+  USBD_MAX_NUM_INTERFACES:
+    comment: USBD_MAX_NUM_INTERFACES (Maximum number of supported interfaces)
+    type: integer
+    default: '1'
+    min: '1'
+    max: '255'
+    group: Basic Parameters
+  USBD_MAX_STR_DESC_SIZ:
+    comment: USBD_MAX_STR_DESC_SIZ (Maximum size for the string descriptors)
+    type: integer
+    default: '512'
+    min: '1'
+    max: '65536'
+    unit: bytes
+    group: Basic Parameters
+  USBD_SUPPORT_USER_STRING_DESC:
+    comment: USBD_SUPPORT_USER_STRING_DESC (Enable user string descriptor)
+    type: list
+    default: '1'
+    group: Basic Parameters
+  USBD_SUPPORT_USER_STRING:
+    comment: USBD_SUPPORT_USER_STRING (Enable user string descriptor)
+    type: list
+    default: '1'
+    group: Basic Parameters
+  USBD_SELF_POWERED:
+    comment: USBD_SELF_POWERED (Enabled self power)
+    type: list
+    default: '1'
+    group: Basic Parameters
+  USBD_DEBUG_LEVEL:
+    comment: USBD_DEBUG_LEVEL (USBD Debug Level)
+    type: list
+    default: '0'
+    group: Basic Parameters
+  USBD_LPM_ENABLED:
+    comment: USBD_LPM_ENABLED (Link Power Management)
+    type: list
+    default: '1'
+    group: Basic Parameters
+  VirtualMode:
+    type: list
+    default: Ccid
+    group: Basic Parameters
+  VirtualModeHS:
+    type: list
+    default: Audio
+    group: Basic Parameters
+  VirtualModeFS:
+    type: list
+    default: Audio
+    group: Basic Parameters
+  VID:
+    comment: VID (Vendor IDentifier)
+    type: integer
+    default: '1155'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor
+  LANGID_STRING:
+    comment: LANGID_STRING (Language Identifier)
+    type: List
+    default: '1033'
+    group: Device Descriptor
+  MANUFACTURER_STRING:
+    comment: MANUFACTURER_STRING (Manufacturer Identifier)
+    type: stringRW
+    default: STMicroelectronics
+    group: Device Descriptor
+  PID_AUDIO_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22336'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_CCID_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '8453'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_CDC_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22336'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_DFU_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '57105'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_HID_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22315'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_MSC_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22314'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_MTP_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22384'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_CUSTOMHID_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22352 '
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  PID_HS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor HS
+  CLASS_NAME_HS:
+    type: integer
+    default: '1'
+    min: '0'
+    max: '65535'
+  PID_AUDIO_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22336'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_CCID_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '8453'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_CDC_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22336'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_DFU_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '57105'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_HID_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22315'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_MSC_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22314'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_MTP_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22384'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_CUSTOMHID_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '22352 '
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  PID_FS:
+    comment: PID (Product IDentifier)
+    type: integer
+    default: '1'
+    min: '0'
+    max: '65535'
+    group: Device Descriptor FS
+  CLASS_NAME_FS:
+    type: integer
+    default: '1'
+    min: '0'
+    max: '65535'
+  PRODUCT_STRING_AUDIO_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Audio Class
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_AUDIO_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_AUDIO_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: AUDIO Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_AUDIO_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: AUDIO Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_AUDIO_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Audio Class
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_AUDIO_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_AUDIO_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: AUDIO Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_AUDIO_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: AUDIO Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_CCID_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Ccid Class
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_CCID_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_CCID_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: CCID Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_CCID_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: CCID Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_CCID_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Ccid Class
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_CCID_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_CCID_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: CCID Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_CCID_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: CCID Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_CDC_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Virtual ComPort
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_CDC_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_CDC_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: CDC Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_CDC_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: CDC Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_CDC_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Virtual ComPort
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_CDC_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_CDC_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: CDC Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_CDC_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: CDC Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_DFU_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 DownLoad Firmware Update
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_DFU_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_DFU_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: DFU Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_DFU_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: DFU Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_DFU_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 DownLoad Firmware Update
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_DFU_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_DFU_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: DFU Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_DFU_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: DFU Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_HID_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Human interface
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_HID_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_HID_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: HID Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_HID_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: HID Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_HID_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Human interface
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_HID_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_HID_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: HID Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_HID_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: HID Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_CUSTOMHID_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Custom Human interface
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_CUSTOMHID_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_CUSTOMHID_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: Custom HID Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_CUSTOMHID_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: Custom HID Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_CUSTOMHID_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Custom Human interface
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_CUSTOMHID_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_CUSTOMHID_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: Custom HID Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_CUSTOMHID_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: Custom HID Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_MSC_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Mass Storage
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_MSC_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_MSC_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: MSC Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_MSC_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: MSC Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_MSC_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Mass Storage
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_MSC_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_MSC_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: MSC Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_MSC_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: MSC Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_MTP_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Mtp Class
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_MTP_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_MTP_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: MTP Config
+    group: Device Descriptor HS
+  INTERFACE_STRING_MTP_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: MTP Interface
+    group: Device Descriptor HS
+  PRODUCT_STRING_MTP_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    default: STM32 Mtp Class
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_MTP_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    default: 00000000001A
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_MTP_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    default: MTP Config
+    group: Device Descriptor FS
+  INTERFACE_STRING_MTP_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    default: MTP Interface
+    group: Device Descriptor FS
+  PRODUCT_STRING_HS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    group: Device Descriptor HS
+  SERIALNUMBER_STRING_HS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    group: Device Descriptor HS
+  CONFIGURATION_STRING_HS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    group: Device Descriptor HS
+  INTERFACE_STRING_HS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    group: Device Descriptor HS
+  PRODUCT_STRING_FS:
+    comment: PRODUCT_STRING (Product Identifier)
+    type: stringRW
+    group: Device Descriptor FS
+  SERIALNUMBER_STRING_FS:
+    comment: SERIALNUMBER_STRING (Serial number)
+    type: stringRW
+    group: Device Descriptor FS
+  CONFIGURATION_STRING_FS:
+    comment: CONFIGURATION_STRING (Configuration Identifier)
+    type: stringRW
+    group: Device Descriptor FS
+  INTERFACE_STRING_FS:
+    comment: INTERFACE_STRING (Interface Identifier)
+    type: stringRW
+    group: Device Descriptor FS
+  MCU_RAM_SIZE:
+    comment: MCU_RAM_SIZE
+    type: integer
+    default: =$RamSize
+  HID_FS_BINTERVAL:
+    comment: HID_FS_BINTERVAL
+    type: hex
+    default: '0xA'
+    min: '0x1'
+    max: '0xFF'
+    group: Class Parameters
+  CUSTOM_HID_FS_BINTERVAL:
+    comment: CUSTOM_HID_FS_BINTERVAL
+    type: hex
+    default: '0x5'
+    min: '1'
+    max: '0xFF'
+    group: Class Parameters
+  APP_RX_DATA_SIZE:
+    comment: USB CDC Rx Buffer Size
+    type: integer
+    default: '2048'
+    min: '4'
+    max: '2048'
+    unit: Bytes
+    group: Class Parameters
+  APP_TX_DATA_SIZE:
+    comment: USB CDC Tx Buffer Size
+    type: integer
+    default: '2048'
+    min: '4'
+    max: '2048'
+    unit: Bytes
+    group: Class Parameters
+  MAX_STATIC_ALLOC_SIZE:
+    comment: MAX_STATIC_ALLOC_SIZE (Maximum static allocation size)
+    type: integer
+    default: '512'
+    min: '1'
+    max: '1000'
+    group: Class Parameters
+  USBD_CUSTOMHID_OUTREPORT_BUF_SIZE:
+    comment: USBD_CUSTOMHID_OUTREPORT_BUF_SIZE (Maximum report buffer size (OUT ENDPOINT))
+    type: integer
+    default: '2'
+    min: '2'
+    max: '64'
+    group: Class Parameters
+  USBD_CUSTOM_HID_REPORT_DESC_SIZE:
+    comment: USBD_CUSTOM_HID_REPORT_DESC_SIZE (Total length for Report descriptor (IN ENDPOINT))
+    type: integer
+    default: '2'
+    min: '2'
+    max: '255'
+    group: Class Parameters
+  MSC_MEDIA_PACKET:
+    comment: MSC_MEDIA_PACKET (Media I/O buffer Size)
+    type: integer
+    default: '512'
+    min: '1'
+    max: '32768'
+    unit: bytes
+    group: Class Parameters
+  USBD_AUDIO_FREQ:
+    comment: USBD_AUDIO_FREQ (Audio sample frequency rate)
+    type: integer
+    default: '22100'
+    min: '250'
+    max: '48000'
+    unit: sample/s
+    group: Class Parameters
+  CCID_BULK_EP_MAX_PACKET:
+    comment: CCID_BULK_EP_MAX_PACKET (CCID bulk endpoint max packet size)
+    type: integer
+    default: '512'
+    min: '1'
+    max: '32768'
+    unit: bytes
+    group: Class Parameters
+  CCID_INTR_EP_MAX_PACKET:
+    comment: CCID_INTR_EP_MAX_PACKET (CCID interrupt endpoint max packet size)
+    type: integer
+    default: '8'
+    min: '1'
+    max: '32768'
+    unit: bytes
+    group: Class Parameters
+  USBD_DFU_MAX_ITF_NUM:
+    comment: USBD_DFU_MAX_ITF_NUM (DFU maximum interface numbers)
+    type: integer
+    default: '1'
+    min: '1'
+    max: '6'
+    group: Class Parameters
+  USBD_DFU_XFER_SIZE:
+    comment: USBD_DFU_XFER_SIZE
+    type: integer
+    default: '1024'
+    min: '5'
+    max: '32768'
+    unit: Bytes
+    group: Class Parameters
+  USBD_DFU_MEDIA:
+    comment: USBD_DFU_MEDIA Interface
+    type: stringRW
+    default: '@Internal Flash   /0x08000000/03*016Ka,01*016Kg,01*064Kg,07*128Kg,04*016Kg,01*064Kg,07*128Kg'
+    group: Class Parameters
+  USBD_DFU_APP_DEFAULT_ADD:
+    comment: USBD_DFU_APP_DEFAULT_ADD (Base Address 0x)
+    type: Hex
+    default: '0x08000000'
+    min: '0x0'
+    max: '0xFFFFFFFF'
+    group: Class Parameters
+  dev_config:
+    comment: dev_config
+    type: list
+    default: '0'
+  USBD_HandleTypeDef_FS:
+    type: list
+    default: hUsbDevice_OTG_FS
+  USBD_HandleTypeDef_HS:
+    type: list
+    default: hUsbDevice_OTG_HS
+  id:
+    type: list
+    default: id
+  DEVICE_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  DEVICE_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_DESC:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  HS_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  FS_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  DFU_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  HID_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  MSC_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  CDC_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  AUDIO_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  CCID_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  MTP_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  CUSTOM_HID_Desc:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CLASS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CDC:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_HID:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CUSTOM_HID:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_MSC:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_AUDIO:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CCID:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_DFU:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_MTP:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_USER_CALLBACK:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_Interface_fops:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_Interface_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_Interface_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_Storage_Interface_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_Storage_Interface_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CustomHID_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CustomHID_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_AUDIO_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_AUDIO_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CCID_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_CCID_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_DFU_fops_FS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+  USBD_DFU_fops_HS:
+    type: integer
+    default: '0'
+    min: '0'
+    max: '10'
+signals:
+  VS_USB_DEVICE_CCID_FS: {}
+  VS_USB_DEVICE_CDC_FS: {}
+  VS_USB_DEVICE_HID_FS: {}
+  VS_USB_DEVICE_CUSTOM_HID_FS: {}
+  VS_USB_DEVICE_AUDIO_FS: {}
+  VS_USB_DEVICE_MSC_FS: {}
+  VS_USB_DEVICE_DFU_FS: {}
+  VS_USB_DEVICE_MTP_FS: {}
+modes:
+- name: AUDIO_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_AUDIO_FS
+  - PRODUCT_STRING_AUDIO_FS
+  - CONFIGURATION_STRING_AUDIO_FS
+  - INTERFACE_STRING_AUDIO_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - USBD_AUDIO_FREQ
+  possible_values:
+    VirtualMode:
+    - Audio
+    VirtualModeFS:
+    - Audio_FS
+    CLASS_NAME_FS:
+    - AUDIO
+- name: CCID_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_CCID_FS
+  - PRODUCT_STRING_CCID_FS
+  - CONFIGURATION_STRING_CCID_FS
+  - INTERFACE_STRING_CCID_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - CCID_BULK_EP_MAX_PACKET
+  - CCID_INTR_EP_MAX_PACKET
+  possible_values:
+    VirtualMode:
+    - Ccid
+    VirtualModeFS:
+    - Ccid_FS
+    CLASS_NAME_FS:
+    - CCID
+- name: CDC_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_CDC_FS
+  - PRODUCT_STRING_CDC_FS
+  - CONFIGURATION_STRING_CDC_FS
+  - INTERFACE_STRING_CDC_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - APP_RX_DATA_SIZE
+  - APP_TX_DATA_SIZE
+  possible_values:
+    VirtualMode:
+    - Cdc
+    VirtualModeFS:
+    - Cdc_FS
+    CLASS_NAME_FS:
+    - CDC
+- name: DFU_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SUPPORT_USER_STRING_DESC
+  - USBD_SUPPORT_USER_STRING
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_DFU_FS
+  - PRODUCT_STRING_DFU_FS
+  - CONFIGURATION_STRING_DFU_FS
+  - INTERFACE_STRING_DFU_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - USBD_DFU_MAX_ITF_NUM
+  - USBD_DFU_XFER_SIZE
+  - USBD_DFU_APP_DEFAULT_ADD
+  - USBD_DFU_MEDIA
+  possible_values:
+    VirtualMode:
+    - Dfu
+    VirtualModeFS:
+    - Dfu_FS
+    CLASS_NAME_FS:
+    - DFU
+- name: HID_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - HID_FS_BINTERVAL
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_HID_FS
+  - PRODUCT_STRING_HID_FS
+  - CONFIGURATION_STRING_HID_FS
+  - INTERFACE_STRING_HID_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  possible_values:
+    VirtualMode:
+    - Hid
+    VirtualModeFS:
+    - Hid_FS
+    CLASS_NAME_FS:
+    - HID
+- name: CUSTOM_HID_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - CUSTOM_HID_FS_BINTERVAL
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_CUSTOMHID_FS
+  - PRODUCT_STRING_CUSTOMHID_FS
+  - CONFIGURATION_STRING_CUSTOMHID_FS
+  - INTERFACE_STRING_CUSTOMHID_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - USBD_CUSTOM_HID_REPORT_DESC_SIZE
+  - USBD_CUSTOMHID_OUTREPORT_BUF_SIZE
+  possible_values:
+    VirtualMode:
+    - CustomHid
+    VirtualModeFS:
+    - Custom_Hid_FS
+    CLASS_NAME_FS:
+    - CUSTOM_HID
+- name: MSC_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_MSC_FS
+  - PRODUCT_STRING_MSC_FS
+  - CONFIGURATION_STRING_MSC_FS
+  - INTERFACE_STRING_MSC_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  - MSC_MEDIA_PACKET
+  possible_values:
+    VirtualMode:
+    - Msc
+    VirtualModeFS:
+    - Msc_FS
+    CLASS_NAME_FS:
+    - MSC
+- name: MTP_FS
+  hal_mode: ''
+  parameters:
+  - VirtualMode
+  - VirtualModeFS
+  - USBD_MAX_NUM_INTERFACES
+  - USBD_MAX_NUM_CONFIGURATION
+  - USBD_MAX_STR_DESC_SIZ
+  - USBD_SELF_POWERED
+  - USBD_DEBUG_LEVEL
+  - MAX_STATIC_ALLOC_SIZE
+  - VID
+  - LANGID_STRING
+  - MANUFACTURER_STRING
+  - USBD_LPM_ENABLED
+  - PID_MTP_FS
+  - PRODUCT_STRING_MTP_FS
+  - CONFIGURATION_STRING_MTP_FS
+  - INTERFACE_STRING_MTP_FS
+  - USBD_HandleTypeDef_FS
+  - CLASS_NAME_FS
+  possible_values:
+    VirtualMode:
+    - Mtp
+    VirtualModeFS:
+    - Mtp_FS
+    CLASS_NAME_FS:
+    - MTP
+source: db/mcu/IP/USB_DEVICE-v2.0_Cube_Modes.xml
+instance: USB_DEVICE

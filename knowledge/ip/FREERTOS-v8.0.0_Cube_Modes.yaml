@@ -1,0 +1,669 @@
+name: FREERTOS
+version: v8.0.0_Cube
+parameters:
+  configUSE_NEWLIB_REENTRANT:
+    comment: USE_NEWLIB_REENTRANT
+    type: list
+    default: '0'
+    group: Newlib settings (see parameter description first)
+  copyHeapFile:
+    comment: Use FW pack heap file
+    type: list
+    default: '1'
+    group: Project settings (see parameter description first)
+  FreeRTOS_API:
+    comment: FreeRTOS API
+    type: uniqueElementList
+    default: '2'
+    group: API
+  CMSIS_version:
+    comment: CMSIS-RTOS version
+    type: String
+    default: '1.02'
+    group: Versions
+  FREERTOS_version:
+    comment: FreeRTOS version
+    type: String
+    default: 10.0.1
+    group: Versions
+  RAM_SIZE:
+    comment: RAM_SIZE
+    type: integer
+    default: =$RamSize
+  MAX_RAM_SIZE:
+    comment: MAX RAM SIZE
+    type: integer
+    default: '2048'
+  MAX_SIZE_IN_USE:
+    comment: Max RAM size according to memory allocation
+    type: integer
+    default: =MAX_RAM_SIZE/4
+  MIN_PRIO_IN_USE:
+    comment: Min Prio used by freertos tasks (middleware ones and user ones)
+    type: integer
+    default: '1'
+  configUSE_PREEMPTION:
+    comment: USE_PREEMPTION
+    type: list
+    default: '1'
+    group: Kernel settings
+  configCPU_CLOCK_HZ:
+    comment: CPU_CLOCK_HZ
+    type: uniqueElementList
+    default: SystemD2Clock
+    group: Kernel settings
+  configTICK_RATE_HZ:
+    comment: TICK_RATE_HZ
+    type: integer
+    default: '1000'
+    min: '1'
+    max: '1000'
+    group: Kernel settings
+  configMAX_PRIORITIES:
+    comment: MAX_PRIORITIES
+    type: uniqueElementList
+    default: '56'
+    group: Kernel settings
+  configUSE_SB_COMPLETED_CALLBACK:
+    comment: USE_SB_COMPLETED_CALLBACK
+    type: integer
+    default: '0'
+    min: '0'
+    max: '1'
+    group: Kernel settings
+  configUSE_MINI_LIST_ITEM:
+    comment: USE_MINI_LIST_ITEM
+    type: integer
+    default: '1'
+    min: '0'
+    max: '1'
+    group: Kernel settings
+  configMINIMAL_STACK_SIZE:
+    comment: MINIMAL_STACK_SIZE
+    type: integer
+    default: '64'
+    min: '48'
+    max: =MAX_SIZE_IN_USE
+    unit: Words
+    group: Kernel settings
+  configMAX_TASK_NAME_LEN:
+    comment: MAX_TASK_NAME_LEN
+    type: integer
+    default: '16'
+    min: '12'
+    max: '255'
+    group: Kernel settings
+  configUSE_16_BIT_TICKS:
+    comment: USE_16_BIT_TICKS
+    type: uniqueElementList
+    default: '0'
+    group: Kernel settings
+  configIDLE_SHOULD_YIELD:
+    comment: IDLE_SHOULD_YIELD
+    type: list
+    default: '1'
+    group: Kernel settings
+  configUSE_MUTEXES:
+    comment: USE_MUTEXES
+    type: list
+    default: '1'
+    group: Kernel settings
+  configUSE_RECURSIVE_MUTEXES:
+    comment: USE_RECURSIVE_MUTEXES
+    type: list
+    default: '0'
+    group: Kernel settings
+  configUSE_COUNTING_SEMAPHORES:
+    comment: USE_COUNTING_SEMAPHORES
+    type: list
+    default: '1'
+    group: Kernel settings
+  configQUEUE_REGISTRY_SIZE:
+    comment: QUEUE_REGISTRY_SIZE
+    type: integer
+    default: '8'
+    min: '0'
+    max: '255'
+    group: Kernel settings
+  configUSE_APPLICATION_TASK_TAG:
+    comment: USE_APPLICATION_TASK_TAG
+    type: list
+    default: '0'
+    group: Kernel settings
+  configTOTAL_HEAP_SIZE:
+    comment: TOTAL_HEAP_SIZE
+    type: integer
+    default: '768'
+    min: =configMINIMAL_STACK_SIZE*4
+    max: =1024*$RamSize
+    unit: Bytes
+    group: Memory management settings
+  configHEAP_CLEAR_MEMORY_ON_FREE:
+    comment: HEAP_CLEAR_MEMORY_ON_FREE
+    type: integer
+    default: '0'
+    min: '0'
+    max: '1'
+    group: Memory management settings
+  HEAP_NUMBER:
+    comment: Memory Management scheme
+    type: list
+    default: '0'
+    group: Memory management settings
+  configGENERATE_RUN_TIME_STATS:
+    comment: GENERATE_RUN_TIME_STATS
+    type: list
+    default: '0'
+    group: Run time and task stats gathering related definitions
+  configUSE_TRACE_FACILITY:
+    comment: USE_TRACE_FACILITY
+    type: list
+    default: '1'
+    group: Run time and task stats gathering related definitions
+  configUSE_STATS_FORMATTING_FUNCTIONS:
+    comment: USE_STATS_FORMATTING_FUNCTIONS
+    type: list
+    default: '0'
+    group: Run time and task stats gathering related definitions
+  configUSE_IDLE_HOOK:
+    comment: USE_IDLE_HOOK
+    type: list
+    default: '0'
+    group: Hook function related definitions
+  configUSE_TICK_HOOK:
+    comment: USE_TICK_HOOK
+    type: list
+    default: '0'
+    group: Hook function related definitions
+  configUSE_MALLOC_FAILED_HOOK:
+    comment: USE_MALLOC_FAILED_HOOK
+    type: list
+    default: '0'
+    group: Hook function related definitions
+  configCHECK_FOR_STACK_OVERFLOW:
+    comment: CHECK_FOR_STACK_OVERFLOW
+    type: list
+    default: '0'
+    group: Hook function related definitions
+  configUSE_CO_ROUTINES:
+    comment: USE_CO_ROUTINES
+    type: list
+    default: '0'
+    group: Co-routine related definitions
+  configMAX_CO_ROUTINE_PRIORITIES:
+    comment: MAX_CO_ROUTINE_PRIORITIES
+    type: integer
+    default: '2'
+    min: '1'
+    max: '255'
+    group: Co-routine related definitions
+  configUSE_TIMERS:
+    comment: USE_TIMERS
+    type: list
+    default: '0'
+    group: Software timer definitions
+  configTIMER_TASK_PRIORITY:
+    comment: TIMER_TASK_PRIORITY
+    type: integer
+    default: '2'
+    min: '0'
+    max: =configMAX_PRIORITIES-1
+    group: Software timer definitions
+  configTIMER_TASK_STACK_DEPTH:
+    comment: TIMER_TASK_STACK_DEPTH
+    type: integer
+    default: =configMINIMAL_STACK_SIZE * 2
+    min: =configMINIMAL_STACK_SIZE
+    max: =MAX_RAM_SIZE/4
+    unit: Words
+    group: Software timer definitions
+  configTIMER_QUEUE_LENGTH:
+    comment: TIMER_QUEUE_LENGTH
+    type: integer
+    default: '10'
+    min: '1'
+    max: '255'
+    group: Software timer definitions
+  configLIBRARY_LOWEST_INTERRUPT_PRIORITY:
+    comment: LIBRARY_LOWEST_INTERRUPT_PRIORITY
+    type: integer
+    default: '15'
+    min: '1'
+    max: '15'
+    group: Interrupt nesting behaviour configuration
+  configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY:
+    comment: LIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY
+    type: integer
+    default: '5'
+    min: '1'
+    max: =configLIBRARY_LOWEST_INTERRUPT_PRIORITY
+    group: Interrupt nesting behaviour configuration
+  configASSERT( x ):
+    default: 'if ((x) == 0) {taskDISABLE_INTERRUPTS(); for( ;; );} '
+  thread_def:
+    default: 'NULL'
+  argument:
+    default: 'NULL'
+  configPRIO_BITS:
+    comment: PRIO_BITS
+    type: integer
+    default: '2'
+  INCLUDE_vTaskPrioritySet:
+    comment: vTaskPrioritySet
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_uxTaskPriorityGet:
+    comment: uxTaskPriorityGet
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_vTaskDelete:
+    comment: vTaskDelete
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_vTaskCleanUpResources:
+    comment: vTaskCleanUpResources
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_vTaskSuspend:
+    comment: vTaskSuspend
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_xTaskDelayUntil:
+    comment: xTaskDelayUntil
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_vTaskDelayUntil:
+    comment: vTaskDelayUntil
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_vTaskDelay:
+    comment: vTaskDelay
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_xTaskGetSchedulerState:
+    comment: xTaskGetSchedulerState
+    type: list
+    default: '1'
+    group: Include definitions
+  configUSE_ALTERNATIVE_API:
+    comment: USE_ALTERNATIVE_API
+    type: list
+    default: '0'
+    group: Kernel settings
+  INCLUDE_xTaskResumeFromISR:
+    comment: xTaskResumeFromISR
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_xQueueGetMutexHolder:
+    comment: xQueueGetMutexHolder
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_xSemaphoreGetMutexHolder:
+    comment: xSemaphoreGetMutexHolder
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_pcTaskGetTaskName:
+    comment: pcTaskGetTaskName
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_uxTaskGetStackHighWaterMark:
+    comment: uxTaskGetStackHighWaterMark
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_xTaskGetCurrentTaskHandle:
+    comment: xTaskGetCurrentTaskHandle
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_eTaskGetState:
+    comment: eTaskGetState
+    type: list
+    default: '1'
+    group: Include definitions
+  INCLUDE_xEventGroupSetBitFromISR:
+    comment: xEventGroupSetBitFromISR
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_xTimerPendFunctionCall:
+    comment: xTimerPendFunctionCall
+    type: list
+    default: '1'
+    group: Include definitions
+  configENABLE_BACKWARD_COMPATIBILITY:
+    comment: ENABLE_BACKWARD_COMPATIBILITY
+    type: list
+    default: '1'
+    group: Kernel settings
+  configUSE_PORT_OPTIMISED_TASK_SELECTION:
+    comment: USE_PORT_OPTIMISED_TASK_SELECTION
+    type: list
+    default: '0'
+    group: Kernel settings
+  configUSE_TICKLESS_IDLE:
+    comment: USE_TICKLESS_IDLE
+    type: list
+    default: '0'
+    group: Kernel settings
+  configUSE_TASK_NOTIFICATIONS:
+    comment: USE_TASK_NOTIFICATIONS
+    type: list
+    default: '1'
+    group: Kernel settings
+  configOVERRIDE_DEFAULT_TICK_CONFIGURATION:
+    comment: OVERRIDE_DEFAULT_TICK_CONFIGURATION
+    type: list
+    default: '0'
+    group: Kernel settings
+  MEMORY_ALLOCATION:
+    comment: Memory Allocation
+    type: uniqueElementList
+    default: '2'
+    group: Memory management settings
+  configUSE_DAEMON_TASK_STARTUP_HOOK:
+    comment: USE_DAEMON_TASK_STARTUP_HOOK
+    type: list
+    default: '0'
+    group: Hook function related definitions
+  INCLUDE_xTaskAbortDelay:
+    comment: xTaskAbortDelay
+    type: list
+    default: '0'
+    group: Include definitions
+  INCLUDE_xTaskGetHandle:
+    comment: xTaskGetHandle
+    type: list
+    default: '0'
+    group: Include definitions
+  configRECORD_STACK_HIGH_ADDRESS:
+    comment: RECORD_STACK_HIGH_ADDRESS
+    type: list
+    default: '0'
+    group: Kernel settings
+  configENABLE_MPU:
+    comment: ENABLE_MPU
+    type: list
+    default: '0'
+    group: MPU/FPU
+  configENABLE_FPU:
+    comment: ENABLE_FPU
+    type: list
+    default: '0'
+    group: MPU/FPU
+  configMESSAGE_BUFFER_LENGTH_TYPE:
+    comment: MESSAGE_BUFFER_LENGTH_TYPE
+    type: uniqueElementList
+    default: size_t
+    group: Added with 10.2.1 support
+  configUSE_POSIX_ERRNO:
+    comment: USE_POSIX_ERRNO
+    type: list
+    default: '0'
+    group: Added with 10.2.1 support
+  INCLUDE_uxTaskGetStackHighWaterMark2:
+    comment: uxTaskGetStackHighWaterMark2
+    type: list
+    default: '0'
+    group: Include definitions
+  configUSE_OS2_THREAD_SUSPEND_RESUME:
+    comment: USE_OS2_THREAD_SUSPEND_RESUME
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  configUSE_OS2_THREAD_ENUMERATE:
+    comment: USE_OS2_THREAD_ENUMERATE
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  configUSE_OS2_EVENTFLAGS_FROM_ISR:
+    comment: USE_OS2_EVENTFLAGS_FROM_ISR
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  configUSE_OS2_THREAD_FLAGS:
+    comment: USE_OS2_THREAD_FLAGS
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  configUSE_OS2_TIMER:
+    comment: USE_OS2_TIMER
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  configUSE_OS2_MUTEX:
+    comment: USE_OS2_MUTEX
+    type: list
+    default: '1'
+    group: CMSIS-RTOS V2 flags
+  FirstAddedTab:
+    comment: First additional tab
+    type: string
+    default: Tasks and Queues
+  SecondAddedTab:
+    comment: Second additional tab
+    type: string
+    default: Timers and Semaphores
+  TasksTableTitle:
+    comment: Title for the tasks table
+    type: string
+    default: Tasks
+  TasksColumns:
+    comment: Names for the table columns
+    type: string
+    default: Name;Task Priority;Stack size (Words);Entry function; Code generation option; Parameters
+  MaxTasks:
+    comment: Maximum number of tasks
+    type: integer
+    default: '15'
+  TasksKeys:
+    comment: Keys for config file
+    type: string
+    default: Tasks01;Tasks02
+  Tasks01:
+    comment: Tasks (1 to 15)
+    type: string
+  Tasks02:
+    comment: Tasks (16 to ..)
+    type: string
+  QueuesColumns:
+    comment: Names for the table columns
+    type: string
+    default: Name;Queue size;Item size
+  MaxQueues:
+    comment: Maximum number of queues
+    type: integer
+    default: '15'
+  QueuesKeys:
+    comment: Keys for config file
+    type: string
+    default: Queues01
+  Queues01:
+    comment: Queues (1 to 15)
+    type: string
+  TimersColumns:
+    comment: Names for the table columns
+    type: string
+    default: Name;Callback;Type;Code generation option
+  MaxTimers:
+    comment: Maximum number of timers
+    type: integer
+    default: '20'
+  TimersKeys:
+    comment: Keys for config file
+    type: string
+    default: Timers01
+  Timers01:
+    comment: Timers (1 to 20)
+    type: string
+  MaxMutexes:
+    comment: Maximum number of mutexes
+    type: integer
+    default: '25'
+  MutexesKeys:
+    comment: Keys for config file
+    type: string
+    default: Mutexes01
+  Mutexes01:
+    comment: Mutexes (1 to 25)
+    type: string
+  MaxRecursiveMutexes:
+    comment: Maximum number of recursive mutexes
+    type: integer
+    default: '25'
+  RecursiveMutexesKeys:
+    comment: Keys for config file
+    type: string
+    default: RecursiveMutexes01
+  RecursiveMutexes01:
+    comment: Recursive mutexes (1 to 25)
+    type: string
+  MaxBinarySemaphores:
+    comment: Maximum number of binary semaphores
+    type: integer
+    default: '25'
+  BinarySemaphoresKeys:
+    comment: Keys for config file
+    type: string
+    default: BinarySemaphores01
+  BinarySemaphores01:
+    comment: Binary semaphores (1 to 25)
+    type: string
+  MaxCountingSemaphores:
+    comment: Maximum number of counting semaphores
+    type: integer
+    default: '20'
+  CountingSemaphoresKeys:
+    comment: Keys for config file
+    type: string
+    default: CountingSemaphores01
+  CountingSemaphores01:
+    comment: Counting semaphores (1 to 20)
+    type: string
+  FootprintOK:
+    comment: Says if the calculated footprint is ok with defined parameters
+    type: string
+    default: unset
+signals:
+  VS_CMSIS_V1: {}
+  VS_CMSIS_V2: {}
+  VS_NATIVE: {}
+modes:
+- name: FreeRTOS_Basemode
+  hal_mode: ''
+  parameters:
+  - FreeRTOS_API
+  - FREERTOS_version
+  - configENABLE_MPU
+  - configENABLE_FPU
+  - configUSE_PREEMPTION
+  - MEMORY_ALLOCATION
+  - configCPU_CLOCK_HZ
+  - configTICK_RATE_HZ
+  - configMAX_PRIORITIES
+  - configUSE_SB_COMPLETED_CALLBACK
+  - configUSE_MINI_LIST_ITEM
+  - configMINIMAL_STACK_SIZE
+  - configMAX_TASK_NAME_LEN
+  - configUSE_16_BIT_TICKS
+  - configIDLE_SHOULD_YIELD
+  - configUSE_MUTEXES
+  - configUSE_RECURSIVE_MUTEXES
+  - configUSE_COUNTING_SEMAPHORES
+  - configQUEUE_REGISTRY_SIZE
+  - configUSE_APPLICATION_TASK_TAG
+  - configTOTAL_HEAP_SIZE
+  - configHEAP_CLEAR_MEMORY_ON_FREE
+  - HEAP_NUMBER
+  - configUSE_IDLE_HOOK
+  - configUSE_TICK_HOOK
+  - configUSE_MALLOC_FAILED_HOOK
+  - configUSE_DAEMON_TASK_STARTUP_HOOK
+  - configCHECK_FOR_STACK_OVERFLOW
+  - configGENERATE_RUN_TIME_STATS
+  - configUSE_TRACE_FACILITY
+  - configUSE_STATS_FORMATTING_FUNCTIONS
+  - configUSE_CO_ROUTINES
+  - configMAX_CO_ROUTINE_PRIORITIES
+  - configUSE_TIMERS
+  - configTIMER_TASK_PRIORITY
+  - configTIMER_QUEUE_LENGTH
+  - configTIMER_TASK_STACK_DEPTH
+  - configPRIO_BITS
+  - configLIBRARY_LOWEST_INTERRUPT_PRIORITY
+  - configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY
+  - configASSERT( x )
+  - INCLUDE_vTaskPrioritySet
+  - INCLUDE_uxTaskPriorityGet
+  - INCLUDE_vTaskDelete
+  - INCLUDE_vTaskCleanUpResources
+  - INCLUDE_vTaskSuspend
+  - INCLUDE_xTaskDelayUntil
+  - INCLUDE_vTaskDelayUntil
+  - INCLUDE_vTaskDelay
+  - INCLUDE_xTaskGetSchedulerState
+  - configUSE_ALTERNATIVE_API
+  - INCLUDE_xTaskResumeFromISR
+  - INCLUDE_xQueueGetMutexHolder
+  - INCLUDE_xSemaphoreGetMutexHolder
+  - INCLUDE_pcTaskGetTaskName
+  - INCLUDE_uxTaskGetStackHighWaterMark
+  - INCLUDE_xTaskGetCurrentTaskHandle
+  - INCLUDE_eTaskGetState
+  - INCLUDE_xEventGroupSetBitFromISR
+  - INCLUDE_xTimerPendFunctionCall
+  - configENABLE_BACKWARD_COMPATIBILITY
+  - configUSE_PORT_OPTIMISED_TASK_SELECTION
+  - configUSE_TICKLESS_IDLE
+  - configUSE_TASK_NOTIFICATIONS
+  - INCLUDE_xTaskAbortDelay
+  - INCLUDE_xTaskGetHandle
+  - configRECORD_STACK_HIGH_ADDRESS
+  - configOVERRIDE_DEFAULT_TICK_CONFIGURATION
+  - configUSE_NEWLIB_REENTRANT
+  - copyHeapFile
+  - configMESSAGE_BUFFER_LENGTH_TYPE
+  - INCLUDE_uxTaskGetStackHighWaterMark2
+  - configUSE_POSIX_ERRNO
+  - Tasks01
+  - Tasks02
+  - Queues01
+  - Timers01
+  - Mutexes01
+  - RecursiveMutexes01
+  - BinarySemaphores01
+  - CountingSemaphores01
+  - configUSE_OS2_THREAD_SUSPEND_RESUME
+  - configUSE_OS2_THREAD_ENUMERATE
+  - configUSE_OS2_EVENTFLAGS_FROM_ISR
+  - configUSE_OS2_THREAD_FLAGS
+  - configUSE_OS2_TIMER
+  - configUSE_OS2_MUTEX
+- name: CMSIS_V1
+  hal_mode: ''
+  base_mode: FreeRTOS_Basemode
+  parameters:
+  - CMSIS_version
+- name: CMSIS_V2
+  hal_mode: ''
+  base_mode: FreeRTOS_Basemode
+  parameters:
+  - CMSIS_version
+- name: Native
+  hal_mode: ''
+  base_mode: FreeRTOS_Basemode
+  parameters: []
+source: db/mcu/IP/FREERTOS-v8.0.0_Cube_Modes.xml
+instance: FREERTOS

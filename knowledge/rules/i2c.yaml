@@ -1,0 +1,13 @@
+# I2C:已实测
+verified: true
+source: "实测 2026-08-06,I2C1 生成 i2c.c 成功"
+
+command_examples:
+  - "set pin PB8 I2C1_SCL"
+  - "set pin PB9 I2C1_SDA"
+  - "set mode I2C1 I2C"
+
+result: "生成 i2c.c,main.c 里调用 MX_I2C1_Init"
+
+notes:
+  - "PB8/PB9 只是 STM32F103C8T6 上的常见组合,以 knowledge/mcu/*.pins.yaml 里的 I2C1_SCL/I2C1_SDA 为准"

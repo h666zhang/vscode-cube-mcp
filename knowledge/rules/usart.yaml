@@ -1,0 +1,22 @@
+# USART:还没有实测过(0.4.x 的验证范围只到 GPIO / I2C / TIM)
+# verified 为 false 的规则不应该被执行;先用 probe 验证再改成 true。
+verified: false
+source: "(未实测)命令写法来自 CubeMX 脚本语法与 db 导出,尚未在真机跑通"
+
+command_examples:
+  - "set mode USART1 Asynchronous"
+  - "set ip parameters USART1 BaudRate 115200"
+  - "set pin PA9 USART1_TX"
+  - "set pin PA10 USART1_RX"
+
+parameters_from_db:
+  baudrate:
+    key: "USART{n}.BaudRate"
+    default: 115200
+    min: 110
+    max: 10500000
+    unit: Bits/s
+
+todo:
+  - "先跑 cubemx_probe(USART2, 115200 + PA2/PA3) 拿到真实 diff,再补上 .ioc 片段并改成 verified: true"
+  - "确认 DMA 收发、NVIC 中断的写法(目前完全没收录)"

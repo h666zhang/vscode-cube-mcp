@@ -1,0 +1,26 @@
+name: NVIC
+version: STM32F103G
+parameters:
+  PriorityGroup:
+    comment: Priority Group
+    type: list
+    default: NVIC_PRIORITYGROUP_4
+  PreemptionPriority:
+    comment: Preemption Priority
+    type: integer
+    default: '0'
+    min: '0'
+    max: '0'
+  SubPriority:
+    comment: Sub Priority
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  IRQn:
+    comment: Interrupt Table
+    type: list
+signals: {}
+modes: []
+source: db/mcu/IP/NVIC-STM32F103G_Modes.xml
+instance: NVIC

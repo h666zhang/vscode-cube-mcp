@@ -43,7 +43,7 @@
 
 ## 开发 / 验证
 
-- 单元测试:`python -m unittest test_cubemx_mcp`(72 个,不依赖 CubeMX)
+- 单元测试:`python -m unittest test_cubemx_mcp`(82 个,不依赖 CubeMX)
 - 语法检查:`python -m py_compile cubemx_mcp.py test_cubemx_mcp.py`
 - MCP 协议级冒烟:**用官方 `mcp.client.stdio.ClientSession` 连接**;手写 JSON-RPC 直连本 2.0 server 会挂起无响应。
 

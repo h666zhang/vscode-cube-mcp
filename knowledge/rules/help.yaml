@@ -1,0 +1,145 @@
+# cubemx_help 的返回值:工具与外设的使用说明
+# 逐字搬运自 cubemx_mcp.py 的 help 常量(2.2);改这里等于改 cubemx_help 的输出
+source: 逐字搬运自 cubemx_mcp.py 的 help 常量(_GUIDE / _NEW_PROJECT_HELP / _PERIPHERAL_HELP / _REMOVE_HELP / _ADDSOURCE_HELP)
+guide: |-
+  Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
+  =============================================================
+  【能力边界(先读)】
+  本工具只负责 **.ioc 工程配置与 HAL 骨架生成**：
+  引脚 / 外设 / 时钟 / 工具链的配置，以及 generate 出可编译的 HAL 工程。
+  **不生成应用业务代码**（LED 闪烁、OLED 显示内容、传感器驱动、中断处理逻辑等），
+  这些请在生成后的工程里自行编写——配置到骨架为止，剩下是你的代码。
+
+  【工具一览(9 个)】
+    cubemx_help                本指南(当前)
+    cubemx_new_project         从零生成 HAL 工程(首选入口)
+    cubemx_load                加载 .ioc 回读配置(只读)
+    cubemx_configure           加载 .ioc,执行 set 命令序列并写回
+    cubemx_generate            加载 .ioc 生成 HAL 代码
+    cubemx_export_pinout       导出引脚配置 CSV(只读)
+    cubemx_remove_peripheral   从 .ioc 移除外设
+    cubemx_add_source          把自定义源文件加入 CMake 源列表
+    cubemx_script              任意 CubeMX 脚本命令(原始脚本接口)
+
+  【从零生成工程(标准流程)】
+  1) 调 cubemx_help(topic="templates") 查看可用芯片模板
+  2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
+     mcu="STM32F103C8T6",
+     commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+  3) 工程生成后,自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
+
+  【cubemx_new_project 参数(默认值而非强制)】
+    mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
+    toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
+    couple_files  默认 True(每个外设生成独立 .c/.h);False 则集中到 main.c
+    clock_source  默认 "HSE"(外部晶振,72MHz);"HSI" 用内部 RC
+    pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
+    commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+    template      指定模板路径,优先于 mcu 查找
+
+  【外设配置命令与已知坑】
+  - GPIO:set pin PB13 GPIO_Output;set gpio parameters PB13 GPIO_Label LED
+  - I2C:set pin PB8 I2C1_SCL;set pin PB9 I2C1_SDA;set mode I2C1 I2C
+  - TIM 内部时钟(重要):脚本 set mode TIM2 一律 KO;set ip parameters TIM2
+    ClockSource TIM_CLOCKSOURCE_INTERNAL 只改参数不改 SH/VP 表达(GUI 仍显示
+    ETR)。可靠做法:new_project 命令含 "set ip parameters TIMx ClockSource
+    TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达
+  - 时钟坑:对 RCC 执行 set 命令(如 PLLMUL)会丢 RCC.PLLSourceVirtual=HSE,
+    时钟静默降级 HSI(64MHz 而非 72MHz);改时钟优先用 new_project 的
+    clock_source/pll_mul 参数
+  - generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,自定义源文件需重新
+    cubemx_add_source
+
+  【约束】
+  - 所有 .ioc / 生成路径必须在 ST_CUBEMX_ALLOWED_ROOTS 白名单内
+  - 工程名仅字母/数字/下划线;路径写绝对路径(Windows 建议 C:/ 正斜杠)
+new_project: |-
+  【从零生成工程(cubemx_new_project)】
+  流程:
+  1) 先调 cubemx_help(topic="templates") 查看可用芯片模板
+  2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
+     mcu="STM32F103C8T6",
+     commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+  3) 自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
+
+  参数(默认值而非强制):
+    mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
+    toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
+    couple_files  默认 True(每个外设独立 .c/.h);False 则集中到 main.c
+    clock_source  默认 "HSE"(72MHz);"HSI" 用内部 RC
+    pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
+    commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+    template      指定模板路径,优先于 mcu 查找
+
+  注意:找不到 {mcu}.ioc 模板时错误信息会列出可用模板,并按指引生成新芯片模板。
+peripheral:
+  gpio: |-
+    【GPIO(已验证)】
+      set pin PB13 GPIO_Output
+      set gpio parameters PB13 GPIO_Label LED
+    示例:LED 在 PB13 → 命令序列如上。
+  i2c: |-
+    【I2C(已验证)】
+      set pin PB8 I2C1_SCL
+      set pin PB9 I2C1_SDA
+      set mode I2C1 I2C
+    生成 i2c.c + main.c 调用 MX_I2C1_Init。
+  tim: |-
+    【TIM 内部时钟(重要,有坑)】
+    - set mode TIM2 一律 KO;set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL
+      只改参数、不改 SH/VP 表达,CubeMX GUI 仍显示 ETR;手写 VP_TIMx 表达会被
+      generate 静默清理。
+    - 可靠做法:new_project 的 commands 里含
+      "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
+      server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
+    - 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。
+
+    【TIM PWM(6.18 标准表达注入,0.4.1 起)】
+    - 命令:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
+      例:set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50
+         → 72MHz/72/100 = 10kHz,占空比 50/100 = 50%
+    - 常用引脚→信号(STM32F103):PA6→S_TIM3_CH1、PA7→S_TIM3_CH2、PB0→S_TIM3_CH3、
+      PB1→S_TIM3_CH4;PA0-WKUP→S_TIM2_CH1_ETR、PA1→S_TIM2_CH2。
+    - .ioc 内部枚举名带序号:"PWM Generation1 CH1"(GUI 名 "PWM Generation CH1"),
+      写错会被 CubeMX 静默丢弃(实测:整个 TIM 从 IP 列表消失)。
+
+    【TIM 输入捕获(6.18 标准表达注入,0.4.1 起)】
+    - 命令:set ip parameters TIM2 InputCapture <pin> <signal> [Prescaler n] [Period n]
+      例:set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535
+    - 自动配 IC1 上升沿(direct)+ IC2 下降沿参数(IC2Polarity=FALLING/IC2Selection=INDIRECTTI),
+      TIM2 中断自动启用。
+    - 已知限制(实测):CubeMX 只生成 IC1 的 sConfigIC;测占空比需在 main.c 手动补 IC2:
+        TIM_IC_InitTypeDef ic2 = {0};
+        ic2.ICPolarity  = TIM_INPUTCHANNELPOLARITY_FALLING;
+        ic2.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+        ic2.ICPrescaler = TIM_ICPSC_DIV1;
+        ic2.ICFilter    = 0;
+        HAL_TIM_IC_ConfigChannel(&htim2, &ic2, TIM_CHANNEL_2);
+        HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+    - PA0 的 .ioc 信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1)。
+    - .ioc 内部枚举名:Input_Capture1_from_TI1(GUI 名 "Input Capture direct mode")。
+  rcc: |-
+    【时钟(RCC,有坑)】
+    - 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
+    - 对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
+      时钟静默降级 HSI(如 64MHz 而非 72MHz)。
+    - 改频率优先用 cubemx_new_project 的 clock_source/pll_mul 参数;
+      需要手动 set 时同时补:
+      set ip parameters RCC PLLSourceVirtual RCC_PLLSOURCE_HSE
+      set ip parameters RCC PLLMUL RCC_PLL_MUL9
+      set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK
+      set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2
+remove: |-
+  【移除外设(cubemx_remove_peripheral)】
+  - 用法:cubemx_remove_peripheral(ioc, peripheral)
+    如 cubemx_remove_peripheral("C:/proj/Demo.ioc", "TIM3")
+  - 直接编辑 .ioc 文本(脚本 set noparam 对部分外设无效):删除 Mcu.IPx、
+    关联引脚/参数、NVIC、functionlistsort 段,并重排序号。
+  - 注意:操作前自行备份;移除后建议重新 generate 同步代码。
+add_source: |-
+  【自定义源文件加入编译(cubemx_add_source)】
+  - 用法:cubemx_add_source(ioc, source_file)
+    如 cubemx_add_source("C:/proj/Demo.ioc", "Core/Src/OLED.c")
+  - 背景:CubeMX 重新 generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,
+    手动加的自定义源文件会丢失;本工具用于重新添加(幂等)。
+  - source_file 必须相对工程根,如 Core/Src/OLED.c(拒绝 ../、绝对路径)。

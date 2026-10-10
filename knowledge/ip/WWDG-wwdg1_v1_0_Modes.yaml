@@ -1,0 +1,49 @@
+name: WWDG
+version: wwdg1_v1_0
+parameters:
+  Instance:
+    comment: WWDG instance
+    type: list
+    default: WWDG
+  Prescaler:
+    comment: WWDG counter clock prescaler
+    type: list
+    default: WWDG_PRESCALER_1
+    group: Watchdog Clocking
+  Window:
+    comment: WWDG window value
+    type: integer
+    default: '64'
+    min: '64'
+    max: '127'
+    group: Watchdog Clocking
+  Counter:
+    comment: WWDG free-running downcounter value
+    type: integer
+    default: '64'
+    min: =#Window
+    max: '127'
+    group: Watchdog Clocking
+  EWIMode:
+    comment: Early wakeup interrupt
+    type: list
+    default: WWDG_EWI_DISABLE
+    group: Watchdog Interrupt
+signals:
+  VS_WWDG: {}
+modes:
+- name: WWDG_Activate
+  hal_mode: WWDG
+  parameters:
+  - Prescaler
+  - Window
+  - Counter
+  - EWIMode
+- name: WWDG_Activate
+  hal_mode: WWDG
+  parameters:
+  - Prescaler
+  - Window
+  - Counter
+source: db/mcu/IP/WWDG-wwdg1_v1_0_Modes.xml
+instance: WWDG

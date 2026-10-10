@@ -1,0 +1,209 @@
+name: SYS
+version: STM32F10x_sys_v1_0
+parameters:
+  instance:
+    type: list
+    default: TIM1
+signals:
+  JTCK-SWCLK:
+    io_mode: System
+  JTDI:
+    io_mode: System
+  JTDO-TRACESWO:
+    io_mode: System
+  JTMS-SWDIO:
+    io_mode: System
+  NJTRST:
+    io_mode: System
+  MCO:
+    io_mode: GPIO
+  OSC_IN:
+    io_mode: System
+  OSC_OUT:
+    io_mode: System
+  OSC32_IN:
+    io_mode: System
+  OSC32_OUT:
+    io_mode: System
+  TAMPER-RTC:
+    io_mode: System
+  TRACECLK:
+    io_mode: System
+  TRACED0:
+    io_mode: System
+  TRACED1:
+    io_mode: System
+  TRACED2:
+    io_mode: System
+  TRACED3:
+    io_mode: System
+  WKUP:
+    io_mode: System
+  VS_MISCREMAP: {}
+  VS_ND: {}
+  VS_tim1: {}
+  VS_tim2: {}
+  VS_tim3: {}
+  VS_tim4: {}
+  VS_tim5: {}
+  VS_tim6: {}
+  VS_tim7: {}
+  VS_tim8: {}
+  VS_tim9: {}
+  VS_tim10: {}
+  VS_tim11: {}
+  VS_tim12: {}
+  VS_tim13: {}
+  VS_tim14: {}
+  VS_tim15: {}
+  VS_tim16: {}
+  VS_tim17: {}
+  VS_tim18: {}
+  VS_tim19: {}
+  VS_tim20: {}
+  VS_tim21: {}
+  VS_tim22: {}
+  VS_tim23: {}
+  VS_RTC: {}
+  VS_Systick: {}
+modes:
+- name: TIM
+  hal_mode: ''
+  parameters:
+  - instance
+- name: TIM1
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM2
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM3
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM4
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM5
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM6
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM7
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM8
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM9
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM10
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM11
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM12
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM13
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM14
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM15
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM16
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM17
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM18
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM19
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM20
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM21
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM22
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: TIM23
+  hal_mode: ''
+  base_mode: TIM
+  parameters: []
+- name: RTC_WKUP
+  hal_mode: ''
+  parameters: []
+- name: RTC_ALARM
+  hal_mode: ''
+  parameters: []
+- name: MISC_REMAP
+  hal_mode: ''
+  parameters: []
+- name: No_Debug
+  hal_mode: ''
+  parameters: []
+- name: Serial_Wire
+  hal_mode: ''
+  parameters: []
+- name: JTAG_4_pins
+  hal_mode: ''
+  parameters: []
+- name: JTAG_5_pins
+  hal_mode: ''
+  parameters: []
+- name: Trace_Asynchronous_SW
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_1bit_JTAG
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_2bits_JTAG
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_4bits_JTAG
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_1bit_SW
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_2bits_SW
+  hal_mode: ''
+  parameters: []
+- name: Trace_Synchro_4bits_SW
+  hal_mode: ''
+  parameters: []
+source: db/mcu/IP/SYS-STM32F10x_sys_v1_0_Modes.xml
+instance: SYS

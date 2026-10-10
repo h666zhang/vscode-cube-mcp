@@ -1,0 +1,291 @@
+name: GPIO
+version: STM32F103x8_gpio_v1_0
+parameters:
+  GPIO_AF:
+    comment: GPIO Alternate Function
+    type: list
+    default: 'null'
+  GPIOx:
+    comment: GPIO address
+    type: list
+  GPIO_Pin:
+    comment: GPIO pin mask
+    type: list
+  PinState:
+    comment: GPIO output level
+    type: list
+    default: GPIO_PIN_RESET
+  GPIO_ModeDefaultPP:
+    comment: GPIO mode
+    type: list
+    default: GPIO_MODE_AF_PP
+  GPIO_ModeDefaultOD:
+    comment: GPIO mode
+    type: list
+    default: GPIO_MODE_AF_OD
+  GPIO_ModeDefaultOutputPP:
+    comment: GPIO mode
+    type: list
+    default: GPIO_MODE_OUTPUT_PP
+  GPIO_ModeDefaultEXTI:
+    comment: GPIO mode
+    type: list
+    default: GPIO_MODE_IT_RISING
+  GPIO_Mode:
+    comment: GPIO mode
+    type: list
+  GPIO_PuPdOD:
+    comment: GPIO Pull-up/Pull-down
+    type: list
+    default: GPIO_PULLUP
+  GPIO_PuPd:
+    comment: GPIO Pull-up/Pull-down
+    type: list
+    default: GPIO_NOPULL
+  GPIO_Pu:
+    comment: GPIO Pull-up/Pull-down
+    type: list
+    default: GPIO_NOPULL
+  GPIO_Speed:
+    comment: Maximum output speed
+    type: list
+    default: GPIO_SPEED_FREQ_LOW
+  GPIO_Speed_High_Default:
+    comment: Maximum output speed
+    type: list
+    default: GPIO_SPEED_FREQ_HIGH
+  GPIO_Mode_For_EXTI_LL:
+    comment: GPIO mode
+    type: list
+    default: GPIO_MODE_INPUT
+signals: {}
+modes:
+- name: GPIO
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+- name: Analog
+  hal_mode: ''
+  parameters:
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_ANALOG
+- name: Input
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_INPUT
+- name: InputFloating
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_PuPd:
+    - GPIO_NOPULL
+    GPIO_Mode:
+    - GPIO_MODE_INPUT
+- name: InputFloatingAndPullUp
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_PuPd:
+    - GPIO_NOPULL
+    - GPIO_PULLUP
+    GPIO_Mode:
+    - GPIO_MODE_INPUT
+- name: InputPullUp
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_PuPd:
+    - GPIO_PULLUP
+    GPIO_Mode:
+    - GPIO_MODE_INPUT
+- name: InputPullDown
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_Pin
+  possible_values:
+    GPIO_PuPd:
+    - GPIO_PULLDOWN
+    GPIO_Mode:
+    - GPIO_MODE_INPUT
+- name: Output
+  hal_mode: ''
+  parameters:
+  - GPIO_Speed
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_ModeDefaultOutputPP
+  - GPIO_Pin
+  - PinState
+  possible_values:
+    GPIO_ModeDefaultOutputPP:
+    - GPIO_MODE_OUTPUT_PP
+    - GPIO_MODE_OUTPUT_OD
+- name: AlternateFunctionPushPull
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+- name: AlternateFunctionPushPullPULLUP
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+- name: AlternateFunctionPushPullUp
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+- name: AlternateFunctionOpenDrain
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_OD
+- name: AlternateFunctionOpenDrainAndPushPullDefaultPP
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_ModeDefaultPP
+  - GPIO_AF
+  possible_values:
+    GPIO_ModeDefaultPP:
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+- name: AlternateFunctionOpenDrainAndPushPull
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+- name: AlternateFunctionPushPullHighSpeed
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Speed:
+    - GPIO_SPEED_FREQ_HIGH
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+- name: AlternateFunctionPushPullHighSpeedDefault
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed_High_Default
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_PP
+- name: EXTI
+  hal_mode: ''
+  parameters:
+  - GPIO_PuPd
+  - GPIOx
+  - GPIO_ModeDefaultEXTI
+  - GPIO_Pin
+- name: EVENTOUT
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_ModeDefaultPP
+  - GPIO_AF
+  possible_values:
+    GPIO_ModeDefaultPP:
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+- name: AlternateFunctionOpenDrainAndPushPullDefaultOD
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_ModeDefaultOD
+  - GPIO_AF
+  possible_values:
+    GPIO_ModeDefaultOD:
+    - GPIO_MODE_AF_OD
+    - GPIO_MODE_AF_PP
+- name: AlternateFunctionOpenDrainNoPullOrPullUp
+  hal_mode: ''
+  parameters:
+  - GPIO_Pin
+  - GPIO_Speed
+  - GPIOx
+  - GPIO_Mode
+  - GPIO_AF
+  possible_values:
+    GPIO_Mode:
+    - GPIO_MODE_AF_OD
+- name: System
+  hal_mode: ''
+  parameters: []
+source: db/mcu/IP/GPIO-STM32F103x8_gpio_v1_0_Modes.xml
+instance: GPIO

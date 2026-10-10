@@ -1,0 +1,27 @@
+# RCC(时钟):已实测,有坑
+verified: true
+source: "实测 2026-08-06 ~ 2026-08-27,CubeMX 6.18-RC3"
+
+known_issue: |
+  对 RCC 执行 set 命令(例如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
+  时钟静默降级成 HSI(如 64MHz 而不是 72MHz),而且不报错。
+  所以改时钟优先用 cubemx_new_project 的 clock_source / pll_mul 参数,
+  写 .ioc 时会按默认值把 RCC.PLLSourceVirtual 补回来。
+
+command_examples:
+  - "set ip parameters RCC PLLSourceVirtual RCC_PLLSOURCE_HSE"
+  - "set ip parameters RCC PLLMUL RCC_PLL_MUL9"
+  - "set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK"
+  - "set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2"
+
+defaults:
+  clock_source: HSE
+  hse_mhz: 8
+  pll_mul: 9
+  sysclk_mhz: 72
+  apb1_divider: RCC_HCLK_DIV2
+
+checked_after_generate:
+  key: "RCC.PLLSourceVirtual"
+  expect: "RCC_PLLSOURCE_HSE"
+  on_missing: "报 CLOCK_DEGRADED(警告:时钟可能已降级为 HSI)"

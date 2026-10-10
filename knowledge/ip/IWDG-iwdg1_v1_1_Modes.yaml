@@ -1,0 +1,29 @@
+name: IWDG
+version: iwdg1_v1_1
+parameters:
+  Instance:
+    comment: IWDG instance
+    type: list
+    default: IWDG
+  Prescaler:
+    comment: IWDG counter clock prescaler
+    type: list
+    default: IWDG_PRESCALER_4
+    group: Watchdog Clocking
+  Reload:
+    comment: IWDG down-counter reload value
+    type: integer
+    default: '4095'
+    min: '0'
+    max: '4095'
+    group: Watchdog Clocking
+signals:
+  VS_IWDG: {}
+modes:
+- name: IWDG_Activate
+  hal_mode: IWDG
+  parameters:
+  - Prescaler
+  - Reload
+source: db/mcu/IP/IWDG-iwdg1_v1_1_Modes.xml
+instance: IWDG

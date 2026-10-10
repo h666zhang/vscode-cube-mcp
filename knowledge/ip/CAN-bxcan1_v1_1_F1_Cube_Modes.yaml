@@ -1,0 +1,116 @@
+name: CAN
+version: bxcan1_v1_1_F1_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: CAN1
+    group: Basic Parameters
+  Prescaler:
+    comment: Prescaler (for Time Quantum)
+    type: integer
+    default: '16'
+    min: '1'
+    max: '1024'
+    group: Bit Timings Parameters
+  SJW:
+    comment: ReSynchronization Jump Width
+    type: list
+    default: CAN_SJW_1TQ
+    group: Bit Timings Parameters
+  BS1:
+    comment: Time Quanta in Bit Segment 1
+    type: list
+    default: CAN_BS1_1TQ
+    group: Bit Timings Parameters
+  BS2:
+    comment: Time Quanta in Bit Segment 2
+    type: list
+    default: CAN_BS2_1TQ
+    group: Bit Timings Parameters
+  CalculateTimeQuantum:
+    comment: Time Quantum
+    type: string
+    default: '1000'
+    unit: ns
+    group: Bit Timings Parameters
+  CalculateTimeBit:
+    comment: Time for one Bit
+    type: string
+    default: '1000'
+    unit: ns
+    group: Bit Timings Parameters
+  CalculateBaudRate:
+    comment: Baud Rate
+    type: string
+    default: '1000'
+    unit: bit/s
+    group: Bit Timings Parameters
+  TTCM:
+    comment: Time Triggered Communication Mode
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  ABOM:
+    comment: Automatic Bus-Off Management
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  AWUM:
+    comment: Automatic Wake-Up Mode
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  NART:
+    comment: Automatic Retransmission
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  RFLM:
+    comment: Receive Fifo Locked Mode
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  TXFP:
+    comment: Transmit Fifo Priority
+    type: list
+    default: DISABLE
+    group: Basic Parameters
+  FilterFIFOAssignment:
+    comment: Filter Fifo Assignment
+    type: list
+    default: CAN_FILTER_FIFO0
+    group: Filter Parameters
+  Mode:
+    comment: Operating Mode
+    type: list
+    default: CAN_MODE_NORMAL
+    group: Advanced Parameters
+signals:
+  RX:
+    io_mode: InputFloatingAndPullUp
+  TX:
+    io_mode: AlternateFunctionPushPull
+modes:
+- name: canBasic
+  hal_mode: ''
+  parameters:
+  - Prescaler
+- name: CAN_Activate
+  hal_mode: ''
+  base_mode: canBasic
+  parameters:
+  - CalculateTimeQuantum
+  - BS1
+  - BS2
+  - CalculateTimeBit
+  - CalculateBaudRate
+  - SJW
+  - TTCM
+  - ABOM
+  - AWUM
+  - NART
+  - RFLM
+  - TXFP
+  - Mode
+source: db/mcu/IP/CAN-bxcan1_v1_1_F1_Cube_Modes.xml
+instance: CAN

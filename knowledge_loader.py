@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""知识库读取器:把 knowledge/ 里的 YAML 读出来给 MCP 工具用。
+
+knowledge/ 下的文件:
+  meta.yaml                        导出信息:芯片型号、每个 IP 用的是哪个 db XML
+  mcu/<mcu_name>.pins.yaml         芯片引脚与每个引脚可选的信号(从 CubeMX db 导出)
+  ip/<ip>.yaml                     IP 的模式名与参数(从 CubeMX db 导出)
+  rules/<peripheral>.yaml          实测出来的规则:命令写法、.ioc 片段、已知坑
+
+两条原则:
+  1. 查不到就报错(带错误码),不猜;
+  2. 规则没实测过(顶层 verified 不是 true)就拒绝执行 —— 防幻觉闸门。
+
+知识库目录默认与本模块同级,可用环境变量 ST_CUBEMX_KNOWLEDGE 覆盖。
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+
+import yaml
+
+from cubemx_result import ToolError
+
+_CACHE: dict = {}
+
+
+def knowledge_dir() -> Path:
+    """知识库目录:环境变量 ST_CUBEMX_KNOWLEDGE 优先,默认与本模块同级的 knowledge/。"""
+    raw = os.environ.get("ST_CUBEMX_KNOWLEDGE", "").strip()
+    return Path(raw) if raw else Path(__file__).resolve().parent / "knowledge"
+
+
+def reload() -> None:
+    """清掉缓存,下次读文件重新加载(改了知识库后调它)。"""
+    _CACHE.clear()
+
+
+def _load(name: str):
+    """读 knowledge/ 下的一个 YAML;不存在返回 None。"""
+    path = knowledge_dir() / name
+    key = str(path)
+    if key not in _CACHE:
+        if not path.is_file():
+            _CACHE[key] = None
+        else:
+            with path.open(encoding="utf-8") as f:
+                _CACHE[key] = yaml.safe_load(f) or {}
+    return _CACHE[key]
+
+
+def meta() -> dict:
+    """读 meta.yaml(导出信息)。"""
+    data = _load("meta.yaml")
+    if data is None:
+        raise ToolError(
+            "UNKNOWN_PERIPHERAL", f"找不到 {knowledge_dir() / 'meta.yaml'};请先跑 tools/gen_knowledge_from_db.py"
+        )
+    return data
+
+
+def require_verified(data: dict, what: str) -> dict:
+    """检查规则是不是实测过的;没过就拒绝执行(防幻觉闸门)。"""
+    if not data.get("verified"):
+        source = data.get("source", "(没写来源)")
+        raise ToolError(
+            "RULE_NOT_VERIFIED",
+            f"{what} 的规则还没实测验证,拒绝执行。来源标记: {source}",
+        )
+    return data
+
+
+# ------------------------------------------------------------------ 规则(rules/)
+
+
+def rule(peripheral: str) -> dict:
+    """读某个外设的规则,如 gpio / i2c / tim / rcc / usart。"""
+    name = peripheral.strip().lower()
+    data = _load(f"rules/{name}.yaml")
+    if data is None:
+        known = sorted(p.stem for p in (knowledge_dir() / "rules").glob("*.yaml"))
+        raise ToolError(
+            "UNKNOWN_PERIPHERAL",
+            f"知识库里没有 {peripheral} 的规则(找的是 rules/{name}.yaml)。已收录: {', '.join(known) or '(空)'}",
+        )
+    return data
+
+
+def rule_mode(peripheral: str, mode: str) -> dict:
+    """读某个外设的某个模式,如 (tim, pwm) / (tim, internal_clock);没实测过会拒绝。"""
+    data = rule(peripheral)
+    modes = data.get("modes") or {}
+    item = modes.get(mode)
+    if item is None:
+        raise ToolError(
+            "UNKNOWN_PARAM",
+            f"{peripheral} 没有模式 {mode}(可用模式: {', '.join(sorted(modes)) or '(无)'})",
+        )
+    return require_verified(item, f"{peripheral}.{mode}")
+
+
+def require_rule_verified(peripheral: str) -> dict:
+    """读外设规则并确认整份规则是实测过的。"""
+    return require_verified(rule(peripheral), peripheral)
+
+
+# ------------------------------------------------------------------ 芯片(mcu/)
+
+
+def mcu_pins(mcu: str = "") -> dict:
+    """读芯片的引脚表。mcu 传型号(如 STM32F103C8T6);留空则用 meta 里记录的那颗。"""
+    info = meta()
+    want = (mcu or "").strip().upper()
+    have = str(info.get("mcu", "")).strip().upper()
+    if want and have and want != have:
+        raise ToolError(
+            "MCU_TEMPLATE_MISSING",
+            f"knowledge/ 里只有 {have} 的引脚表;要 {want} 请先跑 tools/gen_knowledge_from_db.py --mcu {want}",
+        )
+    name = info.get("mcu_name", "")
+    data = _load(f"mcu/{name}.pins.yaml")
+    if data is None:
+        raise ToolError("MCU_TEMPLATE_MISSING", f"找不到 mcu/{name}.pins.yaml;请先跑 tools/gen_knowledge_from_db.py")
+    return data
+
+
+def pin_signals(pin: str, mcu: str = "") -> list:
+    """查某个引脚支持哪些信号(名字来自 CubeMX db,如 PA6 -> [..., TIM3_CH1, ...])。"""
+    pins = mcu_pins(mcu).get("pins") or {}
+    item = pins.get(pin)
+    if item is None:
+        examples = ", ".join(sorted(pins)[:12])
+        raise ToolError("UNKNOWN_PIN_SIGNAL", f"{pin} 不在这颗芯片的引脚表里。引脚名示例: {examples} ...")
+    return list(item.get("signals") or [])
+
+
+def chip_info(mcu: str = "") -> dict:
+    """芯片属性(型号、封装、主频、Flash/RAM 等)。"""
+    return mcu_pins(mcu).get("chip") or {}
+
+
+# ------------------------------------------------------------------ db 事实(ip/)
+
+
+def ip_facts(instance: str) -> dict:
+    """按实例名(如 TIM3 / USART2 / GPIO)读 CubeMX db 导出的模式与参数。"""
+    info = meta()
+    xml = (info.get("source_ip_xml") or {}).get(instance)
+    if not xml:
+        known = ", ".join(sorted(info.get("source_ip_xml") or {}))
+        raise ToolError("UNKNOWN_PERIPHERAL", f"知识库里没有 {instance} 的 db 数据。已有: {known}")
+    data = _load(f"ip/{Path(xml).stem}.yaml")
+    if data is None:
+        raise ToolError(
+            "UNKNOWN_PERIPHERAL", f"找不到 ip/{Path(xml).stem}.yaml;请重新跑 tools/gen_knowledge_from_db.py"
+        )
+    return data
+
+
+def ip_mode_names(instance: str) -> list:
+    """这个 IP 在 CubeMX db 里定义的合法模式名(用来核对 .ioc 片段里写的枚举名)。"""
+    return [m.get("name", "") for m in ip_facts(instance).get("modes") or []]
+
+
+def ip_parameter(instance: str, name: str) -> dict:
+    """这个 IP 的某个参数(默认值/范围/单位),来自 CubeMX db。"""
+    params = ip_facts(instance).get("parameters") or {}
+    item = params.get(name)
+    if item is None:
+        raise ToolError(
+            "UNKNOWN_PARAM",
+            f"{instance} 没有参数 {name}(已知参数: {', '.join(sorted(params)[:15])} ...)",
+        )
+    return item
+
+
+# ------------------------------------------------------------------ help 文本
+
+# topic 别名 -> help.yaml 里的位置
+_HELP_ALIAS = {"clock": "rcc"}
+
+
+def help_text(topic: str = "") -> str | None:
+    """取 cubemx_help 的文本;不是静态文本的 topic(如 templates)返回 None。"""
+    data = _load("rules/help.yaml")
+    if data is None:
+        return None
+    key = _HELP_ALIAS.get(topic.strip().lower(), topic.strip().lower())
+    if not key:
+        return data.get("guide")
+    if key in (data.get("peripheral") or {}):
+        return data["peripheral"][key]
+    return data.get(key)
+
+
+# ------------------------------------------------------------------ 片段渲染
+
+_VALUE_PLACEHOLDER = re.compile(r"\{v\.([A-Za-z0-9_]+)\}")
+
+
+def render_fragment(fragment: str, values: dict | None = None, **params) -> str:
+    """把规则文件里的 .ioc 片段渲染成实际文本。
+
+    两类占位符:
+      {v.key}  规则文件 values: 里的常量(常量值里若还带 {n} 这类占位符,会一起展开)
+      {name}   调用方给的参数,如 tim / pin / n / prescaler / period / pulse / signal
+    占位符对不上就报错,不会静默留空。
+    """
+    table = values or {}
+    text = _VALUE_PLACEHOLDER.sub(lambda m: str(table.get(m.group(1), m.group(0))), fragment)
+    try:
+        return text.format(**params)
+    except KeyError as exc:
+        hint = ", ".join(sorted(params)) or "(无)"
+        raise ToolError("BAD_ARGUMENT", f"片段里有没提供的占位符 {exc};当前可用的: {hint}") from exc
+    except (IndexError, ValueError) as exc:
+        raise ToolError("BAD_ARGUMENT", f"片段渲染失败: {exc}") from exc

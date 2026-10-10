@@ -1,0 +1,14 @@
+name: CRC
+version: integtest1_v1_0
+parameters:
+  Instance:
+    comment: Instance
+    default: CRC
+signals:
+  VS_CRC: {}
+modes:
+- name: CRC_Activate
+  hal_mode: ''
+  parameters: []
+source: db/mcu/IP/CRC-integtest1_v1_0_Modes.xml
+instance: CRC

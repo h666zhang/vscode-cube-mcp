@@ -1,0 +1,334 @@
+name: USART
+version: sci2_v1_1_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: USART$Index
+  VirtualMode:
+    type: list
+    default: VM_ASYNC
+    group: Basic Parameters
+  VirtualClockMode:
+    type: list
+    default: VM_SYNC
+    group: Basic Parameters
+  BaudRate:
+    comment: Baud Rate
+    type: integer
+    default: '115200'
+    min: '110'
+    max: '10500000'
+    unit: Bits/s
+    group: Basic Parameters
+  WordLength:
+    comment: Word Length
+    type: list
+    default: WORDLENGTH_8B
+    group: Basic Parameters
+  UsartWordLength:
+    comment: Word Length
+    type: list
+    default: USART_WORDLENGTH_8B
+    group: Basic Parameters
+  IrdaWordLength:
+    comment: Word Length
+    type: list
+    default: IRDA_WORDLENGTH_8B
+    group: Basic Parameters
+  SmartCardWordLength:
+    comment: Word Length
+    type: list
+    default: SMARTCARD_WORDLENGTH_9B
+    group: Basic Parameters
+  UartWordLength:
+    comment: Word Length
+    type: list
+    default: UART_WORDLENGTH_8B
+    group: Basic Parameters
+  StopBits:
+    comment: Stop Bits
+    type: list
+    default: STOPBITS_1
+    group: Basic Parameters
+  UsartStopBits:
+    comment: Stop Bits
+    type: list
+    default: USART_STOPBITS_2
+    group: Basic Parameters
+  UartStopBits:
+    comment: Stop Bits
+    type: list
+    default: UART_STOPBITS_1
+    group: Basic Parameters
+  SmartCardStopBits:
+    comment: Stop Bits
+    type: list
+    default: SMARTCARD_STOPBITS_1_5
+    group: Basic Parameters
+  Parity:
+    comment: Parity
+    type: list
+    default: PARITY_EVEN
+    group: Basic Parameters
+  UsartParity:
+    comment: Parity
+    type: list
+    default: USART_PARITY_NONE
+    group: Basic Parameters
+  IrdaParity:
+    comment: Parity
+    type: list
+    default: IRDA_PARITY_NONE
+    group: Basic Parameters
+  SmartCardParity:
+    comment: Parity
+    type: list
+    default: SMARTCARD_PARITY_EVEN
+    group: Basic Parameters
+  UartParity:
+    comment: Parity
+    type: list
+    default: UART_PARITY_NONE
+    group: Basic Parameters
+  Mode:
+    comment: Data Direction
+    type: list
+    default: MODE_TX_RX
+    group: Advanced Parameters
+  UsartMode:
+    comment: Data Direction
+    type: list
+    default: USART_MODE_TX_RX
+    group: Advanced Parameters
+  SmartCardMode:
+    comment: Data Direction
+    type: list
+    default: SMARTCARD_MODE_TX_RX
+    group: Advanced Parameters
+  IrdaMode:
+    comment: Data Direction
+    type: list
+    default: IRDA_MODE_TX_RX
+    group: Advanced Parameters
+  UartMode:
+    comment: Data Direction
+    type: list
+    default: UART_MODE_TX_RX
+    group: Advanced Parameters
+  HwFlowCtl:
+    comment: Hardware Flow Control
+    type: list
+    default: UART_HWCONTROL_RTS
+    group: Basic Parameters
+  OverSampling:
+    comment: Over Sampling
+    type: list
+    default: 'null'
+    group: Advanced Parameters
+  CLKPolarity:
+    comment: Clock Polarity
+    type: list
+    default: SMARTCARD_POLARITY_LOW
+    group: Clock Parameters
+  CLKPhase:
+    comment: Clock Phase
+    type: list
+    default: SMARTCARD_PHASE_1EDGE
+    group: Clock Parameters
+  CLKLastBit:
+    comment: Clock Last Bit
+    type: list
+    default: SMARTCARD_LASTBIT_DISABLE
+    group: Clock Parameters
+  IrDAMode:
+    comment: IrDa Mode
+    type: list
+    default: IRDA_POWERMODE_NORMAL
+    group: Advanced Parameters
+  Prescaler:
+    comment: Prescaler
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+    group: Advanced Parameters
+  CalculateSpeed:
+    comment: SmartCard Clock Frequency
+    type: string
+    default: '5000000'
+    group: Clock Parameters
+  NACKState:
+    comment: NAck if Parity Error
+    type: list
+    default: SMARTCARD_NACK_DISABLE
+    group: Advanced Parameters
+  GuardTime:
+    comment: Guard Time
+    type: integer
+    default: '0'
+    min: '0'
+    max: '255'
+    group: Advanced Parameters
+  WakeUpMethode:
+    comment: Wake-Up Method
+    type: list
+    default: UART_WAKEUPMETHOD_IDLELINE
+    group: Advanced Parameters
+  Address:
+    comment: Wake-Up Address
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+    group: Advanced Parameters
+  BreakDetectLength:
+    comment: Break Detect Length
+    type: list
+    default: UART_LINBREAKDETECTLENGTH_10B
+    group: Advanced Parameters
+signals:
+  CK:
+    io_mode: AlternateFunctionPushPull
+  CTS:
+    io_mode: InputFloatingAndPullUp
+  RTS:
+    io_mode: AlternateFunctionPushPull
+  RX:
+    io_mode: InputFloatingAndPullUp
+  TX:
+    io_mode: AlternateFunctionPushPullUp
+modes:
+- name: usartBasic
+  hal_mode: ''
+  parameters:
+  - BaudRate
+- name: Asynchronous
+  hal_mode: UART
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - HwFlowCtl
+  - Mode
+  - OverSampling
+  possible_values:
+    VirtualMode:
+    - VM_ASYNC
+- name: Synchronous
+  hal_mode: USART
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - CLKPolarity
+  - CLKPhase
+  - CLKLastBit
+  possible_values:
+    VirtualMode:
+    - VM_SYNC
+- name: Half_duplex(single_wire_mode)
+  hal_mode: UART
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - OverSampling
+  possible_values:
+    VirtualMode:
+    - VM_ASYNC
+- name: Multiprocessor_communication
+  hal_mode: UART
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - OverSampling
+  - WakeUpMethode
+  - Address
+  possible_values:
+    VirtualMode:
+    - VM_ASYNC
+- name: IrDA
+  hal_mode: IRDA
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - Mode
+  - IrDAMode
+  - Prescaler
+  possible_values:
+    VirtualMode:
+    - VM_IRDA
+- name: LIN
+  hal_mode: UART
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - BreakDetectLength
+  possible_values:
+    VirtualMode:
+    - VM_ASYNC
+- name: SmartCard
+  hal_mode: SMARTCARD
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - NACKState
+  - GuardTime
+  possible_values:
+    VirtualMode:
+    - VM_SMARTCARD
+- name: SmartCard_With_Clock
+  hal_mode: SMARTCARD
+  base_mode: usartBasic
+  parameters:
+  - VirtualMode
+  - VirtualClockMode
+  - WordLength
+  - Parity
+  - StopBits
+  - Mode
+  - NACKState
+  - GuardTime
+  - Prescaler
+  - CalculateSpeed
+  - CLKPolarity
+  - CLKPhase
+  - CLKLastBit
+  possible_values:
+    VirtualMode:
+    - VM_SMARTCARD
+    VirtualClockMode:
+    - VM_SMARTCARD
+- name: CTS_Only
+  hal_mode: ''
+  parameters: []
+- name: RTS_Only
+  hal_mode: ''
+  parameters: []
+- name: CTS_RTS
+  hal_mode: ''
+  parameters: []
+source: db/mcu/IP/USART-sci2_v1_1_Cube_Modes.xml
+instance: USART3

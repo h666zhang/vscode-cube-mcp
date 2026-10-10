@@ -37,6 +37,9 @@ import threading
 
 from mcp.server import MCPServer
 
+import knowledge_loader
+from cubemx_result import ToolError, render, render_run
+
 
 # ------------------------------------------------------------------ config
 def _find_cubemx() -> str:
@@ -90,7 +93,7 @@ def _check_path(p: str) -> str:
         rp = os.path.abspath(root).rstrip(os.sep) or os.sep
         if ap.lower() == rp.lower() or ap.lower().startswith(rp.lower() + os.sep):
             return ap
-    raise ValueError(f"路径不在白名单内(仅允许 {ALLOWED_ROOTS}): {p}")
+    raise ToolError("PATH_NOT_ALLOWED", f"路径不在白名单内(仅允许 {ALLOWED_ROOTS}): {p}")
 
 
 def _cleanup(raw: str) -> str:
@@ -123,8 +126,12 @@ def _kill_process_tree(proc) -> None:
             pass
 
 
-def _run_script(script: str) -> dict:
-    """执行 CubeMX 脚本,返回 {ok, output, exit_code}。超时会强杀进程树,防残留 Java 进程占工程文件锁。"""
+def _run_script(script: str, stage: str = "run_cubemx") -> dict:
+    """执行 CubeMX 脚本,返回 {ok, output, exit_code, stage, error_code}。
+
+    超时会强杀进程树,防残留 Java 进程占工程文件锁。
+    error_code 取值:CUBEMX_TIMEOUT / CUBEMX_EXIT_NONZERO / CUBEMX_KO,成功时为空串。
+    """
     fd, tmp = tempfile.mkstemp(prefix="cubemx_mcp_", suffix=".txt")
     proc = None
     try:
@@ -149,6 +156,8 @@ def _run_script(script: str) -> dict:
                     "ok": False,
                     "output": f"TIMEOUT: CubeMX 子进程超过 {TIMEOUT_SECONDS}s 被终止(已强杀进程树)",
                     "exit_code": None,
+                    "stage": stage,
+                    "error_code": "CUBEMX_TIMEOUT",
                 }
     finally:
         try:
@@ -158,16 +167,27 @@ def _run_script(script: str) -> dict:
 
     raw = (stdout or "") + "\n" + (stderr or "")
     output = _cleanup(raw)
-    ok = proc.returncode == 0 and not any(line.strip() == "KO" for line in output.splitlines())
-    return {"ok": ok, "output": output, "exit_code": proc.returncode}
+    if proc.returncode != 0:
+        error_code = "CUBEMX_EXIT_NONZERO"
+    elif any(line.strip() == "KO" for line in output.splitlines()):
+        error_code = "CUBEMX_KO"
+    else:
+        error_code = ""
+    return {
+        "ok": not error_code,
+        "output": output,
+        "exit_code": proc.returncode,
+        "stage": stage,
+        "error_code": error_code,
+    }
 
 
 def _ioc_path(ioc: str) -> str:
     ap = _check_path(ioc)
     if not os.path.isfile(ap):
-        raise ValueError(f".ioc 文件不存在: {ap}")
+        raise ToolError("IOC_NOT_FOUND", f".ioc 文件不存在: {ap}")
     if not ap.lower().endswith(".ioc"):
-        raise ValueError(f"不是 .ioc 文件: {ap}")
+        raise ToolError("NOT_IOC_FILE", f"不是 .ioc 文件: {ap}")
     return ap
 
 
@@ -208,11 +228,12 @@ def _project_template(mcu: str, template: str = "") -> str:
         if os.path.isfile(tpl):
             return tpl
     available = _available_templates()
-    raise ValueError(
+    raise ToolError(
+        "MCU_TEMPLATE_MISSING",
         f"未找到模板 {mcu}.ioc。\n"
         f"可用模板: {', '.join(available) if available else '(无)'}\n"
         f"新芯片模板生成方法:用 STM32CubeMX GUI 新建该芯片工程后保存为 templates/{mcu}.ioc;"
-        f'或先调 cubemx_help(topic="templates") 查看模板说明。查找过: {search_dirs}'
+        f'或先调 cubemx_help(topic="templates") 查看模板说明。查找过: {search_dirs}',
     )
 
 
@@ -298,9 +319,9 @@ def _patch_ioc_identity(
     # PLLSourceVirtual,这里按默认值补回;显式传其他值可覆盖,不强制)。
     src = clock_source.strip().upper()
     if src not in ("HSE", "HSI"):
-        raise ValueError(f"clock_source 仅支持 HSE/HSI,收到: {clock_source!r}")
+        raise ToolError("BAD_ARGUMENT", f"clock_source 仅支持 HSE/HSI,收到: {clock_source!r}")
     if not (2 <= pll_mul <= 16):
-        raise ValueError(f"pll_mul 应在 2~16 之间,收到: {pll_mul!r}")
+        raise ToolError("BAD_ARGUMENT", f"pll_mul 应在 2~16 之间,收到: {pll_mul!r}")
     if src == "HSE":
         if re.search(r"^RCC\.PLLSourceVirtual=.*$", text, flags=re.MULTILINE):
             text = re.sub(
@@ -320,21 +341,8 @@ def _patch_ioc_identity(
         f.write(text)
 
 
-# ---------------------------------------------------------------- TIM 配置补丁:6.18 内部枚举名对照表(实测)
-# CubeMX GUI 名 ≠ .ioc 内部枚举名,写错会被 load 时静默丢弃(实测:整个 TIM 从 IP 列表消失)。
-# 来源:6.18 原生 .ioc 基准样本逐行比对(2026-08-27 实测,详见 README.dev-notes.md)。
-# 注意:这些值是对 CubeMX 行为的对齐数据,升级 CubeMX 版本后需重新实测确认,勿凭猜测改动。
-_TIM_AUTORELOAD_PRELOAD_ENABLE = "TIM_AUTORELOAD_PRELOAD_ENABLE"
-_TIM_COUNTERMODE_UP = "TIM_COUNTERMODE_UP"
-_TIM_OC_MODE_PWM1 = "TIM_OCMODE_PWM1"
-_TIM_CHANNEL_KEY = "TIM_CHANNEL_{n}"  # 通道键值,如 TIM_CHANNEL_1
-_TIM_PWM_MODE = "PWM Generation{n} CH{n}"  # 内部名带序号,GUI 名 "PWM Generation CH{n}"
-_TIM_IC_MODE = "Input_Capture{n}_from_TI{n}"  # GUI 名 "Input Capture direct mode"
-_TIM_IC_POLARITY_RISING = "TIM_ICPOLARITY_RISING"
-_TIM_IC_POLARITY_FALLING = "TIM_ICPOLARITY_FALLING"
-_TIM_IC_PRESCALER_DIV1 = "TIM_ICPSC_DIV1"
-_TIM_IC_SELECTION_DIRECTTI = "TIM_ICSELECTION_DIRECTTI"
-_TIM_IC_SELECTION_INDIRECTTI = "TIM_ICSELECTION_INDIRECTTI"
+# TIM 的枚举值与 .ioc 片段来自 knowledge/rules/tim.yaml,不再硬编码在这里。
+# 改值请改那个 YAML,再跑 python -m unittest test_cubemx_mcp 确认行为不变。
 
 
 def _inject_tim_internal_clock(
@@ -360,7 +368,7 @@ def _inject_tim_internal_clock(
     """
     tim = target_tim.strip().upper()
     if not re.fullmatch(r"TIM\d+", tim):
-        raise ValueError(f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
+        raise ToolError("BAD_ARGUMENT", f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
     with open(ioc_path, encoding="utf-8", errors="replace") as f:
         lines = f.read().splitlines(keepends=True)
     # 已是内部时钟则直接返回(幂等)
@@ -382,17 +390,12 @@ def _inject_tim_internal_clock(
     new_ips = ip_entries + [tim]
     new_pins = pin_entries + [f"VP_{tim}_VS_ClockSourceINT"]
 
-    tim_params = (
-        f"{tim}.AutoReloadPreload={_TIM_AUTORELOAD_PRELOAD_ENABLE}\n"
-        f"{tim}.CounterMode={_TIM_COUNTERMODE_UP}\n"
-        f"{tim}.IPParameters=Prescaler,Period,CounterMode,AutoReloadPreload\n"
-        f"{tim}.Period={period}-1\n"
-        f"{tim}.Prescaler={prescaler}-1\n"
-        f"VP_{tim}_VS_ClockSourceINT.Mode=Internal\n"
-        f"VP_{tim}_VS_ClockSourceINT.Signal={tim}_VS_ClockSourceINT\n"
-    )
-    if irq:
-        tim_params += f"NVIC.{tim}_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true\n"
+    values = knowledge_loader.rule("tim")["values"]
+    fragment = knowledge_loader.rule_mode("tim", "internal_clock")["ioc_fragment"]
+    if not irq:
+        # 片段里的 NVIC 行是可选的,irq 为 False 时去掉
+        fragment = "\n".join(ln for ln in fragment.splitlines() if not ln.startswith("NVIC."))
+    tim_params = knowledge_loader.render_fragment(fragment, values, tim=tim, prescaler=prescaler, period=period) + "\n"
 
     out = []
     inserted_params = False
@@ -569,12 +572,14 @@ def _inject_tim_pwm(
     """
     tim = target_tim.strip().upper()
     if not re.fullmatch(r"TIM\d+", tim):
-        raise ValueError(f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
+        raise ToolError("BAD_ARGUMENT", f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
     ch = re.search(r"CH(\d)", signal)
     if not ch:
-        raise ValueError(f"无法从信号名解析通道: {signal!r}(应为 S_TIM3_CH1 形式)")
-    mode_name = _TIM_PWM_MODE.format(n=ch.group(1))
-    mode_esc = mode_name.replace(" ", "\\ ")  # .ioc 键名里空格需转义;f-string 表达式不能含反斜杠(3.10 限制),先算好
+        raise ToolError("BAD_ARGUMENT", f"无法从信号名解析通道: {signal!r}(应为 S_TIM3_CH1 形式)")
+    n = ch.group(1)
+    values = knowledge_loader.rule("tim")["values"]
+    mode_name = values["pwm_mode"].format(n=n)
+    mode_esc = mode_name.replace(" ", "\\ ")  # .ioc 键名里空格要转义,见 knowledge/rules/tim.yaml
     sig_body = signal[2:] if signal.startswith("S_") else signal  # S_TIM3_CH1 -> TIM3_CH1
 
     with open(ioc_path, encoding="utf-8", errors="replace") as f:
@@ -590,16 +595,22 @@ def _inject_tim_pwm(
         lines, tim, extra_ips=[tim], extra_pins=[pin], drop_prefixes=(f"{pin}.Mode", f"{pin}.Signal", f"SH.{signal}")
     )
     params = (
-        f"{pin}.Mode={mode_name}\n"
-        f"{pin}.Signal={signal}\n"
-        f"SH.{signal}.0={sig_body},{mode_name}\n"
-        f"SH.{signal}.ConfNb=1\n"
-        f"{tim}.Channel-{mode_esc}={_TIM_CHANNEL_KEY.format(n=ch.group(1))}\n"
-        f"{tim}.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-{mode_name}\n"
-        f"{tim}.OCMode={_TIM_OC_MODE_PWM1}\n"
-        f"{tim}.Period={period}-1\n"
-        f"{tim}.Prescaler={prescaler}-1\n"
-        f"{tim}.Pulse={pulse}\n"
+        knowledge_loader.render_fragment(
+            knowledge_loader.rule_mode("tim", "pwm")["ioc_fragment"],
+            values,
+            tim=tim,
+            pin=pin,
+            signal=signal,
+            n=n,
+            prescaler=prescaler,
+            period=period,
+            pulse=pulse,
+            mode_name=mode_name,
+            mode_name_in_key=mode_esc,
+            signal_body=sig_body,
+            channel_key=values["channel_key"].format(n=n),
+        )
+        + "\n"
     )
     _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
     return (
@@ -621,14 +632,15 @@ def _inject_tim_input_capture(
     """
     tim = target_tim.strip().upper()
     if not re.fullmatch(r"TIM\d+", tim):
-        raise ValueError(f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
+        raise ToolError("BAD_ARGUMENT", f"非法 TIM 名(应为 TIM1~TIM17): {target_tim!r}")
     ch = re.search(r"CH(\d)", signal)
     if not ch:
-        raise ValueError(f"无法从信号名解析通道: {signal!r}(应为 S_TIM2_CH1_ETR 形式)")
+        raise ToolError("BAD_ARGUMENT", f"无法从信号名解析通道: {signal!r}(应为 S_TIM2_CH1_ETR 形式)")
     n = ch.group(1)
+    values = knowledge_loader.rule("tim")["values"]
     sig_body = signal[2:] if signal.startswith("S_") else signal  # S_TIM2_CH1_ETR -> TIM2_CH1_ETR
     sig_body = re.sub(r"_ETR$", "", sig_body)  # TIM2_CH1_ETR -> TIM2_CH1
-    mode1 = _TIM_IC_MODE.format(n=n)
+    mode1 = values["ic_mode"].format(n=n)
 
     with open(ioc_path, encoding="utf-8", errors="replace") as f:
         lines = f.read().splitlines(keepends=True)
@@ -641,23 +653,20 @@ def _inject_tim_input_capture(
         lines, tim, extra_ips=[tim], extra_pins=[pin], drop_prefixes=(f"{pin}.Mode", f"{pin}.Signal", f"SH.{signal}")
     )
     params = (
-        f"{pin}.Mode={mode1}\n"
-        f"{pin}.Signal={signal}\n"
-        f"SH.{signal}.0={sig_body},{mode1}\n"
-        f"SH.{signal}.ConfNb=1\n"
-        f"NVIC.{tim}_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true\n"
-        f"{tim}.IC1Filter=0\n"
-        f"{tim}.IC1Polarity={_TIM_IC_POLARITY_RISING}\n"
-        f"{tim}.IC1Prescaler={_TIM_IC_PRESCALER_DIV1}\n"
-        f"{tim}.IC1Selection={_TIM_IC_SELECTION_DIRECTTI}\n"
-        f"{tim}.IC2Filter=0\n"
-        f"{tim}.IC2Polarity={_TIM_IC_POLARITY_FALLING}\n"
-        f"{tim}.IC2Prescaler={_TIM_IC_PRESCALER_DIV1}\n"
-        f"{tim}.IC2Selection={_TIM_IC_SELECTION_INDIRECTTI}\n"
-        f"{tim}.IPParameters=Prescaler,Period,IC1Polarity,IC1Selection,IC1Prescaler,IC1Filter,IC2Polarity,IC2Selection,IC2Prescaler,IC2Filter,Channel-{mode1}\n"
-        f"{tim}.Period={period}-1\n"
-        f"{tim}.Prescaler={prescaler}-1\n"
-        f"{tim}.Channel-{mode1}={_TIM_CHANNEL_KEY.format(n=n)}\n"
+        knowledge_loader.render_fragment(
+            knowledge_loader.rule_mode("tim", "input_capture")["ioc_fragment"],
+            values,
+            tim=tim,
+            pin=pin,
+            signal=signal,
+            n=n,
+            prescaler=prescaler,
+            period=period,
+            ic_mode=mode1,
+            signal_body=sig_body,
+            channel_key=values["channel_key"].format(n=n),
+        )
+        + "\n"
     )
     _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
     return (
@@ -666,146 +675,7 @@ def _inject_tim_input_capture(
     )
 
 
-# ---------------------------------------------------------------- help 指南
-_GUIDE = """Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
-=============================================================
-【能力边界(先读)】
-本工具只负责 **.ioc 工程配置与 HAL 骨架生成**：
-引脚 / 外设 / 时钟 / 工具链的配置，以及 generate 出可编译的 HAL 工程。
-**不生成应用业务代码**（LED 闪烁、OLED 显示内容、传感器驱动、中断处理逻辑等），
-这些请在生成后的工程里自行编写——配置到骨架为止，剩下是你的代码。
-
-【工具一览(9 个)】
-  cubemx_help                本指南(当前)
-  cubemx_new_project         从零生成 HAL 工程(首选入口)
-  cubemx_load                加载 .ioc 回读配置(只读)
-  cubemx_configure           加载 .ioc,执行 set 命令序列并写回
-  cubemx_generate            加载 .ioc 生成 HAL 代码
-  cubemx_export_pinout       导出引脚配置 CSV(只读)
-  cubemx_remove_peripheral   从 .ioc 移除外设
-  cubemx_add_source          把自定义源文件加入 CMake 源列表
-  cubemx_script              任意 CubeMX 脚本命令(原始脚本接口)
-
-【从零生成工程(标准流程)】
-1) 调 cubemx_help(topic="templates") 查看可用芯片模板
-2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
-   mcu="STM32F103C8T6",
-   commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
-3) 工程生成后,自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
-
-【cubemx_new_project 参数(默认值而非强制)】
-  mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
-  toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
-  couple_files  默认 True(每个外设生成独立 .c/.h);False 则集中到 main.c
-  clock_source  默认 "HSE"(外部晶振,72MHz);"HSI" 用内部 RC
-  pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
-  commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
-  template      指定模板路径,优先于 mcu 查找
-
-【外设配置命令与已知坑】
-- GPIO:set pin PB13 GPIO_Output;set gpio parameters PB13 GPIO_Label LED
-- I2C:set pin PB8 I2C1_SCL;set pin PB9 I2C1_SDA;set mode I2C1 I2C
-- TIM 内部时钟(重要):脚本 set mode TIM2 一律 KO;set ip parameters TIM2
-  ClockSource TIM_CLOCKSOURCE_INTERNAL 只改参数不改 SH/VP 表达(GUI 仍显示
-  ETR)。可靠做法:new_project 命令含 "set ip parameters TIMx ClockSource
-  TIM_CLOCKSOURCE_INTERNAL" 时 server 自动注入 6.18 验证过的标准表达
-- 时钟坑:对 RCC 执行 set 命令(如 PLLMUL)会丢 RCC.PLLSourceVirtual=HSE,
-  时钟静默降级 HSI(64MHz 而非 72MHz);改时钟优先用 new_project 的
-  clock_source/pll_mul 参数
-- generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,自定义源文件需重新
-  cubemx_add_source
-
-【约束】
-- 所有 .ioc / 生成路径必须在 ST_CUBEMX_ALLOWED_ROOTS 白名单内
-- 工程名仅字母/数字/下划线;路径写绝对路径(Windows 建议 C:/ 正斜杠)"""
-
-_NEW_PROJECT_HELP = """【从零生成工程(cubemx_new_project)】
-流程:
-1) 先调 cubemx_help(topic="templates") 查看可用芯片模板
-2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
-   mcu="STM32F103C8T6",
-   commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
-3) 自定义源文件(如 Core/Src/OLED.c)用 cubemx_add_source 加入编译
-
-参数(默认值而非强制):
-  mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
-  toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
-  couple_files  默认 True(每个外设独立 .c/.h);False 则集中到 main.c
-  clock_source  默认 "HSE"(72MHz);"HSI" 用内部 RC
-  pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
-  commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
-  template      指定模板路径,优先于 mcu 查找
-
-注意:找不到 {mcu}.ioc 模板时错误信息会列出可用模板,并按指引生成新芯片模板。"""
-
-_PERIPHERAL_HELP = {
-    "gpio": """【GPIO(已验证)】
-  set pin PB13 GPIO_Output
-  set gpio parameters PB13 GPIO_Label LED
-示例:LED 在 PB13 → 命令序列如上。""",
-    "i2c": """【I2C(已验证)】
-  set pin PB8 I2C1_SCL
-  set pin PB9 I2C1_SDA
-  set mode I2C1 I2C
-生成 i2c.c + main.c 调用 MX_I2C1_Init。""",
-    "tim": """【TIM 内部时钟(重要,有坑)】
-- set mode TIM2 一律 KO;set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL
-  只改参数、不改 SH/VP 表达,CubeMX GUI 仍显示 ETR;手写 VP_TIMx 表达会被
-  generate 静默清理。
-- 可靠做法:new_project 的 commands 里含
-  "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
-  server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
-- 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。
-
-【TIM PWM(6.18 标准表达注入,0.4.1 起)】
-- 命令:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
-  例:set ip parameters TIM3 PWM PA6 S_TIM3_CH1 Prescaler 72 Period 100 Pulse 50
-     → 72MHz/72/100 = 10kHz,占空比 50/100 = 50%
-- 常用引脚→信号(STM32F103):PA6→S_TIM3_CH1、PA7→S_TIM3_CH2、PB0→S_TIM3_CH3、
-  PB1→S_TIM3_CH4;PA0-WKUP→S_TIM2_CH1_ETR、PA1→S_TIM2_CH2。
-- .ioc 内部枚举名带序号:"PWM Generation1 CH1"(GUI 名 "PWM Generation CH1"),
-  写错会被 CubeMX 静默丢弃(实测:整个 TIM 从 IP 列表消失)。
-
-【TIM 输入捕获(6.18 标准表达注入,0.4.1 起)】
-- 命令:set ip parameters TIM2 InputCapture <pin> <signal> [Prescaler n] [Period n]
-  例:set ip parameters TIM2 InputCapture PA0-WKUP S_TIM2_CH1_ETR Prescaler 72 Period 65535
-- 自动配 IC1 上升沿(direct)+ IC2 下降沿参数(IC2Polarity=FALLING/IC2Selection=INDIRECTTI),
-  TIM2 中断自动启用。
-- 已知限制(实测):CubeMX 只生成 IC1 的 sConfigIC;测占空比需在 main.c 手动补 IC2:
-    TIM_IC_InitTypeDef ic2 = {0};
-    ic2.ICPolarity  = TIM_INPUTCHANNELPOLARITY_FALLING;
-    ic2.ICSelection = TIM_ICSELECTION_INDIRECTTI;
-    ic2.ICPrescaler = TIM_ICPSC_DIV1;
-    ic2.ICFilter    = 0;
-    HAL_TIM_IC_ConfigChannel(&htim2, &ic2, TIM_CHANNEL_2);
-    HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
-- PA0 的 .ioc 信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1)。
-- .ioc 内部枚举名:Input_Capture1_from_TI1(GUI 名 "Input Capture direct mode")。""",
-    "rcc": """【时钟(RCC,有坑)】
-- 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
-- 对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
-  时钟静默降级 HSI(如 64MHz 而非 72MHz)。
-- 改频率优先用 cubemx_new_project 的 clock_source/pll_mul 参数;
-  需要手动 set 时同时补:
-  set ip parameters RCC PLLSourceVirtual RCC_PLLSOURCE_HSE
-  set ip parameters RCC PLLMUL RCC_PLL_MUL9
-  set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK
-  set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2""",
-}
-
-_REMOVE_HELP = """【移除外设(cubemx_remove_peripheral)】
-- 用法:cubemx_remove_peripheral(ioc, peripheral)
-  如 cubemx_remove_peripheral("C:/proj/Demo.ioc", "TIM3")
-- 直接编辑 .ioc 文本(脚本 set noparam 对部分外设无效):删除 Mcu.IPx、
-  关联引脚/参数、NVIC、functionlistsort 段,并重排序号。
-- 注意:操作前自行备份;移除后建议重新 generate 同步代码。"""
-
-_ADDSOURCE_HELP = """【自定义源文件加入编译(cubemx_add_source)】
-- 用法:cubemx_add_source(ioc, source_file)
-  如 cubemx_add_source("C:/proj/Demo.ioc", "Core/Src/OLED.c")
-- 背景:CubeMX 重新 generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,
-  手动加的自定义源文件会丢失;本工具用于重新添加(幂等)。
-- source_file 必须相对工程根,如 Core/Src/OLED.c(拒绝 ../、绝对路径)。"""
+# help 文本来自 knowledge/rules/help.yaml(cubemx_help 直接读它),不再硬编码在这里。
 
 
 @mcp.tool()
@@ -836,17 +706,17 @@ def cubemx_help(topic: str = "") -> str:
             "【新增芯片】用 CubeMX GUI File→New Project 选芯片,保存为 templates/{mcu}.ioc 后即可用 cubemx_new_project"
         )
         return "\n".join(lines)
-    if t == "new_project":
-        return _NEW_PROJECT_HELP
-    if t in _PERIPHERAL_HELP:
-        return _PERIPHERAL_HELP[t]
-    if t == "clock":
-        return _PERIPHERAL_HELP["rcc"]  # clock 是 rcc 的别名,避免重复维护
-    if t == "remove":
-        return _REMOVE_HELP
-    if t == "add_source":
-        return _ADDSOURCE_HELP
-    return _GUIDE
+    text = knowledge_loader.help_text(t)
+    if text:
+        return text
+    # 未知 topic 与空 topic 都回到完整指南;知识库缺失时给出排查方向,而不是直接抛错
+    guide = knowledge_loader.help_text("")
+    if guide:
+        return guide
+    return (
+        "知识库读取失败:找不到 knowledge/rules/help.yaml。"
+        "请检查 ST_CUBEMX_KNOWLEDGE 环境变量,或重新跑 tools/gen_knowledge_from_db.py"
+    )
 
 
 @mcp.tool()
@@ -862,7 +732,7 @@ def cubemx_script(script: str) -> str:
       project generate
     """
     r = _run_script(script)
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}"
+    return render_run("cubemx_script", r)
 
 
 @mcp.tool()
@@ -874,7 +744,7 @@ def cubemx_load(ioc: str) -> str:
     """
     ap = _ioc_path(ioc)
     r = _run_script(f'config load "{ap}"')
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}"
+    return render_run("cubemx_load", r)
 
 
 @mcp.tool()
@@ -890,7 +760,7 @@ def cubemx_configure(ioc: str, commands: list) -> str:
     lines.extend(commands)
     lines.append(f'config saveas "{ap}"')
     r = _run_script("\n".join(lines))
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}"
+    return render_run("cubemx_configure", r)
 
 
 @mcp.tool()
@@ -910,7 +780,7 @@ def cubemx_generate(ioc: str, project_dir: str = "") -> str:
         lines.append(f'project path "{pd}"')
     lines.append("project generate")
     r = _run_script("\n".join(lines))
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}"
+    return render_run("cubemx_generate", r)
 
 
 @mcp.tool()
@@ -926,10 +796,10 @@ def cubemx_export_pinout(ioc: str) -> str:
     try:
         r = _run_script(f'config load "{ap}"\ncsv pinout "{csv}"')
         if not r["ok"]:
-            return f"[FAIL exit={r['exit_code']}]\n{r['output']}"
+            return render_run("cubemx_export_pinout", r)
         with open(csv, encoding="utf-8", errors="replace") as f:
             content = f.read()
-        return f"[OK]\n{r['output']}\n--- CSV ---\n{content}"
+        return render("cubemx_export_pinout", True, output=r["output"]) + f"\n--- CSV ---\n{content}"
     finally:
         try:
             os.remove(csv)
@@ -981,7 +851,7 @@ def cubemx_new_project(
       template:     可选,直接指定模板 .ioc 路径(优先于 mcu 查找)
     """
     if not project_name or not re.fullmatch(r"[A-Za-z0-9_]+", project_name):
-        raise ValueError(f"非法工程名(仅允许字母/数字/下划线): {project_name!r}")
+        raise ToolError("BAD_ARGUMENT", f"非法工程名(仅允许字母/数字/下划线): {project_name!r}")
     pd = _check_path(project_dir)
     tpl = _project_template(mcu, template)
     ioc_dst = os.path.join(pd, f"{project_name}.ioc")
@@ -1001,9 +871,11 @@ def cubemx_new_project(
     lines.append(f'config saveas "{ioc_dst}"')
     r = _run_script("\n".join(lines))
     if not r["ok"]:
-        return (
-            f"[FAIL exit={r['exit_code']}]\n{r['output']}\n"
-            f"set 命令序列执行失败,已中止生成(避免产出残缺工程)。.ioc 保留在: {ioc_dst}"
+        return render_run(
+            "cubemx_new_project",
+            r,
+            steps=[("locate_template", "ok"), ("compose_ioc", "ok"), ("run_cubemx", "FAIL")],
+            extra=f"set 命令序列执行失败,已中止生成(避免产出残缺工程)。.ioc 保留在: {ioc_dst}",
         )
     # TIM 内部时钟配置补丁:若命令中有 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
     # 自动把该 TIM 做成内部时钟(标准表达直接注入,见 _inject_tim_internal_clock)。
@@ -1094,7 +966,12 @@ def cubemx_new_project(
             )
     except OSError:
         pass
-    return f"[{'OK' if r['ok'] else 'FAIL'} exit={r['exit_code']}]\n{r['output']}\n工程目录: {pd}{note}{note_internal}{clock_note}"
+    return render_run(
+        "cubemx_new_project",
+        r,
+        steps=[("locate_template", "ok"), ("compose_ioc", "ok"), ("run_cubemx", "ok")],
+        extra=f"工程目录: {pd}{note}{note_internal}{clock_note}",
+    )
 
 
 @mcp.tool()
@@ -1112,7 +989,7 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
     """
     ap = _ioc_path(ioc)
     if not re.fullmatch(r"[A-Za-z0-9_]+", peripheral):
-        raise ValueError(f"非法外设名(仅允许字母/数字/下划线,如 TIM3/I2C1): {peripheral!r}")
+        raise ToolError("BAD_ARGUMENT", f"非法外设名(仅允许字母/数字/下划线,如 TIM3/I2C1): {peripheral!r}")
     with open(ap, encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
     # 收集要删的行号:精确匹配 Mcu.IPx=<peripheral> 的行
@@ -1122,7 +999,7 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
             ip_line_idx = i
             break
     if ip_line_idx is None:
-        raise ValueError(f".ioc 中未找到外设 {peripheral}(检查大小写,如 TIM3/I2C1)")
+        raise ToolError("PERIPHERAL_NOT_FOUND", f".ioc 中未找到外设 {peripheral}(检查大小写,如 TIM3/I2C1)")
     # 删除规则:先标记要删除的行(保留 Mcu.IPx 供重排)
     drop = {ip_line_idx}
     removed = [lines[ip_line_idx].strip()]
@@ -1182,7 +1059,12 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
         new_out.append(ln)
     with open(ap, "w", encoding="utf-8", newline="") as f:
         f.writelines(new_out)
-    return f"已从 {ap} 移除外设 {peripheral}\n删除 {len(removed)} 行相关配置,外设列表已重排(Mcu.IPNb={len(keep_ips)})"
+    return render(
+        "cubemx_remove_peripheral",
+        True,
+        steps=[("check_path", "ok"), ("compose_ioc", "ok")],
+        extra=f"已从 {ap} 移除外设 {peripheral}\n删除 {len(removed)} 行相关配置,外设列表已重排(Mcu.IPNb={len(keep_ips)})",
+    )
 
 
 @mcp.tool()
@@ -1200,7 +1082,7 @@ def cubemx_add_source(ioc: str, source_file: str) -> str:
     proj_root = os.path.dirname(ap)
     cmake_lists = os.path.join(proj_root, "cmake", "stm32cubemx", "CMakeLists.txt")
     if not os.path.isfile(cmake_lists):
-        raise ValueError(f"找不到 {cmake_lists};请先 project generate 生成工程")
+        raise ToolError("PROJECT_NOT_GENERATED", f"找不到 {cmake_lists};请先 project generate 生成工程")
     sf = source_file.replace("\\", "/").strip()
     # 输入校验:必须是相对工程根的普通路径——拒绝绝对路径、盘符、路径穿越(../)、换行注入
     if (
@@ -1213,14 +1095,22 @@ def cubemx_add_source(ioc: str, source_file: str) -> str:
         or "\n" in sf
         or "\r" in sf
     ):
-        raise ValueError(f"非法 source_file(须为相对工程根的路径,如 Core/Src/OLED.c): {source_file!r}")
+        raise ToolError(
+            "BAD_ARGUMENT",
+            f"非法 source_file(须为相对工程根的路径,如 Core/Src/OLED.c): {source_file!r}",
+        )
     with open(cmake_lists, encoding="utf-8") as f:
         text = f.read()
     marker = "${CMAKE_CURRENT_SOURCE_DIR}/../../"
     entry = f"    {marker}{sf}\n"
     # 幂等:已含该条目标记(大小写不敏感,Windows 文件系统)则直接返回
     if (marker + sf).lower() in text.lower():
-        return f"{sf} 已在源列表中,无需重复添加"
+        return render(
+            "cubemx_add_source",
+            True,
+            steps=[("check_path", "ok"), ("compose_ioc", "ok")],
+            extra=f"{sf} 已在源列表中,无需重复添加",
+        )
     # 选插入锚点:优先 stm32f1xx_it.c(接近列表尾部),退而求其次 main.c(列表首项)
     anchors = [
         f"    {marker}Core/Src/stm32f1xx_it.c",
@@ -1228,14 +1118,20 @@ def cubemx_add_source(ioc: str, source_file: str) -> str:
     ]
     hit = next((a for a in anchors if a in text), None)
     if hit is None:
-        raise ValueError(
+        raise ToolError(
+            "PROJECT_STRUCTURE_UNEXPECTED",
             f"无法在 {cmake_lists} 中找到插入锚点(MX_Application_Src 中 main.c/stm32f1xx_it.c "
-            f"条目均不存在);请检查工程 CMakeLists.txt 结构"
+            f"条目均不存在);请检查工程 CMakeLists.txt 结构",
         )
     text = text.replace(hit, entry + hit, 1)
     with open(cmake_lists, "w", encoding="utf-8") as f:
         f.write(text)
-    return f"已将 {sf} 加入 {cmake_lists}"
+    return render(
+        "cubemx_add_source",
+        True,
+        steps=[("check_path", "ok"), ("compose_ioc", "ok")],
+        extra=f"已将 {sf} 加入 {cmake_lists}",
+    )
 
 
 def main() -> None:

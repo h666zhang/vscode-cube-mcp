@@ -1,0 +1,123 @@
+# TIM:内部时钟 / PWM / 输入捕获的 .ioc 片段、枚举值与推导规则
+#
+# 事实来源(两条都核对过):
+#   1) 枚举值(如 "PWM Generation1 CH1")与 CubeMX 自带 db/ 导出的
+#      knowledge/ip/TIM1_8F1-gptimer2_v1_x_Cube_Modes.yaml 一致;
+#   2) .ioc 片段与 6.18 原生生成的基准样本逐行比对一致(见 README.dev-notes.md)。
+#
+# 升级 CubeMX 版本后必须重新实测确认,不要凭猜测改动这里的值。
+
+peripheral: TIM
+verified: true
+source: "实测 2026-08-27,CubeMX 6.18-RC3;基准样本 PWM_IC_OLED"
+report_level: "只能改 .ioc 文本"
+note: |
+  CubeMX 脚本模式做不到 TIM 的这些配置:
+    - `set mode TIMx <mode>` 一律返回 KO;
+    - `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 只改参数,
+      不改 SH/VP 表达,生成后 GUI 里仍显示 ETR。
+  所以三个模式都靠往 .ioc 文本里注入下面这些片段实现。
+
+values:
+  auto_reload_preload_enable: TIM_AUTORELOAD_PRELOAD_ENABLE
+  counter_mode_up: TIM_COUNTERMODE_UP
+  oc_mode_pwm1: TIM_OCMODE_PWM1
+  channel_key: "TIM_CHANNEL_{n}"
+  pwm_mode: "PWM Generation{n} CH{n}"
+  pwm_mode_in_key: 'PWM Generation{n}\ CH{n}'
+  ic_mode: "Input_Capture{n}_from_TI{n}"
+  ic_polarity_rising: TIM_ICPOLARITY_RISING
+  ic_polarity_falling: TIM_ICPOLARITY_FALLING
+  ic_prescaler_div1: TIM_ICPSC_DIV1
+  ic_selection_directti: TIM_ICSELECTION_DIRECTTI
+  ic_selection_indirectti: TIM_ICSELECTION_INDIRECTTI
+  clock_source_internal: TIM_CLOCKSOURCE_INTERNAL
+  nvic_enabled: 'true\:0\:0\:false\:false\:true\:true\:true\:true'
+
+modes:
+
+  internal_clock:
+    verified: true
+    command: "set ip parameters {tim} ClockSource TIM_CLOCKSOURCE_INTERNAL"
+    defaults:
+      prescaler: 7200
+      period: 10000
+    ip_entries: ["{tim}"]
+    pin_entries: ["VP_{tim}_VS_ClockSourceINT"]
+    ip_parameters: [Prescaler, Period, CounterMode, AutoReloadPreload]
+    ioc_fragment: |
+      {tim}.AutoReloadPreload={v.auto_reload_preload_enable}
+      {tim}.CounterMode={v.counter_mode_up}
+      {tim}.IPParameters=Prescaler,Period,CounterMode,AutoReloadPreload
+      {tim}.Period={period}-1
+      {tim}.Prescaler={prescaler}-1
+      VP_{tim}_VS_ClockSourceINT.Mode=Internal
+      VP_{tim}_VS_ClockSourceINT.Signal={tim}_VS_ClockSourceINT
+      NVIC.{tim}_IRQn={v.nvic_enabled}
+
+  pwm:
+    verified: true
+    command: "set ip parameters {tim} PWM {pin} {signal} [Prescaler n] [Period n] [Pulse n]"
+    defaults:
+      prescaler: 7200
+      period: 10000
+      pulse: 5000
+    ip_entries: ["{tim}"]
+    pin_entries: ["{pin}"]
+    ip_parameters: [Prescaler, Period, OCMode, Pulse]
+    derive:
+      n: "从 {signal} 里取 CH 后面的数字"
+      mode_name: "{v.pwm_mode} 里的 {n} 代入该数字"
+      mode_name_in_key: "{v.pwm_mode_in_key} 里的 {n} 代入该数字(.ioc 键名里的空格要转义)"
+      signal_body: "去掉 {signal} 的 S_ 前缀"
+    ioc_fragment: |
+      {pin}.Mode={mode_name}
+      {pin}.Signal={signal}
+      SH.{signal}.0={signal_body},{mode_name}
+      SH.{signal}.ConfNb=1
+      {tim}.Channel-{mode_name_in_key}={channel_key}
+      {tim}.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-{mode_name}
+      {tim}.OCMode={v.oc_mode_pwm1}
+      {tim}.Period={period}-1
+      {tim}.Prescaler={prescaler}-1
+      {tim}.Pulse={pulse}
+    known_issue: |
+      .ioc 内部枚举名带序号:"PWM Generation1 CH1"。
+      GUI 里显示的是 "PWM Generation CH1"(没有序号)。
+      写成 GUI 名会被 CubeMX 静默丢弃(实测:整个 TIM 从 IP 列表消失)。
+
+  input_capture:
+    verified: true
+    command: "set ip parameters {tim} InputCapture {pin} {signal} [Prescaler n] [Period n]"
+    defaults:
+      prescaler: 72
+      period: 65535
+    ip_entries: ["{tim}"]
+    pin_entries: ["{pin}"]
+    ip_parameters: [Prescaler, Period, IC1Polarity, IC1Selection, IC1Prescaler, IC1Filter, IC2Polarity, IC2Selection, IC2Prescaler, IC2Filter]
+    derive:
+      n: "从 {signal} 里取 CH 后面的数字"
+      ic_mode: "{v.ic_mode} 里的 {n} 代入该数字"
+      signal_body: "去掉 {signal} 的 S_ 前缀,再去掉 _ETR 后缀(如 S_TIM2_CH1_ETR -> TIM2_CH1)"
+    ioc_fragment: |
+      {pin}.Mode={ic_mode}
+      {pin}.Signal={signal}
+      SH.{signal}.0={signal_body},{ic_mode}
+      SH.{signal}.ConfNb=1
+      NVIC.{tim}_IRQn={v.nvic_enabled}
+      {tim}.IC1Filter=0
+      {tim}.IC1Polarity={v.ic_polarity_rising}
+      {tim}.IC1Prescaler={v.ic_prescaler_div1}
+      {tim}.IC1Selection={v.ic_selection_directti}
+      {tim}.IC2Filter=0
+      {tim}.IC2Polarity={v.ic_polarity_falling}
+      {tim}.IC2Prescaler={v.ic_prescaler_div1}
+      {tim}.IC2Selection={v.ic_selection_indirectti}
+      {tim}.IPParameters=Prescaler,Period,IC1Polarity,IC1Selection,IC1Prescaler,IC1Filter,IC2Polarity,IC2Selection,IC2Prescaler,IC2Filter,Channel-{ic_mode}
+      {tim}.Period={period}-1
+      {tim}.Prescaler={prescaler}-1
+      {tim}.Channel-{ic_mode}={channel_key}
+    known_issue: |
+      PA0 在 .ioc 里的信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1);
+      组合名来自 CubeMX db 里 RefSignal 的 ExclusiveGroupName,不用猜。
+      GUI 名 "Input Capture direct mode" 对应的内部名是 Input_Capture1_from_TI1。

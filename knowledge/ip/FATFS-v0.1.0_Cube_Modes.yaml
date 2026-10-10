@@ -1,0 +1,430 @@
+name: FATFS
+version: v0.1.0_Cube
+parameters:
+  FATFS_version:
+    comment: FATFS version
+    type: uniqueElementList
+    default: '11'
+    group: Version
+  MAX_VOLUMES_VALUE:
+    comment: Max value for the volumes parameter
+    type: integer
+    default: '9'
+  SD_MODE:
+    comment: SD MODE
+    type: integer
+    default: '4'
+  SDMMC1_MODE:
+    comment: SD MODE
+    type: integer
+    default: '4'
+  SDMMC2_MODE:
+    comment: SD MODE
+    type: integer
+    default: '4'
+  Instance:
+    comment: Instance
+    default: FATFS
+  _HSD:
+    comment: SDMMC instance
+    type: list
+    default: hsd1
+    group: SDIO/SDMMC
+  _HUSBH:
+    comment: USBH instance
+    type: list
+    default: hUsbHostFS
+    group: USBH
+  _HNAND:
+    comment: NandFlash instance
+    type: list
+    default: hnand1
+    group: Nand
+  _HSDRAM:
+    comment: SDRAM instance
+    type: list
+    default: hsdram1
+    group: SDRAM
+  VIRTUAL_SRAM1:
+    comment: SRAM1 on
+    type: integer
+    default: '1'
+    group: SRAM
+  VIRTUAL_SRAM2:
+    comment: SRAM2 on
+    type: integer
+    default: '1'
+    group: SRAM
+  VIRTUAL_SRAM3:
+    comment: SRAM3 on
+    type: integer
+    default: '1'
+    group: SRAM
+  VIRTUAL_SRAM4:
+    comment: SRAM4 on
+    type: integer
+    default: '1'
+    group: SRAM
+  _HSRAM:
+    comment: SRAM instance
+    type: list
+    default: hsram1
+    group: SRAM
+  USE_DMA_CODE_SD:
+    comment: Use dma template
+    type: list
+    default: '1'
+    group: SDIO/SDMMC
+  USE_DMA_CODE_USBH:
+    comment: Use dma template
+    type: list
+    default: '1'
+    group: USBH
+  DISKIO_CODE:
+    comment: Diskio code
+    type: list
+    default: '0'
+    group: User Defined
+  SRAM_BSP_CODE:
+    comment: BSP code for SRAM
+    type: list
+    default: '0'
+    group: SRAM
+  SD_BSP_CODE:
+    comment: BSP code for SD
+    type: list
+    default: '0'
+    group: SDIO/SDMMC
+  BOARD_NAME:
+    comment: Name
+    type: list
+    default: none
+    group: Board
+  VIRTUAL_CS:
+    comment: At least one CS set
+    type: integer
+    default: '1'
+    group: CS
+  _FS_READONLY:
+    comment: FS_READONLY (Read-only mode)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _FS_MINIMIZE:
+    comment: FS_MINIMIZE (Minimization level)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _USE_STRFUNC:
+    comment: USE_STRFUNC (String functions)
+    type: list
+    default: '2'
+    group: Function Parameters
+  _USE_FIND:
+    comment: USE_FIND (Find functions)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _USE_MKFS:
+    comment: USE_MKFS (Make filesystem function)
+    type: list
+    default: '1'
+    group: Function Parameters
+  _USE_FORWARD:
+    comment: USE_FORWARD (Forward function)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _USE_LABEL:
+    comment: USE_LABEL (Volume label functions)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _USE_FASTSEEK:
+    comment: USE_FASTSEEK (Fast seek function)
+    type: list
+    default: '1'
+    group: Function Parameters
+  HS_DMA_ENABLED:
+    type: integer
+    default: '1'
+    group: Function Parameters
+  FS_DMA_ENABLED:
+    type: integer
+    default: '1'
+    group: Function Parameters
+  _USE_BUFF_WO_ALIGNMENT:
+    comment: USE_BUFF_WO_ALIGNMENT (Data alignment management)
+    type: uniqueElementList
+    default: '0'
+    group: Function Parameters
+  VIRTUAL_CODE_PAGE:
+    comment: VIRTUAL_CODE_PAGE
+    type: uniqueElementList
+    default: '932'
+    group: Locale and Namespace Parameters
+  _CODE_PAGE:
+    comment: CODE_PAGE (Code page on target)
+    type: list
+    default: '850'
+    group: Locale and Namespace Parameters
+  _USE_LFN:
+    comment: USE_LFN (Use Long Filename)
+    type: list
+    default: '3'
+    group: Locale and Namespace Parameters
+  _MAX_LFN:
+    comment: MAX_LFN (Max Long Filename)
+    type: integer
+    default: '255'
+    min: '12'
+    max: '255'
+    group: Locale and Namespace Parameters
+  _LFN_UNICODE:
+    comment: LFN_UNICODE (Enable Unicode)
+    type: list
+    default: '0'
+    group: Locale and Namespace Parameters
+  _STRF_ENCODE:
+    comment: STRF_ENCODE (Character encoding)
+    type: list
+    default: '3'
+    group: Locale and Namespace Parameters
+  _FS_RPATH:
+    comment: FS_RPATH (Relative Path)
+    type: list
+    default: '0'
+    group: Locale and Namespace Parameters
+  _VOLUMES:
+    comment: VOLUMES (Logical drives)
+    type: integer
+    default: '5'
+    min: '5'
+    max: =MAX_VOLUMES_VALUE
+    group: Physical Drive Parameters
+  _MAX_SS:
+    comment: MAX_SS (Maximum Sector Size)
+    type: list
+    default: '512'
+    group: Physical Drive Parameters
+  _MIN_SS:
+    comment: MIN_SS (Minimum Sector Size)
+    type: list
+    default: '512'
+    group: Physical Drive Parameters
+  _MULTI_PARTITION:
+    comment: MULTI_PARTITION (Volume partitions feature)
+    type: list
+    default: '0'
+    group: Physical Drive Parameters
+  _USE_TRIM:
+    comment: USE_TRIM (Erase feature)
+    type: list
+    default: '0'
+    group: Physical Drive Parameters
+  _FS_NOFSINFO:
+    comment: FS_NOFSINFO (Force full FAT scan)
+    type: list
+    default: '0'
+    group: Physical Drive Parameters
+  _FS_TINY:
+    comment: FS_TINY (Tiny mode)
+    type: list
+    default: '0'
+    group: System Parameters
+  _FS_NORTC:
+    comment: FS_NORTC (Timestamp feature)
+    type: list
+    default: '0'
+    group: System Parameters
+  _NORTC_YEAR:
+    comment: '      NORTC_YEAR (Year for timestamp)'
+    type: integer
+    default: '2018'
+    min: '1980'
+    max: '2107'
+    group: System Parameters
+  _NORTC_MON:
+    comment: '      NORTC_MON (Month for timestamp)'
+    type: integer
+    default: '1'
+    min: '1'
+    max: '12'
+    group: System Parameters
+  _NORTC_MDAY:
+    comment: '      NORTC_MDAY (Day for timestamp)'
+    type: integer
+    default: '4'
+    min: '1'
+    max: '30'
+    group: System Parameters
+  _WORD_ACCESS:
+    comment: WORD_ACCESS (Platform dependent access option)
+    type: list
+    default: '0'
+    group: System Parameters
+  _FS_REENTRANT:
+    comment: FS_REENTRANT (Re-Entrancy)
+    type: list
+    default: '1'
+    group: System Parameters
+  _FS_TIMEOUT:
+    comment: FS_TIMEOUT (Timeout ticks)
+    type: integer
+    default: '1000'
+    min: '1'
+    max: '100000000'
+    group: System Parameters
+  _USE_MUTEX:
+    comment: USE_MUTEX
+    type: list
+    default: '0'
+    group: System Parameters
+  _SYNC_t:
+    comment: SYNC_t (O/S sync object)
+    type: uniqueElementList
+    default: osMutexId_t
+    group: System Parameters
+  _FS_LOCK:
+    comment: FS_LOCK (Number of files opened simultaneously)
+    type: integer
+    default: '2'
+    min: '0'
+    max: '255'
+    group: System Parameters
+  _USE_EXPAND:
+    comment: USE_EXPAND (Use f_expand function)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _USE_CHMOD:
+    comment: USE_CHMOD (Change attributes function)
+    type: list
+    default: '0'
+    group: Function Parameters
+  _FS_EXFAT:
+    comment: FS_EXFAT (Support of exFAT file system)
+    type: list
+    default: '0'
+    group: System Parameters
+  _LFN_BUF:
+    comment: LFN_BUF
+    type: integer
+    default: '255'
+    min: '12'
+    max: '255'
+    group: Locale and Namespace Parameters
+  _SFN_BUF:
+    comment: SFN_BUF
+    type: integer
+    default: '12'
+    min: '12'
+    max: =_LFN_BUF
+    group: Locale and Namespace Parameters
+  _FS_FATFS_SDIO:
+    comment: SD mode
+    type: integer
+    default: '1'
+  _FS_FATFS_SDRAM:
+    comment: SDRAM mode
+    type: integer
+    default: '1'
+  _FS_FATFS_SRAM:
+    comment: SRAM mode
+    type: integer
+    default: '1'
+  _FS_FATFS_USB:
+    comment: USB mode
+    type: integer
+    default: '1'
+  _FS_FATFS_USER:
+    comment: USER mode
+    type: integer
+    default: '1'
+signals:
+  VS_SDIO: {}
+  VS_FMC_SDRAM: {}
+  VS_SRAM: {}
+  VS_USB: {}
+  VS_Generic: {}
+modes:
+- name: FatFS_Basemode
+  hal_mode: ''
+  parameters:
+  - FATFS_version
+  - _FS_READONLY
+  - _FS_MINIMIZE
+  - _USE_STRFUNC
+  - _USE_FIND
+  - _USE_MKFS
+  - _USE_FASTSEEK
+  - _USE_EXPAND
+  - _USE_CHMOD
+  - _USE_LABEL
+  - _USE_FORWARD
+  - _USE_BUFF_WO_ALIGNMENT
+  - _CODE_PAGE
+  - _USE_LFN
+  - _MAX_LFN
+  - _LFN_UNICODE
+  - _LFN_BUF
+  - _SFN_BUF
+  - _STRF_ENCODE
+  - _FS_RPATH
+  - _VOLUMES
+  - _MAX_SS
+  - _MIN_SS
+  - _MULTI_PARTITION
+  - _USE_TRIM
+  - _FS_NOFSINFO
+  - _FS_TINY
+  - _FS_EXFAT
+  - _FS_NORTC
+  - _NORTC_YEAR
+  - _NORTC_MON
+  - _NORTC_MDAY
+  - _WORD_ACCESS
+  - _FS_REENTRANT
+  - _FS_TIMEOUT
+  - _USE_MUTEX
+  - _SYNC_t
+  - _FS_LOCK
+  - BOARD_NAME
+  - VIRTUAL_CODE_PAGE
+- name: SDIO
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - _HSD
+  - SD_MODE
+  - USE_DMA_CODE_SD
+  - SD_BSP_CODE
+- name: FSMC_NAND16
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - _HNAND
+- name: FMC_SDRAM
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - _HSDRAM
+- name: SRAM
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - _HSRAM
+  - SRAM_BSP_CODE
+- name: USB
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - _HUSBH
+  - USE_DMA_CODE_USBH
+- name: User_defined
+  hal_mode: ''
+  base_mode: FatFS_Basemode
+  parameters:
+  - DISKIO_CODE
+source: db/mcu/IP/FATFS-v0.1.0_Cube_Modes.xml
+instance: FATFS

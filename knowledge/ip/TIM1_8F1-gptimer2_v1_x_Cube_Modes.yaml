@@ -1,0 +1,1951 @@
+name: TIM1_8F1
+version: gptimer2_v1_x_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: TIM$Index
+  Prescaler:
+    comment: Prescaler (PSC - 16 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+    group: Counter Settings
+  CounterMode:
+    comment: Counter Mode
+    type: list
+    default: TIM_COUNTERMODE_UP
+    group: Counter Settings
+  Period:
+    comment: Counter Period (AutoReload Register - 16 bits value )
+    type: integer
+    default: '65535'
+    min: '0'
+    max: '65535'
+    group: Counter Settings
+  ClockDivision:
+    comment: Internal Clock Division (CKD)
+    type: list
+    default: TIM_CLOCKDIVISION_DIV1
+    group: Counter Settings
+  RepetitionCounter:
+    comment: Repetition Counter (RCR - 8 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '255'
+    group: Counter Settings
+  AutoReloadPreload:
+    comment: auto-reload preload
+    type: list
+    default: TIM_AUTORELOAD_PRELOAD_DISABLE
+    group: Counter Settings
+  Channel:
+    comment: Channel
+    type: list
+    default: TIM_CHANNEL_1
+  Output_Channel:
+    comment: Output Channel
+    type: list
+    default: TIM_CHANNEL_1
+  Input_Channel:
+    comment: Input Channel
+    type: list
+    default: TIM_CHANNEL_3
+  TIM_OnePulse_Mode:
+    comment: One Pulse Mode
+    type: list
+    default: TIM_OPMODE_SINGLE
+    group: Counter Settings
+  ClockSource:
+    comment: ClockSource
+    type: list
+    default: TIM_CLOCKSOURCE_INTERNAL
+  ClockPrescaler:
+    comment: Clock Prescaler
+    type: list
+    default: TIM_CLOCKPRESCALER_DIV1
+    group: Clock
+  ClockPolarity:
+    comment: Clock Polarity
+    type: list
+    default: TIM_CLOCKPOLARITY_BOTHEDGE
+    group: Clock
+  ClockFilter:
+    comment: Clock Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+    group: Clock
+  Slave_TriggerPrescaler:
+    comment: Trigger Prescaler
+    type: list
+    default: TIM_TRIGGERPRESCALER_DIV1
+    group: Trigger
+  Slave_TriggerPolarity:
+    comment: Trigger Polarity
+    type: list
+    default: TIM_TRIGGERPOLARITY_RISING
+    group: Trigger
+  Slave_TriggerFilter:
+    comment: Trigger Filter
+    type: integer
+    default: =ICFilter_CH2$Input_Capture2_from_TI2
+    min: =ICFilter_CH2$Input_Capture2_from_TI2
+    max: =ICFilter_CH2$Input_Capture2_from_TI2
+    group: Trigger
+  ICPolarity:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_CH3:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_CH4:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_CH1:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_CH2:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_TRC:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICSelection:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_DIRECTTI
+  ICSelection_TRC:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_TRC
+  ICPrescaler:
+    comment: Prescaler Division Ratio
+    type: list
+    default: TIM_ICPSC_DIV1
+  ICFilter:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_CH1:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_CH2:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_CH3:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_CH4:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_TRC_TI1:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: =Slave_TriggerFilter$TriggerSource_TI1ED
+    min: =Slave_TriggerFilter$TriggerSource_TI1ED
+    max: =Slave_TriggerFilter$TriggerSource_TI1ED
+  ICFilter_TRC_TI2:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_TRC_TI3:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_TRC_TI4:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  TIM_InputTrigger_List:
+    comment: 'Input Trigger '
+    type: list
+    default: TIM_TS_ITR0
+  TIM_InputTrigger:
+    comment: TIM_InputTrigger
+    type: list
+    default: TIM_TS_ITR0
+  TIM_SlaveMode_List:
+    comment: Slave Mode Controller
+    type: list
+    default: TIM_SLAVEMODE_DISABLE
+    group: Counter Settings
+  TIM_SlaveMode:
+    comment: Slave Mode Controller
+    type: list
+    default: TIM_SLAVEMODE_RESET
+    group: Counter Settings
+  TIM_CommutationSource:
+    comment: Commutation source
+    type: list
+    default: TIM_COMMUTATION_SOFTWARE
+    group: Counter Settings
+  ICPolarity_1:
+    comment: Polarity Selection
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_RISING
+  ICPolarity_2:
+    comment: Polarity Selection (opposite CH1)
+    type: list
+    default: TIM_INPUTCHANNELPOLARITY_FALLING
+  ICSelection_1:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_DIRECTTI
+  ICSelection_2:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_INDIRECTTI
+  ICPrescaler_1:
+    comment: Prescaler Division Ratio
+    type: list
+    default: TIM_ICPSC_DIV1
+  ICPrescaler_2:
+    comment: Prescaler Division Ratio
+    type: list
+    default: TIM_ICPSC_DIV1
+  ICFilter_1:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  ICFilter_2:
+    comment: Input Filter (4 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  Channel_1:
+    comment: Channel
+    type: list
+    default: TIM_CHANNEL_1
+  Channel_2:
+    comment: Channel
+    type: list
+    default: TIM_CHANNEL_1
+  Channel_3:
+    comment: Channel
+    type: list
+    default: TIM_CHANNEL_3
+  Pulse:
+    comment: Pulse (16 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+  OCMode_PWM:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_PWM1
+  OCFastMode_PWM:
+    comment: Fast Mode
+    type: list
+    default: TIM_OCFAST_DISABLE
+  DefaultOCFastMode:
+    comment: Fast Mode
+    type: list
+    default: TIM_OCFAST_DISABLE
+  OCMode_forced:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_FORCED_ACTIVE
+  Separateur-channel1-nonParameter:
+    comment: '          ____ Parameters for Channel 1 ____'
+    type: subtitle
+  Separateur-channel2-nonParameter:
+    comment: '          ____ Parameters for Channel 2 ____'
+    type: subtitle
+  Separateur-channel3-nonParameter:
+    comment: '          ____ Parameters for Channel 3 ____'
+    type: subtitle
+  OCMode_1:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_TIMING
+  OCMode_2:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_TIMING
+  OCMode_3:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_TIMING
+  OCMode_4:
+    comment: Mode
+    type: list
+    default: TIM_OCMODE_TIMING
+  Pulse_1:
+    comment: Pulse (16 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+  Pulse_2:
+    comment: Pulse (16 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+  Pulse_3:
+    comment: Pulse (16 bits value)
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+  OCPolarity_1:
+    comment: CH Polarity
+    type: list
+    default: TIM_OCPOLARITY_HIGH
+  OCPolarity_2:
+    comment: CH Polarity
+    type: list
+    default: TIM_OCPOLARITY_HIGH
+  OCPolarity_3:
+    comment: CH Polarity
+    type: list
+    default: TIM_OCPOLARITY_HIGH
+  OCPolarity_4:
+    comment: CH Polarity
+    type: list
+    default: TIM_OCPOLARITY_HIGH
+  OCNPolarity_1:
+    comment: CHN Polarity
+    type: list
+    default: TIM_OCNPOLARITY_HIGH
+  OCNPolarity_2:
+    comment: CHN Polarity
+    type: list
+    default: TIM_OCNPOLARITY_HIGH
+  OCNPolarity_3:
+    comment: CHN Polarity
+    type: list
+    default: TIM_OCNPOLARITY_HIGH
+  OCIdleState_1:
+    comment: CH Idle State
+    type: list
+    default: TIM_OCIDLESTATE_RESET
+  OCIdleState_2:
+    comment: CH Idle State
+    type: list
+    default: TIM_OCIDLESTATE_RESET
+  OCIdleState_3:
+    comment: CH Idle State
+    type: list
+    default: TIM_OCIDLESTATE_RESET
+  OCIdleState_4:
+    comment: CH Idle State
+    type: list
+    default: TIM_OCIDLESTATE_RESET
+  OCNIdleState_1:
+    comment: CHN Idle State
+    type: list
+    default: TIM_OCNIDLESTATE_RESET
+  OCNIdleState_2:
+    comment: CHN Idle State
+    type: list
+    default: TIM_OCNIDLESTATE_RESET
+  OCNIdleState_3:
+    comment: CHN Idle State
+    type: list
+    default: TIM_OCNIDLESTATE_RESET
+  OCNIdleState_4:
+    comment: CHN Idle State
+    type: list
+    default: TIM_OCNIDLESTATE_RESET
+  OC1Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC2Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC3Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC4Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC5Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC6Preload:
+    comment: Output compare preload
+    type: list
+    default: DISABLE
+  OC1Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  OC2Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  OC3Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  OC4Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  OC5Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  OC6Preload_PWM:
+    comment: Output compare preload
+    type: list
+    default: ENABLE
+  EncoderMode:
+    comment: Encoder Mode
+    type: list
+    default: TIM_ENCODERMODE_TI1
+  IC1Polarity:
+    comment: Polarity
+    type: list
+    default: TIM_ICPOLARITY_RISING
+  IC1Selection:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_DIRECTTI
+  IC1Prescaler:
+    comment: Prescaler Division Ratio
+    type: list
+    default: TIM_ICPSC_DIV1
+  IC1Filter:
+    comment: Input Filter
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  IC2Polarity:
+    comment: Polarity
+    type: list
+    default: TIM_ICPOLARITY_RISING
+  IC2Selection:
+    comment: IC Selection
+    type: list
+    default: TIM_ICSELECTION_DIRECTTI
+  IC2Prescaler:
+    comment: Prescaler Division Ratio
+    type: list
+    default: TIM_ICPSC_DIV1
+  IC2Filter:
+    comment: Input Filter
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+  TIM_MasterOutputTrigger:
+    comment: Trigger Event Selection
+    type: list
+    default: TIM_TRGO_RESET
+    group: Trigger Output (TRGO) Parameters
+  TIM_MasterSlaveMode:
+    comment: Master/Slave Mode (MSM bit)
+    type: list
+    default: TIM_MASTERSLAVEMODE_DISABLE
+    group: Trigger Output (TRGO) Parameters
+  DeadTime:
+    comment: Dead Time
+    type: integer
+    default: '0'
+    min: '0'
+    max: '255'
+    group: Break And Dead Time management - Output Configuration
+  OffStateRunMode:
+    comment: 'Off State Selection for Run Mode (OSSR)  '
+    type: list
+    default: TIM_OSSR_DISABLE
+    group: Break And Dead Time management - Output Configuration
+  OffStateIDLEMode:
+    comment: 'Off State Selection for Idle Mode (OSSI)  '
+    type: list
+    default: TIM_OSSI_DISABLE
+    group: Break And Dead Time management - Output Configuration
+  LockLevel:
+    comment: 'Lock Configuration  '
+    type: list
+    default: TIM_LOCKLEVEL_OFF
+    group: Break And Dead Time management - Output Configuration
+  BreakState:
+    comment: BRK State
+    type: list
+    default: TIM_BREAK_DISABLE
+    group: Break And Dead Time management - BRK Configuration
+  BreakPolarity:
+    comment: BRK Polarity
+    type: list
+    default: TIM_BREAKPOLARITY_HIGH
+    group: Break And Dead Time management - BRK Configuration
+  AutomaticOutput:
+    comment: Automatic Output State
+    type: list
+    default: TIM_AUTOMATICOUTPUT_DISABLE
+    group: Break And Dead Time management - Output Configuration
+  ClearInputState:
+    comment: Clear Input State
+    type: list
+    default: ENABLE
+    group: Clear Input
+  ClearInputSource:
+    comment: Clear Input Source
+    type: list
+    default: TIM_CLEARINPUTSOURCE_NONE
+    group: Clear Input
+  ClearInputPolarity:
+    comment: Clear Input Polarity
+    type: list
+    default: TIM_CLEARINPUTPOLARITY_NONINVERTED
+    group: Clear Input
+  ClearInputPrescaler:
+    comment: Clear Input Prescaler
+    type: list
+    default: TIM_CLEARINPUTPRESCALER_DIV1
+    group: Clear Input
+  ClearInputFilter:
+    comment: Clear Input Filter
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+    group: Clear Input
+  ClearChannel__1:
+    comment: Clear Channel 1
+    type: list
+    default: TIM_CHANNEL_1
+    group: Clear Input
+  ClearChannel1:
+    comment: Clear Channel 1
+    type: list
+    group: Clear Input
+  ClearChannel__2:
+    comment: Clear Channel 2
+    type: list
+    default: TIM_CHANNEL_2
+    group: Clear Input
+  ClearChannel2:
+    comment: Clear Channel 2
+    type: list
+    group: Clear Input
+  ClearChannel__3:
+    comment: Clear Channel 3
+    type: list
+    default: TIM_CHANNEL_3
+    group: Clear Input
+  ClearChannel3:
+    comment: Clear Channel 3
+    type: list
+    group: Clear Input
+  ClearChannel__4:
+    comment: Clear Channel 4
+    type: list
+    default: TIM_CHANNEL_4
+    group: Clear Input
+  ClearChannel4:
+    comment: Clear Channel 4
+    type: list
+    group: Clear Input
+  Commutation_Delay:
+    comment: Commutation Delay
+    type: integer
+    default: '0'
+    min: '0'
+    max: '65535'
+  TI1_Selection:
+    comment: TI1_Selection
+    type: list
+    default: TIM_TI1SELECTION_XORCOMBINATION
+  TIM5_TI4_REMAP:
+    comment: TI4 remap capabilities for TIM5
+    type: list
+    default: TIM_TIM5_LSI
+    group: TI4 remap capabilities for TIM5
+signals:
+  BKIN:
+    io_mode: AlternateFunctionPushPull
+    direction: Input
+  CH1:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    exclusive_group: S_TIM2_CH1_ETR:TIM2
+    shareable_group: S_$IpInstance_CH1:TIM1,TIM3,TIM4,TIM5,TIM8,TIM9,TIM10,TIM11,TIM12,TIM13,TIM14,TIM15,TIM16,TIM17,TIM19,TIM21,TIM22
+  CH1N:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    direction: Output
+  CH2:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    shareable_group: S_$IpInstance_CH2
+  CH2N:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    direction: Output
+  CH3:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    shareable_group: S_$IpInstance_CH3
+  CH3N:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    direction: Output
+  CH4:
+    io_mode: AlternateFunctionOpenDrainAndPushPullDefaultPP
+    shareable_group: S_$IpInstance_CH4
+  ETR:
+    io_mode: AlternateFunctionPushPull
+    direction: Input
+    exclusive_group: S_TIM2_CH1_ETR:TIM2
+    shareable_group: S_$IpInstance_ETR:TIM1,TIM3,TIM4,TIM5,TIM8,TIM9,TIM10,TIM11,TIM12,TIM13,TIM14,TIM15,TIM16,TIM17,TIM19,TIM21,TIM22
+  VS_ControllerModeReset: {}
+  VS_ControllerModeGated: {}
+  VS_ControllerModeClock: {}
+  VS_ControllerModeTrigger: {}
+  VS_ControllerModeCombinedResetTrigger: {}
+  VS_ClockSourceINT: {}
+  VS_ClockSourceITR: {}
+  VS_CH1:
+    shareable_group: S_VirtualCH1$IpInstance
+  VS_CH2:
+    shareable_group: S_VirtualCH2$IpInstance
+  VS_CH3:
+    shareable_group: S_VirtualCH3$IpInstance
+  VS_CH4:
+    shareable_group: S_VirtualCH4$IpInstance
+  VS_no_output1: {}
+  VS_no_output2: {}
+  VS_no_output3: {}
+  VS_no_output4: {}
+  VS_OPM: {}
+  VS_XOR: {}
+  VS_NoInput4: {}
+  VS_NoInput1: {}
+  VS_NoInput2: {}
+  VS_NoETR: {}
+  VS_indirect_ch1: {}
+  VS_indirect_ch2: {}
+  VS_indirect_ch3: {}
+  VS_indirect_ch4: {}
+modes:
+- name: Empty
+  hal_mode: TIM
+  parameters: []
+- name: Counter_init
+  hal_mode: TIM
+  parameters:
+  - Prescaler
+  - CounterMode
+  - Period
+  - ClockDivision
+  - RepetitionCounter
+  - AutoReloadPreload
+  - TIM_MasterSlaveMode
+  - TIM_MasterOutputTrigger
+  - BreakState
+  - BreakPolarity
+  - AutomaticOutput
+  - OffStateRunMode
+  - OffStateIDLEMode
+  - LockLevel
+  - DeadTime
+  - ClockFilter
+- name: TRGO_use
+  hal_mode: TIM
+  group: TRGO configuration
+  parameters:
+  - TIM_MasterOutputTrigger
+  - TIM_MasterSlaveMode
+- name: Enable_Timer
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: Input_Capture1_from_TI1
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 1
+  parameters:
+  - Channel
+  - ICPolarity_CH1
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+    ICSelection:
+    - TIM_ICSELECTION_DIRECTTI
+- name: Input_Capture1_from_TI2
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 1
+  parameters:
+  - Channel
+  - ICPolarity_CH1
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture1_from_TI2_63
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 1
+  parameters:
+  - Channel
+  - ICPolarity_CH1
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture1_from_TRC
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 1
+  parameters:
+  - Channel
+  - ICPolarity_TRC
+  - ICSelection_TRC
+  - ICPrescaler
+  - ICFilter_TRC_TI1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+    ICSelection_TRC:
+    - TIM_ICSELECTION_TRC
+- name: Input_Capture2_from_TI2
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 2
+  parameters:
+  - Channel
+  - ICPolarity_CH2
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+    ICSelection:
+    - TIM_ICSELECTION_DIRECTTI
+- name: Input_Capture2_from_TI1
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 2
+  parameters:
+  - Channel
+  - ICPolarity_CH2
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture2_from_TI1_63
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 2
+  parameters:
+  - Channel
+  - ICPolarity_CH2
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture2_from_TRC
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 2
+  parameters:
+  - Channel
+  - ICPolarity_TRC
+  - ICSelection_TRC
+  - ICPrescaler
+  - ICFilter_TRC_TI2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+    ICSelection_TRC:
+    - TIM_ICSELECTION_TRC
+- name: Input_Capture3_from_TI3
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 3
+  parameters:
+  - Channel
+  - ICPolarity_CH3
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+    ICSelection:
+    - TIM_ICSELECTION_DIRECTTI
+- name: Input_Capture3_from_TI4
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 3
+  parameters:
+  - Channel
+  - ICPolarity_CH3
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture3_from_TI4_63
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 3
+  parameters:
+  - Channel
+  - ICPolarity_CH3
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture3_from_TRC
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 3
+  parameters:
+  - Channel
+  - ICPolarity_TRC
+  - ICSelection_TRC
+  - ICPrescaler
+  - ICFilter_TRC_TI3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+    ICSelection_TRC:
+    - TIM_ICSELECTION_TRC
+- name: Input_Capture4_from_TI4
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 4
+  parameters:
+  - Channel
+  - ICPolarity_CH4
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+    ICSelection:
+    - TIM_ICSELECTION_DIRECTTI
+- name: Input_Capture4_from_TI4_Remap
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 4
+  parameters:
+  - Channel
+  - ICPolarity_CH4
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH4
+  - TIM5_TI4_REMAP
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+    ICSelection:
+    - TIM_ICSELECTION_DIRECTTI
+- name: Input_Capture4_from_TI3
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 4
+  parameters:
+  - Channel
+  - ICPolarity_CH4
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture4_from_TI3_63
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 4
+  parameters:
+  - Channel
+  - ICPolarity_CH4
+  - ICSelection
+  - ICPrescaler
+  - ICFilter_CH4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+    ICSelection:
+    - TIM_ICSELECTION_INDIRECTTI
+- name: Input_Capture4_from_TRC
+  hal_mode: TIM_IC
+  base_mode: Counter_init
+  group: Input Capture Channel 4
+  parameters:
+  - Channel
+  - ICPolarity_TRC
+  - ICSelection_TRC
+  - ICPrescaler
+  - ICFilter_TRC_TI4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+    ICSelection_TRC:
+    - TIM_ICSELECTION_TRC
+- name: Output Compare1 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare No Output Channel 1
+  parameters:
+  - Channel
+  - OCMode_1
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Output Compare2 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare No Output Channel 2
+  parameters:
+  - Channel
+  - OCMode_2
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Output Compare3 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare No Output Channel 3
+  parameters:
+  - Channel
+  - OCMode_3
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Output Compare4 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare No Output Channel 4
+  parameters:
+  - Channel
+  - OCMode_4
+  - Pulse
+  - OC4Preload
+  - DefaultOCFastMode
+  - OCPolarity_4
+  - OCIdleState_4
+  - OCNIdleState_4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+- name: Output Compare1 CH1
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 1
+  parameters:
+  - Channel
+  - OCMode_1
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Output Compare2 CH2
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 2
+  parameters:
+  - Channel
+  - OCMode_2
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Output Compare3 CH3
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 3
+  parameters:
+  - Channel
+  - OCMode_3
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Output Compare4 CH4
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 4
+  parameters:
+  - Channel
+  - OCMode_4
+  - Pulse
+  - OC4Preload
+  - DefaultOCFastMode
+  - OCPolarity_4
+  - OCIdleState_4
+  - OCNIdleState_4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+- name: Output Compare1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 1N
+  parameters:
+  - Channel
+  - OCMode_1
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Output Compare2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 2N
+  parameters:
+  - Channel
+  - OCMode_2
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Output Compare3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 3N
+  parameters:
+  - Channel
+  - OCMode_3
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Output Compare1 CH1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 1 and 1N
+  parameters:
+  - Channel
+  - OCMode_1
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Output Compare2 CH2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 2 and 2N
+  parameters:
+  - Channel
+  - OCMode_2
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Output Compare3 CH3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Output Compare Channel 3 and 3N
+  parameters:
+  - Channel
+  - OCMode_3
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Forced Output1 CH1
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 1
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Forced Output2 CH2
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 2
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Forced Output3 CH3
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 3
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Forced Output4 CH4
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 4
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC4Preload
+  - DefaultOCFastMode
+  - OCPolarity_4
+  - OCIdleState_4
+  - OCNIdleState_4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+- name: Forced Output1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 1N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Forced Output2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 2N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Forced Output3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 3N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: Forced Output1 CH1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 1 and  1N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC1Preload
+  - DefaultOCFastMode
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: Forced Output2 CH2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 2 and  2N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC2Preload
+  - DefaultOCFastMode
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: Forced Output3 CH3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Forced Output Channel 3 and  3N
+  parameters:
+  - Channel
+  - OCMode_forced
+  - Pulse
+  - OC3Preload
+  - DefaultOCFastMode
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: PWM Generation1 CH1
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 1
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC1Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: PWM Generation2 CH2
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 2
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC2Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: PWM Generation3 CH3
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 3
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC3Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: PWM Generation4 CH4
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 4
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC4Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_4
+  - OCIdleState_4
+  - OCNIdleState_4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+- name: PWM Generation1 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 1
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC1Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: PWM Generation2 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 2
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC2Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: PWM Generation3 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 3
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC3Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: PWM Generation4 No Output
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 4
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC4Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_4
+  - OCIdleState_4
+  - OCNIdleState_4
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_4
+- name: PWM Generation1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 1N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC1Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: PWM Generation2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 2N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC2Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: PWM Generation3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 3N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC3Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: PWM Generation1 CH1 CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 1 and 1N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC1Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_1
+- name: PWM Generation2 CH2 CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 2 and 2N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC2Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_2
+- name: PWM Generation3 CH3 CH3N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: PWM Generation Channel 3 and 3N
+  parameters:
+  - Channel
+  - OCMode_PWM
+  - Pulse
+  - OC3Preload_PWM
+  - OCFastMode_PWM
+  - OCPolarity_3
+  - OCNPolarity_3
+  - OCIdleState_3
+  - OCNIdleState_3
+  possible_values:
+    Channel:
+    - TIM_CHANNEL_3
+- name: OPM_bit
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: Counter Settings
+  parameters:
+  - TIM_OnePulse_Mode
+- name: One-Pulse-Generation1-CH1
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 1
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_1
+  - Pulse
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_1
+    Input_Channel:
+    - TIM_CHANNEL_2
+- name: One-Pulse-Generation2-CH2
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 2
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_2
+  - Pulse
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_2
+    Input_Channel:
+    - TIM_CHANNEL_1
+- name: One-Pulse-Generation1-CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 1
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_1
+  - Pulse
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_1
+    Input_Channel:
+    - TIM_CHANNEL_2
+- name: One-Pulse-Generation2-CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 2
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_2
+  - Pulse
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_2
+    Input_Channel:
+    - TIM_CHANNEL_1
+- name: One-Pulse-Generation1-CH1-CH1N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 1
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_1
+  - Pulse
+  - OCPolarity_1
+  - OCNPolarity_1
+  - OCIdleState_1
+  - OCNIdleState_1
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_1
+    Input_Channel:
+    - TIM_CHANNEL_2
+- name: One-Pulse-Generation2-CH2-CH2N
+  hal_mode: TIM_OC
+  base_mode: Counter_init
+  group: One Pulse Generation Channel 2
+  parameters:
+  - Output_Channel
+  - Input_Channel
+  - OCMode_2
+  - Pulse
+  - OCPolarity_2
+  - OCNPolarity_2
+  - OCIdleState_2
+  - OCNIdleState_2
+  - ICPolarity
+  - ICSelection
+  - ICPrescaler
+  - ICFilter
+  possible_values:
+    Output_Channel:
+    - TIM_CHANNEL_2
+    Input_Channel:
+    - TIM_CHANNEL_1
+- name: Xored_Inputs_Hall_Sensor_Interface
+  hal_mode: TIM_HallSensor
+  base_mode: Counter_init
+  group: Hall Sensor
+  parameters:
+  - IC1Prescaler
+  - IC1Polarity
+  - IC1Filter
+  - Commutation_Delay
+- name: Encoder_Interface
+  hal_mode: TIM_Encoder
+  base_mode: Counter_init
+  group: Encoder
+  parameters:
+  - EncoderMode
+  - Separateur-channel1-nonParameter
+  - IC1Polarity
+  - IC1Selection
+  - IC1Prescaler
+  - IC1Filter
+  - Separateur-channel2-nonParameter
+  - IC2Polarity
+  - IC2Selection
+  - IC2Prescaler
+  - IC2Filter
+- name: PWM_Input_1
+  hal_mode: ''
+  base_mode: Counter_init
+  group: 'PWM Input CH1 '
+  parameters:
+  - TIM_InputTrigger_List
+  - TIM_SlaveMode_List
+  - Separateur-channel1-nonParameter
+  - Channel_1
+  - ICPolarity_1
+  - ICSelection_1
+  - ICPrescaler_1
+  - ICFilter_1
+  - Separateur-channel2-nonParameter
+  - Channel_2
+  - ICPolarity_2
+  - ICSelection_2
+  - ICPrescaler_2
+  - ICFilter_2
+  possible_values:
+    TIM_InputTrigger_List:
+    - TIM_TS_TI1FP1
+    TIM_SlaveMode_List:
+    - TIM_SLAVEMODE_RESET
+- name: PWM_Input_2
+  hal_mode: ''
+  base_mode: Counter_init
+  group: PWM Input CH2
+  parameters:
+  - TIM_InputTrigger_List
+  - TIM_SlaveMode_List
+  - Separateur-channel1-nonParameter
+  - Channel_1
+  - ICPolarity_1
+  - ICSelection_1
+  - ICPrescaler_1
+  - ICFilter_1
+  - Separateur-channel2-nonParameter
+  - Channel_2
+  - ICPolarity_2
+  - ICSelection_2
+  - ICPrescaler_2
+  - ICFilter_2
+  possible_values:
+    TIM_InputTrigger_List:
+    - TIM_TS_TI2FP2
+    TIM_SlaveMode_List:
+    - TIM_SLAVEMODE_RESET
+- name: Internal
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: ClockSourceETR_Mode2
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - ClockPolarity
+  - ClockPrescaler
+  possible_values:
+    ClockPolarity:
+    - TIM_CLOCKPOLARITY_INVERTED
+    - TIM_CLOCKPOLARITY_NONINVERTED
+    ClockPrescaler:
+    - TIM_CLOCKPRESCALER_DIV1
+    - TIM_CLOCKPRESCALER_DIV2
+    - TIM_CLOCKPRESCALER_DIV4
+    - TIM_CLOCKPRESCALER_DIV8
+- name: ITR0
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: ITR1
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: ITR2
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: ITR3
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters: []
+- name: ClockSourceTI1ED
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - ClockPolarity
+  possible_values:
+    ClockPolarity:
+    - TIM_CLOCKPOLARITY_BOTHEDGE
+- name: ClockSourceTI1FP1
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - ClockPolarity
+  possible_values:
+    ClockPolarity:
+    - TIM_CLOCKPOLARITY_RISING
+    - TIM_CLOCKPOLARITY_FALLING
+    - TIM_CLOCKPOLARITY_BOTHEDGE
+- name: ClockSourceTI2FP2
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - ClockPolarity
+  possible_values:
+    ClockPolarity:
+    - TIM_CLOCKPOLARITY_RISING
+    - TIM_CLOCKPOLARITY_FALLING
+    - TIM_CLOCKPOLARITY_BOTHEDGE
+- name: TriggerSource_ITR0
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_ITR1
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_ITR1
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_ITR2
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_ITR3
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_TI1ED
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_ETR
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_TI1FP1
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: TriggerSource_TI2FP2
+  hal_mode: TIM_Base
+  base_mode: Counter_init
+  parameters:
+  - Slave_TriggerPolarity
+  - Slave_TriggerPrescaler
+  - Slave_TriggerFilter
+  - TIM_SlaveMode
+- name: ETR-as-clearing-source
+  hal_mode: ''
+  base_mode: Empty
+  parameters:
+  - ClearInputState
+  - ClearInputSource
+  - ClearInputPolarity
+  - ClearInputPrescaler
+  - ClearInputFilter
+  - ClearChannel1
+  - ClearChannel2
+  - ClearChannel3
+  - ClearChannel4
+- name: XOR_enable
+  hal_mode: ''
+  base_mode: Empty
+  parameters: []
+source: db/mcu/IP/TIM1_8F1-gptimer2_v1_x_Cube_Modes.xml
+instance: TIM4

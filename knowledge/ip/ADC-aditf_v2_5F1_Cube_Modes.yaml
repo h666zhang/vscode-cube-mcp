@@ -1,0 +1,491 @@
+name: ADC
+version: aditf_v2_5F1_Cube
+parameters:
+  MasterList:
+    comment: Master List
+    type: list
+  Mode:
+    comment: Mode
+    type: list
+    default: 'null'
+    group: ADCsgroup
+  DMAAccessMode_ADC1:
+    comment: DMA Access Mode
+    type: list
+    default: ADC_DMAACCESSMODE_ENABLED
+    group: ADCsgroup
+  DMAAccessMode_ADC2:
+    comment: DMA Access Mode
+    type: list
+    default: ADC_DMAACCESSMODE_ENABLED
+    group: ADCsgroup
+  DMAAccessMode_ADC3:
+    comment: DMA Access Mode
+    type: list
+    default: ADC_DMAACCESSMODE_ENABLED
+    group: ADCsgroup
+  Instance:
+    comment: ADC instance
+    type: list
+    default: ADC$Index
+    group: ADCgroup
+  DataAlign:
+    comment: Data Alignment
+    type: list
+    default: ADC_DATAALIGN_RIGHT
+    group: ADCgroup
+  ScanConvMode:
+    comment: Scan Conversion Mode
+    type: list
+    default: ADC_SCAN_DISABLE
+    group: ADCgroup
+  ContinuousConvMode:
+    comment: Continuous Conversion Mode
+    type: list
+    default: DISABLE
+    group: ADCgroup
+  DiscontinuousConvMode:
+    comment: Discontinuous Conversion Mode
+    type: list
+    default: DISABLE
+    group: ADCgroup
+  NbrOfDiscConversion:
+    comment: Number Of Discontinuous Conversions
+    type: integer
+    default: 'null'
+    min: '1'
+    max: '1'
+  EnableRegularConversion:
+    comment: Enable Regular Conversions
+    type: list
+    default: ENABLE
+    group: ADC_Regular_ConversionMode
+  NbrOfConversionFlag:
+    comment: Number Of Conversion Flag
+    type: integer
+    default: '0'
+    min: '0'
+    max: '1'
+    group: ADCgroup
+  NbrOfConversion:
+    comment: Number Of Conversion
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+    group: ADCgroup
+  ExternalTrigConv:
+    comment: External Trigger Conversion Source
+    type: list
+    default: ADC_SOFTWARE_START
+    group: ADCgroup
+  InjNumberOfConversion:
+    comment: Number Of Conversions
+    type: integer
+    default: '0'
+    min: '0'
+    max: '4'
+    group: ADCgroup
+  ExternalTrigInjecConv:
+    comment: External Trigger Source
+    type: list
+    default: 'null'
+    group: ADCgroup
+  InjectedConvMode:
+    comment: Injected Conversion Mode
+    type: list
+    default: 'null'
+    group: ADCgroup
+  InjectedDiscontinuousConvMode:
+    comment: Injected Discontinuous Conversion Mode
+    type: list
+    default: ENABLE
+  AutoInjectedConv:
+    comment: Automatic Injected Conversion
+    type: list
+    default: ENABLE
+  Rank:
+    comment: Rank
+    type: integer
+    default: '1'
+    min: '1'
+    max: '16'
+    group: ADCgroup
+  InjectedRank:
+    comment: Rank
+    type: integer
+    default: 'null'
+    min: '1'
+    max: '4'
+    group: ADCChannel
+  Channel:
+    comment: Channel
+    type: list
+    group: ADCChannel
+  SamplingTime:
+    comment: Sampling Time
+    type: list
+    default: ADC_SAMPLETIME_1CYCLE_5
+    group: ADCChannel
+  InjectedOffset:
+    comment: Injected Offset
+    type: integer
+    default: '0'
+    min: '0'
+    max: '4095'
+  EnableAnalogWatchDog:
+    comment: Enable Analog WatchDog Mode
+    type: boolean
+    default: 'false'
+    group: ADCgroup
+  WatchdogMode:
+    comment: Watchdog Mode
+    type: list
+    default: 'null'
+    group: ADCgroup
+  WatchdogChannel:
+    comment: Analog WatchDog Channel
+    type: list
+    default: 'null'
+    group: ADCChannel
+  AWD1HighThreshold:
+    comment: High Threshold
+    type: list
+    default: 'null'
+    group: ADCgroup
+  AWD1LowThreshold:
+    comment: Low Threshold
+    type: list
+    default: 'null'
+    group: ADCgroup
+  EnableInjectedConversion:
+    comment: Enable Injected Conversions
+    type: list
+    default: ENABLE
+    group: ADCgroup
+  AWD1ITMode:
+    comment: Interrupt Mode
+    type: list
+    default: 'null'
+    group: ADCgroup
+  master:
+    comment: Master Flag
+    type: integer
+    default: '0'
+    min: '0'
+    max: '1'
+  UnUsedParameter:
+    comment: UnUsedParameter
+    type: list
+    default: 'null'
+  AllChannels:
+    comment: Channel
+    type: list
+    group: ADCChannel
+  Available_Channel:
+    comment: Available Channel
+    type: list
+    default: ADC_CHANNEL_TEMPSENSOR
+    group: ADCChannel
+  AnalogWDChannel:
+    comment: Analog WatchDog Channel
+    type: list
+    group: ADCChannel
+  ChannelForWatchDog:
+    comment: Channel type for WatchDog
+    type: list
+    default: Regular
+signals:
+  EXTI11:
+    io_mode: EXTI
+    shareable_group: GPXTI11
+  EXTI15:
+    io_mode: EXTI
+    shareable_group: GPXTI15
+  IN0:
+    io_mode: Analog
+    shareable_group: ADCx_IN0:ADC1,ADC2,ADC3
+  IN1:
+    io_mode: Analog
+    shareable_group: ADCx_IN1:ADC1,ADC2,ADC3
+  IN2:
+    io_mode: Analog
+    shareable_group: ADCx_IN2:ADC1,ADC2,ADC3
+  IN3:
+    io_mode: Analog
+    shareable_group: ADCx_IN3:ADC1,ADC2,ADC3
+  IN4:
+    io_mode: Analog
+    shareable_group: ADCx_IN4:ADC1,ADC2
+  IN5:
+    io_mode: Analog
+    shareable_group: ADCx_IN5:ADC1,ADC2
+  IN6:
+    io_mode: Analog
+    shareable_group: ADCx_IN6:ADC1,ADC2
+  IN7:
+    io_mode: Analog
+    shareable_group: ADCx_IN7:ADC1,ADC2
+  IN8:
+    io_mode: Analog
+    shareable_group: ADCx_IN8:ADC1,ADC2
+  IN9:
+    io_mode: Analog
+    shareable_group: ADCx_IN9:ADC1,ADC2
+  IN10:
+    io_mode: Analog
+    shareable_group: ADCx_IN10:ADC1,ADC2,ADC3
+  IN11:
+    io_mode: Analog
+    shareable_group: ADCx_IN11:ADC1,ADC2,ADC3
+  IN12:
+    io_mode: Analog
+    shareable_group: ADCx_IN12:ADC1,ADC2,ADC3
+  IN13:
+    io_mode: Analog
+    shareable_group: ADCx_IN13:ADC1,ADC2,ADC3
+  IN14:
+    io_mode: Analog
+    shareable_group: ADCx_IN14:ADC1,ADC2
+  IN15:
+    io_mode: Analog
+    shareable_group: ADCx_IN15:ADC1,ADC2
+  TempSens_Input:
+    io_mode: Analog
+  Vref_Input:
+    io_mode: Analog
+  Vbat_Input:
+    io_mode: Analog
+modes:
+- name: remap
+  hal_mode: ''
+  group: Remap
+  parameters: []
+- name: remap
+  hal_mode: ''
+  group: Remap
+  parameters: []
+- name: ADCs_Common_Settings
+  hal_mode: ''
+  group: ADCs_Common_Settings
+  parameters:
+  - Mode
+  - DMAAccessMode_ADC1
+  - DMAAccessMode_ADC2
+  - DMAAccessMode_ADC3
+- name: ADC_Settings
+  hal_mode: ''
+  group: ADC_Settings
+  parameters:
+  - DataAlign
+  - ScanConvMode
+  - ContinuousConvMode
+  - DiscontinuousConvMode
+  - NbrOfDiscConversion
+- name: ADC_Regular_ConversionMode
+  hal_mode: ''
+  group: ADC_Regular_ConversionMode
+  parameters:
+  - EnableRegularConversion
+  - NbrOfConversionFlag
+  - NbrOfConversion
+  - ExternalTrigConv
+- name: injected_remap
+  hal_mode: ''
+  group: injectedRemap
+  parameters: []
+- name: injected_remap
+  hal_mode: ''
+  group: injectedRemap
+  parameters: []
+- name: ADC_Injected_ConversionMode
+  hal_mode: ''
+  group: ADC_Injected_ConversionMode
+  parameters:
+  - EnableInjectedConversion
+  - InjNumberOfConversion
+  - ExternalTrigInjecConv
+  - InjectedConvMode
+  - AutoInjectedConv
+  - InjectedDiscontinuousConvMode
+- name: ChannelRegularConversion
+  hal_mode: ''
+  base_mode: ADC_Regular_ConversionMode
+  group: ADC_Regular_ConversionMode
+  parameters:
+  - Rank
+  - Channel
+  - SamplingTime
+- name: cpChannelRegularConversion
+  hal_mode: ''
+  parameters:
+  - Rank
+  - Channel
+  - SamplingTime
+- name: ChannelInjectedConversion
+  hal_mode: ''
+  base_mode: ADC_Injected_ConversionMode
+  group: ADC_Injected_ConversionMode
+  parameters:
+  - InjectedRank
+  - Channel
+  - SamplingTime
+  - InjectedOffset
+- name: cpChannelInjectedConversion
+  hal_mode: ''
+  parameters:
+  - InjectedRank
+  - Channel
+  - SamplingTime
+  - InjectedOffset
+- name: WatchDog
+  hal_mode: ''
+  group: WatchDog
+  parameters:
+  - EnableAnalogWatchDog
+  - WatchdogMode
+  - WatchdogChannel
+  - AWD1HighThreshold
+  - AWD1LowThreshold
+  - AWD1ITMode
+- name: IN0
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_0
+- name: IN1
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_1
+- name: IN2
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_2
+- name: IN3
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_3
+- name: IN4
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_4
+- name: IN5
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_5
+- name: IN6
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_6
+- name: IN7
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_7
+- name: IN8
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_8
+- name: IN9
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_9
+- name: IN10
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_10
+- name: IN11
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_11
+- name: IN12
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_12
+- name: IN13
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_13
+- name: IN14
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_14
+- name: IN15
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_15
+- name: IN-TempSens
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_TEMPSENSOR
+- name: IN-Vrefint
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_VREFINT
+- name: IN-Vbat
+  hal_mode: ''
+  parameters:
+  - Channel
+  possible_values:
+    Channel:
+    - ADC_CHANNEL_VBAT
+- name: External-Trigger-for-Injected-conversion
+  hal_mode: ''
+  parameters: []
+- name: External-Trigger-for-Regular-conversion
+  hal_mode: ''
+  parameters: []
+source: db/mcu/IP/ADC-aditf_v2_5F1_Cube_Modes.xml
+instance: ADC2

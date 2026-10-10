@@ -1,0 +1,227 @@
+name: I2C
+version: i2c1_v1_5_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: I2C$Index
+  I2C_Speed_Mode:
+    comment: 'I2C Speed Mode '
+    type: list
+    default: I2C_Standard
+    group: Timing configuration
+  I2C_Mode:
+    comment: 'I2C Speed Mode '
+    type: list
+    default: I2C_Standard
+    group: Master Features
+  SMBusAnalogFilter:
+    comment: Analog Filter
+    type: list
+    default: SMBUS_ANALOGFILTER_ENABLE
+    group: Timing configuration
+  Analog_Filter:
+    comment: Analog Filter
+    type: list
+    default: I2C_ANALOGFILTER_ENABLE
+    group: Timing configuration
+  I2C_Coeff_DF:
+    comment: Coefficient of Digital Filter
+    type: integer
+    default: '0'
+    min: '0'
+    max: '15'
+    group: Timing configuration
+  ClockSpeed:
+    comment: I2C Clock Speed (Hz)
+    type: integer
+    default: '400000'
+    min: '1'
+    max: '400000'
+    group: Master Features
+  SmbusClockSpeed:
+    comment: Clock Speed (Hz)
+    type: integer
+    default: '100000'
+    min: '1'
+    max: '100000'
+    group: Timing configuration
+  DutyCycle:
+    comment: Fast Mode Duty Cycle
+    type: list
+    default: I2C_DUTYCYCLE_2
+    group: Master Features
+  OwnAddress:
+    comment: Primary slave address
+    type: integer
+    default: '0'
+    min: '0'
+    max: '127'
+    group: Slave Features
+  OwnAddress1:
+    comment: Primary slave address
+    type: integer
+    default: =(OwnAddress*2)
+    min: '0'
+    max: '1023'
+    group: Slave Features
+  AddressingMode:
+    comment: Primary Address Length selection
+    type: list
+    default: I2C_ADDRESSINGMODE_7BIT
+    group: Slave Features
+  OwnAddress2:
+    comment: Secondary slave address
+    type: integer
+    default: '0'
+    min: '0'
+    max: '0'
+    group: Slave Features
+  OwnAddress22:
+    comment: Secondary slave address
+    type: integer
+    default: =(OwnAddress2*2)
+    min: '0'
+    max: '127'
+    group: Slave Features
+  DualAddressMode:
+    comment: Dual Address Acknowledged
+    type: list
+    default: I2C_DUALADDRESS_DISABLE
+    group: Slave Features
+  GeneralCallMode:
+    comment: General Call address detection
+    type: list
+    default: I2C_GENERALCALL_DISABLE
+    group: Slave Features
+  NoStretchMode:
+    comment: Clock No Stretch Mode
+    type: list
+    default: I2C_NOSTRETCH_DISABLE
+    group: Slave Features
+  OwnAddress2Masks:
+    comment: Secondary Address Mask
+    type: list
+    default: I2C_OA2_NOMASK
+    group: Slave Features
+  TIDLE:
+    comment: Idle Clock Timeout Detection
+    type: list
+    default: SMBUS_TIDLE_DISABLED
+    group: Timeout configuration
+  Timeout:
+    comment: Timeout
+    type: string
+    default: '0x00008019'
+    group: Timeout configuration
+  SMBusPacketErrorCheckMode:
+    comment: Packet Error Check Mode
+    type: list
+    default: 'null'
+    group: SMBus Features
+  SMBusPeripheralMode:
+    comment: Peripheral Mode
+    type: list
+    default: 'null'
+    group: SMBus Features
+  SMBusAddressingMode:
+    comment: Primary Address Length selection
+    type: list
+    default: 'null'
+    group: SMBus Slave Features
+  SMBusOwnAddress:
+    comment: Primary slave address
+    type: integer
+    default: '1'
+    min: '1'
+    max: '127'
+    group: SMBus Slave Features
+  SMBusOwnAddress1:
+    comment: Primary slave address
+    type: integer
+    default: =SMBusOwnAddress*2
+    min: '0'
+    max: '127'
+    group: SMBus Slave Features
+  SMBusOwnAddress2:
+    comment: Secondary slave address
+    type: integer
+    default: '0'
+    min: '0'
+    max: '127'
+    group: SMBus Slave Features
+  SMBusOwnAddress22:
+    comment: Secondary slave address
+    type: integer
+    default: '0'
+    min: '0'
+    max: '127'
+    group: SMBus Slave Features
+  SMBusDualAddressMode:
+    comment: Dual Address Acknowledged
+    type: list
+    default: 'null'
+    group: SMBus Slave Features
+  SMBusGeneralCallMode:
+    comment: General Call Address Detection
+    type: list
+    default: 'null'
+    group: SMBus Slave Features
+  SMBusNoStretchMode:
+    comment: Clock No Stretch Mode
+    type: list
+    default: 'null'
+    group: SMBus Slave Features
+  SMBusOwnAddress2Masks:
+    comment: Secondary Address Mask
+    type: list
+    default: SMBUS_OA2_NOMASK
+    group: SMBus Slave Features
+signals:
+  SCL:
+    io_mode: AlternateFunctionOpenDrainNoPullOrPullUp
+  SDA:
+    io_mode: AlternateFunctionOpenDrainNoPullOrPullUp
+  SMBA:
+    io_mode: AlternateFunctionOpenDrainNoPullOrPullUp
+modes:
+- name: I2C
+  hal_mode: I2C
+  parameters:
+  - I2C_Mode
+  - ClockSpeed
+  - DutyCycle
+  - I2C_Coeff_DF
+  - Analog_Filter
+  - NoStretchMode
+  - AddressingMode
+  - DualAddressMode
+  - OwnAddress
+  - OwnAddress2
+  - GeneralCallMode
+  - OwnAddress2Masks
+  - Instance
+- name: SMBus_common
+  hal_mode: ''
+  parameters:
+  - SmbusClockSpeed
+  - SMBusAnalogFilter
+  - SMBusOwnAddress
+  - SMBusAddressingMode
+  - SMBusDualAddressMode
+  - SMBusOwnAddress2
+  - SMBusOwnAddress2Masks
+  - SMBusGeneralCallMode
+  - SMBusNoStretchMode
+  - SMBusPacketErrorCheckMode
+  - SMBusPeripheralMode
+  - Timeout
+- name: SMBus-two-wire-Interface
+  hal_mode: SMBUS
+  base_mode: SMBus_common
+  parameters: []
+- name: SMBus-Alert-mode
+  hal_mode: SMBUS
+  base_mode: SMBus_common
+  parameters: []
+source: db/mcu/IP/I2C-i2c1_v1_5_Cube_Modes.xml
+instance: I2C2

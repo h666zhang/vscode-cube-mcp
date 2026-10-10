@@ -1,0 +1,29 @@
+# .ioc 文件的结构规则:改文本时必须遵守
+# 来源:实测(CubeMX 6.18-RC3;三个 TIM 注入器 + cubermx_remove_peripheral 跑通的形态)
+
+verified: true
+source: "实测 2026-08-26 ~ 2026-08-27,CubeMX 6.18-RC3"
+
+entries:
+  ip_list:
+    key_pattern: "Mcu.IP{N}={instance}"
+    count_key: "Mcu.IPNb"
+    note: "N 从 0 连续编号;增删外设后必须重排编号并更新计数,否则 CubeMX 读到的外设列表是错的"
+  pin_list:
+    key_pattern: "Mcu.Pin{N}={pin_name}"
+    count_key: "Mcu.PinsNb"
+    note: "虚拟引脚(VP_*)也要列进来,例如 VP_TIM2_VS_ClockSourceINT"
+  function_list:
+    key: "ProjectManager.functionlistsort"
+    segment_pattern: "{seq}-MX_{instance}_Init-{instance}-false-HAL-{hal}"
+    example: "4-MX_TIM3_Init-TIM3-false-HAL-true"
+    note: "逗号分隔;新增外设时追加一段,序号重排;HAL 使能位是 true/false"
+
+write:
+  insert_anchor: "board=custom"
+  insert_position: "参数块插在 board=custom 这一行之前(键序更接近 CubeMX 原生输出)"
+  newline: '写回时用 open(path, "w", newline="") 保持文件原来的换行符'
+
+escaping:
+  nvic_value: '值里的冒号要转义,例如 true\:0\:0\:false\:false\:true\:true\:true\:true'
+  key_spaces: '键名里的空格要转义,例如 {pin}.Mode=PWM\ Generation1\ CH1'

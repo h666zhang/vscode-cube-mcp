@@ -1,0 +1,1085 @@
+name: DMA
+version: STM32F103G_dma_v1_0
+parameters:
+  Instance:
+    comment: Channel
+    type: list
+  Direction:
+    comment: Direction
+    type: list
+    default: DMA_PERIPH_TO_MEMORY
+  PeriphInc:
+    comment: Peripheral Increment
+    type: list
+    default: DMA_PINC_ENABLE
+  MemInc:
+    comment: Memory Increment
+    type: list
+    default: DMA_MINC_ENABLE
+  PeriphDataAlignment:
+    comment: Peripheral Data Alignment
+    type: list
+    default: DMA_PDATAALIGN_BYTE
+  MemDataAlignment:
+    comment: Memomry Data Alignment
+    type: list
+    default: DMA_MDATAALIGN_WORD
+  Mode:
+    comment: Mode
+    type: list
+    default: DMA_NORMAL
+  Priority:
+    comment: Priority
+    type: list
+    default: DMA_PRIORITY_LOW
+  ClockEnableMode:
+    comment: Clock Enable Mode
+    type: list
+  DMA_Handle:
+    comment: DMA Handle
+    type: list
+  IpInstance:
+    comment: IP Instance
+    type: list
+signals: {}
+modes:
+- name: DMA_Request
+  hal_mode: ''
+  parameters:
+  - Instance
+  - Direction
+  - PeriphInc
+  - MemInc
+  - PeriphDataAlignment
+  - MemDataAlignment
+  - Mode
+  - Priority
+  - DMA_Handle
+- name: DMA1
+  hal_mode: ''
+  parameters:
+  - ClockEnableMode
+  - IpInstance
+  possible_values:
+    ClockEnableMode:
+    - __HAL_RCC_DMA1_CLK_ENABLE
+    IpInstance:
+    - DMA
+- name: DMA2
+  hal_mode: ''
+  parameters:
+  - ClockEnableMode
+  - IpInstance
+  possible_values:
+    ClockEnableMode:
+    - __HAL_RCC_DMA2_CLK_ENABLE
+    IpInstance:
+    - DMA
+- name: MEMTOMEM
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_MEMORY
+    Mode:
+    - DMA_NORMAL
+    IpInstance:
+    - DMA
+- name: ADC1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - DMA_Handle
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - ADC1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: ADC3
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - DMA_Handle
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - ADC3
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: DAC_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - DMA_Handle1
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - DAC
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: DAC_CH2
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - DMA_Handle2
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - DAC
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: I2C1_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - I2C1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: I2C1_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - I2C1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: I2C2_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - I2C2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: I2C2_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - I2C2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SDIO
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  - PeriphDataAlignment
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SDIO
+    PeriphInc:
+    - DMA_PINC_DISABLE
+    PeriphDataAlignment:
+    - DMA_PDATAALIGN_WORD
+- name: SPI1_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SPI1_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SPI2_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI2:I2S2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SPI2_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI2:I2S2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SPI3_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI3:I2S3
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: SPI3_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - SPI3:I2S3
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: TIM1_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM1
+- name: TIM1_CH2
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC2]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM1
+- name: TIM1_CH3
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM1
+- name: TIM1_CH4/TRIG/COM
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC4]
+    - hdma[TIM_DMA_ID_TRIGGER]
+    - hdma[TIM_DMA_ID_COMMUTATION]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM1
+- name: TIM1_UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM1
+- name: TIM2_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM2
+- name: TIM2_CH2/CH4
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC2]
+    - hdma[TIM_DMA_ID_CC4]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM2
+- name: TIM2_CH3
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM2
+- name: TIM2_UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM2
+- name: TIM3_CH1/TRIG
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    - hdma[TIM_DMA_ID_TRIGGER]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM3
+- name: TIM3_CH3
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM3
+- name: TIM3_CH4/UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC4]
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM3
+- name: TIM4_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM4
+- name: TIM4_CH2
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC2]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM4
+- name: TIM4_CH3
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM4
+- name: TIM4_UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM4
+- name: TIM5_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM5
+- name: TIM5_CH2
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC2]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM5
+- name: TIM5_CH3/UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM5
+- name: TIM5_CH4/TRIG
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC4]
+    - hdma[TIM_DMA_ID_TRIGGER]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM5
+- name: TIM6_UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM6
+- name: TIM7_UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM7
+- name: TIM8_CH1
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC1]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM8
+- name: TIM8_CH2
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC2]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM8
+- name: TIM8_CH3/UP
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC3]
+    - hdma[TIM_DMA_ID_UPDATE]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM8
+- name: TIM8_CH4/TRIG/COM
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdma[TIM_DMA_ID_CC4]
+    - hdma[TIM_DMA_ID_TRIGGER]
+    - hdma[TIM_DMA_ID_COMMUTATION]
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - TIM8
+- name: UART4_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - UART4
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: UART4_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - UART4
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART1_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART1_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART1
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART2_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART2_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART2
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART3_RX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_PERIPH_TO_MEMORY
+    DMA_Handle:
+    - hdmarx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART3
+    PeriphInc:
+    - DMA_PINC_DISABLE
+- name: USART3_TX
+  hal_mode: ''
+  base_mode: DMA_Request
+  parameters:
+  - Direction
+  - DMA_Handle
+  - Mode
+  - IpInstance
+  - PeriphInc
+  possible_values:
+    Direction:
+    - DMA_MEMORY_TO_PERIPH
+    DMA_Handle:
+    - hdmatx
+    Mode:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
+    IpInstance:
+    - USART3
+    PeriphInc:
+    - DMA_PINC_DISABLE
+source: db/mcu/IP/DMA-STM32F103G_dma_v1_0_Modes.xml
+instance: DMA

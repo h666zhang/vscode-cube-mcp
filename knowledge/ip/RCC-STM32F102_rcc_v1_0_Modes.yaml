@@ -1,0 +1,679 @@
+name: RCC
+version: STM32F102_rcc_v1_0
+parameters:
+  OscillatorType:
+    comment: Oscillator Type
+    type: list
+    default: +OscillatorTypeHSI+|OscillatorTypeLSI+|OscillatorTypeHSE+|OscillatorTypeLSE
+  HSE_Timout:
+    comment: HSE Startup Timout Value (ms)
+    type: integer
+    default: '100'
+    min: '1'
+    max: '4294967295'
+    group: RCC Parameters
+  LSE_Timout:
+    comment: LSE Startup Timout Value (ms)
+    type: integer
+    default: '5000'
+    min: '1'
+    max: '4294967295'
+    group: RCC Parameters
+  PLLMUL:
+    comment: PLL Mul
+    type: list
+    default: RCC_PLL_MUL2
+  APB1TimCLKDivider:
+    comment: APB1 Timer Clock Divider
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+  APB2TimCLKDivider:
+    comment: APB2 Timer Clock Divider
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+  USBPrescaler:
+    comment: USB clock Divider
+    type: list
+    default: RCC_USBCLKSOURCE_PLL
+  HSIDivPLL:
+    comment: HSIRC Divider for PLL
+    type: integer
+    default: '2'
+    min: '2'
+    max: '2'
+  HSEDivPLL:
+    comment: HSE Prediv Value
+    type: list
+    default: RCC_HSE_PREDIV_DIV1
+  RCC_RTC_Clock_Source_FROM_HSE:
+    comment: HSE RTC Divider
+    type: integer
+    default: '128'
+    min: '128'
+    max: '128'
+  RCC_MCOMult_Clock_Source_FROM_PLLMUL:
+    comment: PLL Divider for MCO
+    type: integer
+    default: '2'
+    min: '2'
+    max: '2'
+  HCLKDiv2:
+    comment: HCLK Divider for SDIO
+    type: integer
+    default: '2'
+    min: '2'
+    max: '2'
+  AHBCLKDivider:
+    comment: AHBCLK Divider
+    type: list
+    default: RCC_SYSCLK_DIV1
+  ADCPresc:
+    comment: ADC1 Clock Divider
+    type: list
+    default: RCC_ADCPCLK2_DIV2
+  TimSys_Div:
+    comment: Cortex timer system Div
+    type: list
+    default: SYSTICK_CLKSOURCE_HCLK
+  Cortex_DivARG:
+    comment: Cortex_DivARG
+    type: String
+    default: HAL_RCC_GetHCLKFreq()/1000
+  APB1CLKDivider:
+    comment: APB1 Clock Divider
+    type: list
+    default: RCC_HCLK_DIV1
+  APB2CLKDivider:
+    comment: APB2 Clock Divider
+    type: list
+    default: RCC_HCLK_DIV1
+  PLLSourceVirtual:
+    comment: PLL Source
+    type: list
+    default: RCC_PLLSOURCE_HSE
+  PLLSourceVirtualString:
+    comment: PLL Source
+    type: string
+    default: +PLLSourceVirtual
+  PLLSource:
+    comment: PLL Source
+    type: list
+    default: +PLLSourceVirtualString
+  PLLSourceLL:
+    comment: PLLSourceLL
+    type: list
+    default: +HSEDivPLL
+  SYSCLKSource:
+    comment: SYSCLK Source
+    type: list
+    default: RCC_SYSCLKSOURCE_HSI
+  RTCClockSelection:
+    comment: RTC Clock Selection
+    type: list
+    default: RCC_RTCCLKSOURCE_LSI
+  RCC_RTC_Clock_SourceLL:
+    comment: RTC Clock Source
+    type: list
+    default: RCC_RTCCLKSOURCE_LSE
+  RCC_MCOSource:
+    comment: MCO Clock Source
+    type: list
+    default: RCC_MCO1SOURCE_SYSCLK
+  EnbaleCSS:
+    comment: 'Clock Security System: available only when HSE is used directly or undirectly as System Clock'
+    type: list
+    default: 'false'
+  HSI_VALUE:
+    comment: HSI Source
+    type: double
+    default: '8000000'
+    unit: MHz
+  LSI_VALUE:
+    comment: LSI Source
+    type: double
+    default: '40000'
+    min: '40000'
+    max: '40000'
+    unit: KHz
+  HSE_VALUE:
+    comment: HSE OSC
+    type: double
+    default: '8000000'
+    min: '1000000'
+    max: '25000000'
+    unit: MHz
+  LSE_VALUE:
+    comment: LSE OSC
+    type: double
+    default: '32768'
+    min: '32768'
+    max: '32768'
+    unit: KHz
+  VCOOutput2Freq_Value:
+    comment: VCOInput
+    type: double
+    default: '4000000'
+    min: '1000000'
+    max: '25000000'
+    unit: MHz
+  PLLCLKFreq_Value:
+    comment: PLL clock
+    type: double
+    default: '8000000'
+    min: '16000000'
+    max: '48000000'
+    unit: MHz
+  HSIPLLFreq_Value:
+    comment: HSI diviseur output to PLL
+    type: double
+    default: '4000000'
+    unit: MHz
+  HSEPLLFreq_Value:
+    comment: HSE diviseur output to PLL
+    type: double
+    default: '8000000'
+    unit: MHz
+  SYSCLKFreq_VALUE:
+    comment: System clock
+    type: double
+    default: '8000000'
+    max: '36000000'
+    unit: MHz
+  AHBFreq_Value:
+    comment: HCLK
+    type: double
+    default: '8000000'
+    unit: MHz
+  HCLKFreq_Value:
+    comment: HCLK
+    type: double
+    default: '8000000'
+    max: '36000000'
+    unit: MHz
+  RTCFreq_Value:
+    comment: RTC
+    type: double
+    default: '40000'
+    max: '1000000'
+    unit: KHz
+  USBFreq_Value:
+    comment: USB
+    type: double
+    default: '8000000'
+    min: '47880000'
+    max: '48120000'
+    unit: MHz
+  WatchDogFreq_Value:
+    comment: IWDG clock
+    type: double
+    default: '40000'
+    unit: KHz
+  TimSysFreq_Value:
+    comment: 'Timer System '
+    type: double
+    default: '1000000'
+    unit: MHz
+  FCLKCortexFreq_Value:
+    comment: FCLK Cortex clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  FLITFCLKFreq_Value:
+    comment: FLITF clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  ADCFreqValue:
+    comment: ADC clock
+    type: double
+    default: '4000000'
+    max: '14000000'
+    unit: MHz
+  FSMCFreq_Value:
+    comment: FSMC clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  SDIOFreq_Value:
+    comment: SDIO clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  SDIOHCLKDiv2FreqValue:
+    comment: SDIO clock
+    type: double
+    default: '4000000'
+    unit: MHz
+  I2S2Freq_Value:
+    comment: I2S2 clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  I2S3Freq_Value:
+    comment: I2S3 clock
+    type: double
+    default: '8000000'
+    unit: MHz
+  synchADCFreq_Value:
+    comment: ADC synchr
+    type: double
+    default: =APB2Freq_Value
+    unit: MHz
+  asynchADCFreq_Value:
+    comment: ADC asynchr
+    type: double
+    default: =ADCFreqValue
+    unit: MHz
+  APB1Freq_Value:
+    comment: APB1 peripheral clocks
+    type: double
+    default: '8000000'
+    min: '10000000'
+    max: '36000000'
+    unit: MHz
+  APB2Freq_Value:
+    comment: APB2 peripheral clocks
+    type: double
+    default: '8000000'
+    max: '36000000'
+    unit: MHz
+  APB1TimFreq_Value:
+    comment: APB1 timers clocks
+    type: double
+    default: '8000000'
+    unit: MHz
+  APB2TimFreq_Value:
+    comment: APB2 timers clocks
+    type: double
+    default: '8000000'
+    unit: MHz
+  PLLMCOFreq_Value:
+    comment: PLL MCO DIV output
+    type: double
+    default: '4000000'
+    unit: MHz
+  MCOFreq_Value:
+    comment: MCO Output
+    type: double
+    default: '8000000'
+    max: '50000000'
+    unit: MHz
+  EnableHSE:
+    comment: HSE OSC
+    type: list
+    default: 'true'
+  EnableHSERTCDevisor:
+    comment: RTC and HSE Oscillator
+    type: list
+    default: 'true'
+  EnableMCOMultDivisor:
+    comment: PLL and MCO
+    type: list
+    default: 'true'
+  RTCEnable:
+    comment: RTC
+    type: list
+    default: 'true'
+  EnableLSERTC:
+    comment: EnableLSERTC
+    type: list
+    default: 'true'
+  EnableLSE:
+    comment: LSE OSC
+    type: list
+    default: 'true'
+  IWDGEnable:
+    comment: IWDG
+    type: list
+    default: 'true'
+  FSMCEnable:
+    comment: FSMC
+    type: list
+    default: 'true'
+  SDIOEnable:
+    comment: SDIO
+    type: list
+    default: 'true'
+  USBEnable:
+    comment: USB
+    type: list
+    default: 'true'
+  MCOEnable:
+    comment: Master Clock Output
+    type: list
+    default: 'true'
+  ADCEnable:
+    comment: ADC Clock Output
+    type: list
+    default: 'true'
+  I2S2Enable:
+    comment: I2S2 instance
+    type: list
+    default: 'false'
+  I2S3Enable:
+    comment: I2S3 instance
+    type: list
+    default: 'false'
+  HSEUsed:
+    comment: HSE used flag
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+  OscillatorTypeHSE:
+    comment: Clock Type HSE
+    type: list
+  HSEState:
+    comment: Hse State
+    type: list
+    default: RCC_HSE_BYPASS
+  LSEUsed:
+    comment: LSE Is Used
+    type: integer
+    default: '1'
+    min: '1'
+  OscillatorTypeLSE:
+    comment: Clock Type LSE
+    type: list
+  LSEState:
+    comment: Lse State
+    type: list
+    default: RCC_LSE_BYPASS
+  OscillatorTypeLSI:
+    comment: Clock Type LSI
+    type: list
+  LSIUsed:
+    comment: LSI used flag
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+  LSIState:
+    comment: Lsi State
+    type: list
+    default: RCC_LSI_OFF
+  OscillatorTypeHSI:
+    comment: Clock Type HSI
+    type: list
+  HSIUsed:
+    comment: HSI Is Used
+    type: integer
+    default: '1'
+    min: '1'
+  HSIState:
+    comment: Hsi State
+    type: list
+    default: RCC_HSI_OFF
+  PLLUsed:
+    comment: MainPLL Is Used
+    type: integer
+    default: '1'
+    min: '1'
+  PLLState:
+    comment: Pll State
+    type: list
+    default: RCC_PLL_OFF
+  PeriphClockSelectionARG:
+    comment: Periph Clock Selection
+    type: list
+    default: +PeriphClockSelection
+  PeriphClockSelection:
+    comment: Periph Clock Selection
+    type: list
+    default: +RCC_PERIPHCLK_RTCVar+|RCC_PERIPHCLK_ADCVar+|RCC_PERIPHCLK_I2S2Var+|RCC_PERIPHCLK_I2S3Var+|RCC_PERIPHCLK_USBVar
+  RCC_PERIPHCLK_I2S2Var:
+    comment: RCC_PERIPHCLK_I2S2Var
+    type: list
+    default: RCC_PERIPHCLK_I2S2
+  RCC_PERIPHCLK_I2S3Var:
+    comment: RCC_PERIPHCLK_I2S3Var
+    type: list
+    default: RCC_PERIPHCLK_I2S3
+  RCC_PERIPHCLK_RTCVar:
+    comment: RCC_PERIPHCLK_RTCVar
+    type: list
+    default: RCC_PERIPHCLK_RTC
+  RCC_PERIPHCLK_ADCVar:
+    comment: RCC_PERIPHCLK_ADCVar
+    type: list
+    default: RCC_PERIPHCLK_ADC
+  RCC_PERIPHCLK_USBVar:
+    comment: RCC_PERIPHCLK_USBVar
+    type: list
+    default: RCC_PERIPHCLK_USB
+  I2S2ClockSelectionARG:
+    comment: I2S2ClockSelectionARG
+    type: list
+    default: RCC_I2S2CLKSOURCE_SYSCLK
+  I2S3ClockSelectionARG:
+    comment: I2S3ClockSelectionARG
+    type: list
+    default: RCC_I2S3CLKSOURCE_SYSCLK
+  USBClockSelectionARG:
+    comment: USBClockSelectionARG
+    type: list
+    default: +USBPrescaler
+  RTCClockSelectionARG:
+    comment: RTCClockSelectionARG
+    type: list
+    default: +RTCClockSelection
+  ADCClockSelectionARG:
+    comment: ADCClockSelectionARG
+    type: list
+    default: +ADCPresc
+  HSEPredivValueARG:
+    comment: HSEPredivValueARG
+    type: list
+    default: +HSEDivPLL
+  HSEStateARG:
+    comment: Lse StateARG
+    type: list
+    default: +HSEState
+  LSEStateARG:
+    comment: Lse StateARG
+    type: list
+    default: +LSEState
+  HSIStateARG:
+    comment: HSI StateARG
+    type: list
+    default: +HSIState
+  HSICalibrationValueARG:
+    comment: HSICalibrationValueARG
+    type: list
+    default: RCC_HSICALIBRATION_DEFAULT
+  HSICalibrationValue:
+    comment: HSI Calibration Value
+    type: integer
+    default: '16'
+    min: '0'
+    max: '31'
+    group: RCC Parameters
+  LSIStateARG:
+    comment: LSI StateARG
+    type: list
+    default: +LSIState
+  PLLStateARG:
+    comment: PLLStateARG
+    type: list
+    default: +PLLState
+  PLLSourceARG:
+    comment: PLLSourceARG
+    type: list
+    default: +PLLSource
+  PLLMULARG:
+    comment: PLLMULARG
+    type: list
+    default: +PLLMUL
+  ClockTypeARG:
+    comment: Clock TypeARG
+    type: list
+    default: +ClockType
+  SYSCLKSourceARG:
+    comment: SysClock SourceARG
+    type: list
+    default: +SYSCLKSource
+  AHBCLKDividerARG:
+    comment: AHBCLKDividerARG
+    type: list
+    default: +AHBCLKDivider
+  APB1CLKDividerARG:
+    comment: APB1CLKDividerARG
+    type: list
+    default: +APB1CLKDivider
+  APB2CLKDividerARG:
+    comment: APB2CLKDividerARG
+    type: list
+    default: +APB2CLKDivider
+  ClockType:
+    comment: Clock Type
+    type: list
+    default: +ClockTypeHCLK+|ClockTypeSysClk+|ClockTypePCLK1+|ClockTypePCLK2
+  ClockTypeSysClk:
+    comment: Clock Type SysClk
+    type: list
+    default: RCC_CLOCKTYPE_SYSCLK
+  ClockTypeHCLK:
+    comment: Clock Type AHB
+    type: list
+    default: RCC_CLOCKTYPE_HCLK
+  ClockTypePCLK1:
+    comment: Clock Type HCLK1
+    type: list
+    default: RCC_CLOCKTYPE_PCLK1
+  ClockTypePCLK2:
+    comment: Clock Type HCLK2
+    type: list
+    default: RCC_CLOCKTYPE_PCLK2
+  VDD_VALUE:
+    comment: VDD voltage (V)
+    type: double
+    default: '3.3'
+    min: '2'
+    max: '3.6'
+    unit: V
+    group: System Parameters
+  FLatency:
+    comment: Flash Latency(WS)
+    type: uniqueElementList
+    default: FLASH_LATENCY_0
+    group: System Parameters
+  PREFETCH_ENABLE:
+    comment: Prefetch Buffer
+    type: list
+    default: '1'
+    group: System Parameters
+  RCC_MCO:
+    comment: Clock Output
+    type: list
+    default: RCC_MCO
+  RCC_MCODiv:
+    comment: MCO Prescaler
+    type: list
+    default: RCC_MCODIV_1
+  PLLUsedForSys:
+    comment: MainPLL Is Used
+    type: integer
+    default: '1'
+    min: '1'
+    max: '1'
+signals:
+  MCO:
+    io_mode: AlternateFunctionPushPull
+  OSC32_IN:
+    io_mode: System
+  OSC32_OUT:
+    io_mode: System
+  OSC_IN:
+    io_mode: System
+  OSC_OUT:
+    io_mode: System
+modes:
+- name: ClockTree
+  hal_mode: ''
+  parameters:
+  - PLLMUL
+  - APB1TimCLKDivider
+  - APB2TimCLKDivider
+  - RCC_RTC_Clock_Source_FROM_HSE
+  - RCC_MCOMult_Clock_Source_FROM_PLLMUL
+  - AHBCLKDivider
+  - TimSys_Div
+  - APB1CLKDivider
+  - APB2CLKDivider
+  - PLLSource
+  - SYSCLKSource
+  - RTCClockSelection
+  - RCC_MCOSource
+  - HSI_VALUE
+  - LSE_VALUE
+  - LSI_VALUE
+  - HSE_VALUE
+  - HSIPLLFreq_Value
+  - HSEPLLFreq_Value
+  - PLLCLKFreq_Value
+  - SYSCLKFreq_VALUE
+  - AHBFreq_Value
+  - HCLKFreq_Value
+  - RTCFreq_Value
+  - WatchDogFreq_Value
+  - TimSysFreq_Value
+  - APB1Freq_Value
+  - APB2Freq_Value
+  - APB1TimFreq_Value
+  - APB2TimFreq_Value
+  - MCOFreq_Value
+  - EnableHSE
+  - EnableHSERTCDevisor
+  - EnableMCOMultDivisor
+  - RTCEnable
+  - EnableHSERTCDevisor
+  - EnableLSERTC
+  - EnableLSE
+  - IWDGEnable
+  - MCOEnable
+  - OscillatorTypeHSE
+  - HSEUsed
+  - HSEState
+  - OscillatorTypeLSE
+  - LSEUsed
+  - LSEState
+  - OscillatorTypeLSI
+  - LSIUsed
+  - LSIState
+  - OscillatorTypeHSI
+  - HSIUsed
+  - HSIState
+  - PLLUsed
+  - PLLState
+  - PeriphClockSelectionARG
+  - ClockTypeARG
+  - ClockTypeARG
+  - ClockType
+  - ClockTypeHCLK
+  - ClockTypePCLK1
+  - ClockTypePCLK2
+  - PeriphClockSelection
+  - RCC_PERIPHCLK_RTCVar
+  - RTCClockSelectionARG
+  - HSEStateARG
+  - LSEStateARG
+  - HSIStateARG
+  - LSIStateARG
+  - PLLStateARG
+  - PLLSourceARG
+  - PLLMULARG
+- name: AdvancedSettings
+  hal_mode: ''
+  parameters:
+  - VDD_VALUE
+  - PREFETCH_ENABLE
+  - FLatency
+  - HSICalibrationValue
+  - HSE_Timout
+  - LSE_Timout
+source: db/mcu/IP/RCC-STM32F102_rcc_v1_0_Modes.xml
+instance: RCC

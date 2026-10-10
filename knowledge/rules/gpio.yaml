@@ -1,0 +1,13 @@
+# GPIO:已实测
+verified: true
+source: "实测 2026-08-06,Blink_PB13 工程生成成功"
+
+command_examples:
+  - "set pin PB13 GPIO_Output"
+  - "set gpio parameters PB13 GPIO_Label LED"
+
+result: "生成 gpio.c,main.c 里调用 MX_GPIO_Init;标签写进 main.h 的宏"
+
+notes:
+  - "引脚名直接写 .ioc 里的名字(如 PB13);PA0 这类带后缀的写 PA0-WKUP"
+  - "该引脚是否支持这个模式,以 knowledge/mcu/*.pins.yaml 里的 signals 为准"

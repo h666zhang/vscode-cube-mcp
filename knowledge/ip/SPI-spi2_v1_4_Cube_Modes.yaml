@@ -1,0 +1,287 @@
+name: SPI
+version: spi2_v1_4_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: SPI$Index
+  VirtualNSS:
+    type: list
+    default: VM_NSSSOFT
+    group: Basic Parameters
+  VirtualType:
+    type: list
+    default: VM_MASTER
+    group: Basic Parameters
+  Mode:
+    comment: Mode
+    type: list
+    default: SPI_MODE_SLAVE
+    group: Basic Parameters
+  Direction:
+    comment: Direction
+    type: list
+    default: SPI_DIRECTION_2LINES
+    group: Basic Parameters
+  TIMode:
+    comment: Frame Format
+    type: list
+    default: SPI_TIMODE_DISABLE
+    group: Basic Parameters
+  DataSize:
+    comment: Data Size
+    type: list
+    default: SPI_DATASIZE_8BIT
+    group: Basic Parameters
+  FirstBit:
+    comment: First Bit
+    type: list
+    default: SPI_FIRSTBIT_MSB
+    group: Basic Parameters
+  BaudRatePrescaler:
+    comment: Prescaler (for Baud Rate)
+    type: list
+    default: SPI_BAUDRATEPRESCALER_2
+    group: Clock Parameters
+  CalculateBaudRate:
+    comment: Baud Rate
+    type: string
+    default: '8000000'
+    min: '0'
+    max: '18000000'
+    group: Clock Parameters
+  CLKPolarity:
+    comment: Clock Polarity (CPOL)
+    type: list
+    default: SPI_POLARITY_LOW
+    group: Clock Parameters
+  CLKPhase:
+    comment: Clock Phase (CPHA)
+    type: list
+    default: SPI_PHASE_1EDGE
+    group: Clock Parameters
+  CRCCalculation:
+    comment: CRC Calculation
+    type: list
+    default: SPI_CRCCALCULATION_DISABLE
+    group: Advanced Parameters
+  CRCPolynomial:
+    comment: CRC Polynomial
+    type: polynomial
+    default: X1+X3
+    max: '8'
+    group: Advanced Parameters
+  NSS:
+    comment: NSS Signal Type
+    type: list
+    default: SPI_NSS_HARD_OUTPUT
+    group: Advanced Parameters
+signals:
+  MISO:
+    io_mode: AlternateFunctionPushPull
+  MOSI:
+    io_mode: AlternateFunctionPushPull
+  SCK:
+    io_mode: AlternateFunctionPushPull
+  NSS:
+    io_mode: AlternateFunctionPushPull
+modes:
+- name: NSS_Signal_Hard_Input
+  hal_mode: SPI
+  parameters:
+  - VirtualNSS
+  possible_values:
+    VirtualNSS:
+    - VM_NSSHARD
+- name: NSS_Signal_Hard_Output
+  hal_mode: SPI
+  parameters:
+  - VirtualNSS
+  possible_values:
+    VirtualNSS:
+    - VM_NSSHARD
+- name: Full_Duplex_Master
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_MASTER
+    Mode:
+    - SPI_MODE_MASTER
+    Direction:
+    - SPI_DIRECTION_2LINES
+- name: Full_Duplex_Slave
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_SLAVE
+    Mode:
+    - SPI_MODE_SLAVE
+    Direction:
+    - SPI_DIRECTION_2LINES
+- name: Simplex_Bidirectional_Master
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_MASTER
+    Mode:
+    - SPI_MODE_MASTER
+    Direction:
+    - SPI_DIRECTION_1LINE
+- name: Simplex_Bidirectional_Slave
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_SLAVE
+    Mode:
+    - SPI_MODE_SLAVE
+    Direction:
+    - SPI_DIRECTION_1LINE
+- name: RX_Only_Simplex_Unidirect_Master
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_MASTER
+    Mode:
+    - SPI_MODE_MASTER
+    Direction:
+    - SPI_DIRECTION_2LINES_RXONLY
+- name: RX_Only_Simplex_Unidirect_Slave
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_SLAVE
+    Mode:
+    - SPI_MODE_SLAVE
+    Direction:
+    - SPI_DIRECTION_2LINES_RXONLY
+- name: TX_Only_Simplex_Unidirect_Master
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_MASTER
+    Mode:
+    - SPI_MODE_MASTER
+    Direction:
+    - SPI_DIRECTION_2LINES
+- name: TX_Only_Simplex_Unidirect_Slave
+  hal_mode: ''
+  parameters:
+  - VirtualType
+  - Mode
+  - Direction
+  - TIMode
+  - DataSize
+  - FirstBit
+  - BaudRatePrescaler
+  - CalculateBaudRate
+  - CLKPolarity
+  - CLKPhase
+  - CRCCalculation
+  - CRCPolynomial
+  - NSS
+  possible_values:
+    VirtualType:
+    - VM_SLAVE
+    Mode:
+    - SPI_MODE_SLAVE
+    Direction:
+    - SPI_DIRECTION_2LINES
+source: db/mcu/IP/SPI-spi2_v1_4_Cube_Modes.xml
+instance: SPI2

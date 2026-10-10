@@ -1,0 +1,59 @@
+name: USB
+version: usb1_v1_1_Cube
+parameters:
+  Instance:
+    comment: Instance
+    default: USB
+  DeviceSpeed:
+    comment: Speed
+    type: List
+    default: PCD_SPEED_FULL
+    group: Basic Parameters
+  dev_endpoints:
+    comment: Device endpoints number
+    type: integer
+    default: '8'
+    min: '1'
+    max: '8'
+  phy_itface:
+    comment: Physical interface
+    type: List
+    default: 'null'
+    group: Basic Parameters
+  Sof_enable:
+    comment: Sof Enable
+    type: List
+    default: 'null'
+    group: Basic Parameters
+  low_power_enable:
+    comment: Low Power
+    type: List
+    default: DISABLE
+    group: Power Parameters
+  lpm_enable:
+    comment: Link Power Management
+    type: List
+    default: DISABLE
+    group: Power Parameters
+  battery_charging_enable:
+    comment: Battery Charging
+    type: List
+    default: DISABLE
+    group: Power Parameters
+signals:
+  DM:
+    io_mode: System
+  DP:
+    io_mode: System
+modes:
+- name: Device
+  hal_mode: PCD
+  parameters:
+  - DeviceSpeed
+  - dev_endpoints
+  - Sof_enable
+  - low_power_enable
+  - lpm_enable
+  - battery_charging_enable
+source: db/mcu/IP/USB-usb1_v1_1_Cube_Modes.xml
+instance: USB
