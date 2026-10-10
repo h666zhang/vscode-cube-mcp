@@ -129,6 +129,56 @@ peripheral:
       set ip parameters RCC PLLMUL RCC_PLL_MUL9
       set ip parameters RCC SYSCLKSource RCC_SYSCLKSOURCE_PLLCLK
       set ip parameters RCC APB1CLKDivider RCC_HCLK_DIV2
+  usart: |-
+    【USART(探针实测 2026-10-10)】
+    - 命令:set mode USART2 Asynchronous;set ip parameters USART2 BaudRate 9600;
+      set pin PA2 USART2_TX / set pin PA3 USART2_RX
+    - 和 TIM 不一样:USART 的 set mode 是有效的。
+    - BaudRate 等于 db 默认值 115200 时,CubeMX 不会写出 USARTx.BaudRate 行;换成别的值才出现
+      (探针里看不到不代表命令无效)。
+    - 中断:在 cubemx_intent 的意图里写 "interrupt": true(靠注入 .ioc 键实现)。
+  spi: |-
+    【SPI(探针实测 2026-10-10)】
+    - 命令:set mode SPI1 Full_Duplex_Master;set pin PA5 SPI1_SCK / PA6 SPI1_MISO / PA7 SPI1_MOSI
+    - 模式名用下划线:Full_Duplex_Master / Full_Duplex_Slave / RX_Only_Simplex_Unidirect_Master /
+      TX_Only_Simplex_Unidirect_Master。
+    - 引脚侧的 Mode 也写 SPI 的模式名(PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种。
+    - 默认 BaudRatePrescaler=2 -> 36 MBits/s。
+  adc: |-
+    【ADC(探针实测 2026-10-10)】
+    - 命令:set mode ADC1 IN0;set pin PA0-WKUP ADC1_IN0
+    - 模式名就是通道号:PA0-WKUP->IN0、PA1->IN1、PA5->IN5。
+    - CubeMX 写回 .ioc 时引脚信号名是 ADCx_IN0(带 x 占位符),但命令里要写 ADC1_IN0。
+    - 默认采样时间 ADC_SAMPLETIME_1CYCLE_5。
+  can: |-
+    【CAN(探针实测 2026-10-10)】
+    - 命令:set mode CAN CAN_Activate;set pin PA11 CAN_RX / set pin PA12 CAN_TX
+    - 实例名是 CAN(不是 CAN1):STM32F103C8T6 只有一个 bxCAN。
+    - 默认波特率算出来是 749999 bit/s。
+  rtc: |-
+    【RTC(探针实测 2026-10-10)】
+    - 命令:set mode RTC RTC_Enabled;需要日历时再叠加 set mode RTC RTC_Calendar
+    - 用虚拟引脚(VP_RTC_VS_RTC_Activate / VP_RTC_VS_RTC_Calendar)表达。
+    - 用 LSE 时 PC14/PC15 会被占用(OSC32_IN/OSC32_OUT),先和别的用途协调。
+  iwdg: |-
+    【IWDG(独立看门狗,探针实测 2026-10-10)】
+    - 命令:set mode IWDG IWDG_Activate
+    - 不需要引脚,写的是虚拟引脚 VP_IWDG_VS_IWDG。
+  wwdg: |-
+    【WWDG(窗口看门狗,探针实测 2026-10-10)】
+    - 命令:set mode WWDG WWDG_Activate
+    - 同上,写的是虚拟引脚 VP_WWDG_VS_WWDG。
+  dma: |-
+    【DMA(实测:当前配不了,别在这上面耗时间)】
+    - 脚本 set 配不了:`set mode DMA ...` 一律 KO;CubeMX 的 help 命令表里也没有 DMA 项。
+    - 注入 .ioc 键(Dma.Request0=SPI1_RX 等)会在 CubeMX saveas 时被丢掉。
+    - 要用 DMA:先用 CubeMX GUI 给外设 Add 一次 DMA,然后继续用本工具(工具不会去动已有的 DMA 配置)。
+  nvic: |-
+    【中断(探针实测 2026-10-10)】
+    - 脚本 set 配不了(CubeMX 命令表里没有中断相关项),但注入 .ioc 键有效:
+      NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true
+    - 实测:注入后 generate,Core/Src/stm32f1xx_it.c 里会出现对应的 <IRQ>Handler。
+    - 用 cubemx_intent 时写成 {"interrupt": true}(用 {实例}_IRQn)或直接给中断名(如 I2C1_EV_IRQn)。
 remove: |-
   【移除外设(cubemx_remove_peripheral)】
   - 用法:cubemx_remove_peripheral(ioc, peripheral)

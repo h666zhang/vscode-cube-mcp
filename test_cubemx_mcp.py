@@ -1080,6 +1080,11 @@ class TestKnowledgeLoader(unittest.TestCase):
         self.assertIn("移除外设", knowledge_loader.help_text("remove"))
         self.assertIsNone(knowledge_loader.help_text("templates"))
 
+    def test_help_text_covers_new_peripherals(self):
+        for topic in ("usart", "spi", "adc", "can", "rtc", "iwdg", "wwdg", "dma", "nvic"):
+            text = knowledge_loader.help_text(topic)
+            self.assertTrue(text and "【" in text, f"{topic} 没有帮助文本")
+
 
 class TestRenderFragment(unittest.TestCase):
     """render_fragment:把规则文件里的 .ioc 片段渲染成实际文本。"""
