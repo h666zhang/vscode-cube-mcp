@@ -11,6 +11,7 @@ from unittest import mock
 
 import cubemx_mcp
 import cubemx_result
+import intent_resolver
 import ioc_editor
 import knowledge_loader
 
@@ -1167,6 +1168,139 @@ class TestIocEditorWrite(unittest.TestCase):
                 f.write(SAMPLE_IOC)
             ioc_editor.remove_peripheral(path, "TIM3")
             self.assertTrue(os.path.isfile(path + ".bak"))
+
+
+class TestIntentResolver(unittest.TestCase):
+    """intent_resolver:意图 -> 查表 -> 动作(不依赖 CubeMX)。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(SAMPLE_IOC)
+
+    def test_tim_clock_comes_from_rules(self):
+        self.assertEqual(intent_resolver.tim_clock_mhz(), 72)
+
+    def test_split_divider(self):
+        self.assertEqual(intent_resolver.split_divider(7200), (1, 7200))
+        prescaler, period = intent_resolver.split_divider(720000)
+        self.assertGreater(prescaler, 1)
+        self.assertLessEqual(period, 65535)
+
+    def test_signal_name_uses_db_groups(self):
+        # TIM3 的 CH1 用共享组名 -> S_TIM3_CH1
+        self.assertEqual(intent_resolver.ioc_signal_name("TIM3", "CH1"), "S_TIM3_CH1")
+        # TIM2 的 CH1 在 db 里有独占组名(PA0 上 CH1 与 ETR 组合)-> S_TIM2_CH1_ETR
+        self.assertEqual(intent_resolver.ioc_signal_name("TIM2", "CH1"), "S_TIM2_CH1_ETR")
+
+    def test_find_channel_from_pin_table(self):
+        self.assertEqual(intent_resolver.find_channel("TIM3", "PA6"), "CH1")
+
+    def test_find_channel_unknown_pin_signal(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.find_channel("TIM3", "PB13")
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PIN_SIGNAL")
+
+    def test_pwm_business_params_converted(self):
+        params = intent_resolver.tim_params("pwm", {"freq_hz": 10000, "duty": 0.5})
+        self.assertEqual(params["prescaler"], 1)
+        self.assertEqual(params["period"], 7200)
+        self.assertEqual(params["pulse"], 3600)
+
+    def test_pwm_explicit_params_win(self):
+        params = intent_resolver.tim_params("pwm", {"freq_hz": 10000, "prescaler": 72, "period": 100, "pulse": 50})
+        self.assertEqual((params["prescaler"], params["period"], params["pulse"]), (72, 100, 50))
+
+    def test_pwm_out_of_range_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.tim_params("pwm", {"prescaler": 0})
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_apply_pwm_writes_ioc(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc,
+            [{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "prescaler": 72, "period": 100, "pulse": 50}],
+        )
+        self.assertTrue(plan["notes"])
+        self.assertEqual(plan["commands"], [])
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("PA6.Mode=PWM Generation1 CH1", text)
+        self.assertIn("PA6.Signal=S_TIM3_CH1", text)
+
+    def test_apply_input_capture_on_pa0(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "TIM2", "mode": "input_capture", "pin": "PA0-WKUP"}]
+        )
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("PA0-WKUP.Signal=S_TIM2_CH1_ETR", text)
+        self.assertTrue(plan["notes"])
+
+    def test_pin_conflict_within_intents(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(
+                self.ioc,
+                [
+                    {"peripheral": "TIM3", "mode": "pwm", "pin": "PA6"},
+                    {"peripheral": "TIM4", "mode": "pwm", "pin": "PA6"},
+                ],
+            )
+        self.assertEqual(ctx.exception.code, "PIN_CONFLICT")
+
+    def test_pin_conflict_with_existing_ioc(self):
+        path = os.path.join(self._td.name, "used.ioc")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("Mcu.IPNb=0\nMcu.PinsNb=0\nPA6.Signal=GPIO_Output\nboard=custom\n")
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(path, [{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6"}])
+        self.assertEqual(ctx.exception.code, "PIN_CONFLICT")
+
+    def test_gpio_intent_returns_commands(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}]
+        )
+        self.assertIn("set pin PB13 GPIO_Output", plan["commands"])
+        self.assertIn("set gpio parameters PB13 GPIO_Label LED", plan["commands"])
+
+    def test_i2c_intent_roles_from_pin_table(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "I2C1", "pins": ["PB8", "PB9"]}])
+        self.assertIn("set pin PB8 I2C1_SCL", plan["commands"])
+        self.assertIn("set pin PB9 I2C1_SDA", plan["commands"])
+        self.assertIn("set mode I2C1 I2C", plan["commands"])
+
+    def test_unsupported_peripheral_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pin": "PA5"}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+
+    def test_unknown_tim_mode_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM3", "mode": "output_compare", "pin": "PA6"}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
+    def test_empty_intents_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [])
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_cubemx_intent_tool(self):
+        with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
+            with mock.patch.object(
+                cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}
+            ):
+                out = cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "GPIO", "pin": "PB13", "mode": "output"}])
+        self.assertIn("[OK", out)
+        self.assertIn("cubemx_intent", out)
+
+    def test_cubemx_intent_rejects_unverified_rule(self):
+        with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
+            with self.assertRaises(ValueError) as ctx:
+                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "USART2", "mode": "asynchronous", "pin": "PA2"}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
 
 if __name__ == "__main__":

@@ -45,6 +45,17 @@ def verify_written(ioc_path: str, expected_lines) -> None:
         raise ToolError("READBACK_MISMATCH", f"写入 {ioc_path} 后回读,有 {len(missing)} 行没找到:\n{shown}")
 
 
+def used_pins(ioc_path: str) -> dict:
+    """读 .ioc,返回 {引脚名: 信号} —— 给引脚冲突检测用。"""
+    out = {}
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            hit = re.match(r"^([A-Za-z0-9_\-]+)\.Signal=(.+)$", line.strip())
+            if hit:
+                out[hit.group(1)] = hit.group(2)
+    return out
+
+
 def _ensure_ip_param(text: str, name: str) -> str:
     """确保 RCC.IPParameters 列表包含 name(CubeMX 只加载列表里声明的字段)。"""
     m = re.search(r"^RCC\.IPParameters=(.*)$", text, flags=re.MULTILINE)

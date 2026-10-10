@@ -37,6 +37,7 @@ import threading
 
 from mcp.server import MCPServer
 
+import intent_resolver
 import ioc_editor
 import knowledge_loader
 from cubemx_result import ToolError, render, render_run
@@ -537,6 +538,48 @@ def cubemx_new_project(
         extra=f"工程目录: {pd}{note}{note_internal}",
         warnings=warnings,
     )
+
+
+@mcp.tool()
+def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
+    """按"配置意图"改 .ioc:意图里只说要什么,内部名由知识库查出来。
+
+    意图示例(业务参数,代码按定时器时钟换算):
+      {"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "freq_hz": 10000, "duty": 0.5}
+    也可以直接给寄存器参数(显式给的优先):
+      {"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "prescaler": 72, "period": 100, "pulse": 50}
+    其它已支持:
+      {"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}
+      {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}
+
+    引脚与信号名(.ioc 里的 S_TIM3_CH1 之类)一律查表得到;查不到会带错误码拒绝,
+    不会猜。改之前自动备份成 .ioc.bak,改完回读校验。
+
+    参数:
+      ioc:      工程 .ioc 文件绝对路径(会被写回)
+      intents:  意图列表,按顺序应用
+      generate: 改完是否顺手 project generate(默认 False,只改配置)
+    """
+    ap = _ioc_path(ioc)
+    plan = intent_resolver.apply_intents(ap, intents)
+    steps = [
+        ("check_path", "ok"),
+        ("load_knowledge", "ok"),
+        ("resolve_intent", "ok"),
+        ("compose_ioc", "ok"),
+    ]
+    if plan["commands"]:
+        script = "\n".join([f'config load "{ap}"', *plan["commands"], f'config saveas "{ap}"'])
+        result = _run_script(script)
+        if not result["ok"]:
+            return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
+        steps.append(("run_cubemx", "ok"))
+    if generate:
+        result = _run_script(f'config load "{ap}"\nproject generate')
+        if not result["ok"]:
+            return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
+        steps.append(("run_cubemx", "ok"))
+    return render("cubemx_intent", True, steps=steps, extra="\n".join(plan["notes"]))
 
 
 @mcp.tool()

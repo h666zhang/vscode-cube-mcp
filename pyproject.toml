@@ -33,7 +33,7 @@ Issues = "https://github.com/h666zhang/vscode-cube-mcp/issues"
 vscode-cube-mcp = "cubemx_mcp:main"
 
 [tool.setuptools]
-py-modules = ["cubemx_mcp", "cubemx_result", "ioc_editor", "knowledge_loader"]
+py-modules = ["cubemx_mcp", "cubemx_result", "intent_resolver", "ioc_editor", "knowledge_loader"]
 
 [tool.setuptools.data-files]
 # templates/ 模板库必须随包分发(cubemx_new_project 依赖它)
@@ -47,7 +47,7 @@ py-modules = ["cubemx_mcp", "cubemx_result", "ioc_editor", "knowledge_loader"]
 
 [tool.pytest.ini_options]
 # 覆盖率门槛:核心逻辑 <80% 视为失败(本地与 CI 同一配置)
-addopts = "--cov=cubemx_mcp --cov=cubemx_result --cov=ioc_editor --cov=knowledge_loader --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=cubemx_mcp --cov=cubemx_result --cov=intent_resolver --cov=ioc_editor --cov=knowledge_loader --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["test_cubemx_mcp.py"]
 
 [tool.ruff]
