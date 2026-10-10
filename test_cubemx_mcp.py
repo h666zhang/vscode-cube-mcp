@@ -11,6 +11,7 @@ from unittest import mock
 
 import cubemx_mcp
 import cubemx_result
+import ioc_editor
 import knowledge_loader
 
 
@@ -999,6 +1000,12 @@ class TestResult(unittest.TestCase):
                     cubemx_mcp._project_template("STM32F407VGT6")
         self.assertEqual(ctx.exception.code, "MCU_TEMPLATE_MISSING")
 
+    def test_render_with_warning(self):
+        out = cubemx_result.render("x", True, warnings=["CLOCK_DEGRADED"])
+        self.assertIn("[OK]", out)
+        self.assertIn("CLOCK_DEGRADED", out)
+        self.assertIn("建议", out)
+
 
 class TestKnowledgeLoader(unittest.TestCase):
     """knowledge_loader:读 knowledge/ 下的 YAML(不依赖 CubeMX)。"""
@@ -1117,6 +1124,49 @@ class TestRenderFragment(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             knowledge_loader.render_fragment("{tim}.X={nope}")
         self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+
+class TestIocEditorWrite(unittest.TestCase):
+    """ioc_editor:写回前的备份与写回后的回读校验。"""
+
+    def test_backup_creates_bak(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.ioc")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("A=1\n")
+            bak = ioc_editor.backup(path)
+            self.assertEqual(bak, path + ".bak")
+            with open(bak, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "A=1\n")
+
+    def test_verify_written_ok_and_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.ioc")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("A=1\nB=2\n")
+            ioc_editor.verify_written(path, ["A=1", "B=2"])  # 都在,不抛
+            with self.assertRaises(ValueError) as ctx:
+                ioc_editor.verify_written(path, ["A=1", "C=3"])
+            self.assertEqual(ctx.exception.code, "READBACK_MISMATCH")
+
+    def test_inject_pwm_backs_up_original(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.ioc")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(SAMPLE_IOC)
+            with open(path, encoding="utf-8") as f:
+                before = f.read()
+            ioc_editor.inject_tim_pwm(path, "TIM3", "PA6", "S_TIM3_CH1", prescaler=72, period=100, pulse=50)
+            with open(path + ".bak", encoding="utf-8") as f:
+                self.assertEqual(f.read(), before)
+
+    def test_remove_peripheral_backs_up(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.ioc")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(SAMPLE_IOC)
+            ioc_editor.remove_peripheral(path, "TIM3")
+            self.assertTrue(os.path.isfile(path + ".bak"))
 
 
 if __name__ == "__main__":

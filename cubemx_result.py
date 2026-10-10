@@ -86,11 +86,20 @@ class ToolError(ValueError):
         super().__init__(head + message + tail)
 
 
-def render(tool: str, ok: bool, exit_code=None, code: str = "", steps=None, output: str = "", extra: str = "") -> str:
+def render(
+    tool: str,
+    ok: bool,
+    exit_code=None,
+    code: str = "",
+    steps=None,
+    output: str = "",
+    extra: str = "",
+    warnings=None,
+) -> str:
     """把一次调用的结果渲染成文本。
 
     第一行是结论:成功就是 [OK exit=N],失败就是 [FAIL exit=N] tool 卡在 <步骤>: <码> - <说明>。
-    之后依次是建议、走过的步骤、extra(调用方要补的说明)、CubeMX 原始输出。
+    之后依次是建议、走过的步骤、警告、extra(调用方要补的说明)、CubeMX 原始输出。
 
     参数:
       tool:      工具名,如 cubemx_generate
@@ -99,7 +108,8 @@ def render(tool: str, ok: bool, exit_code=None, code: str = "", steps=None, outp
       code:      失败时的错误码(见 ERRORS)
       steps:     走过的步骤,形如 [("check_path", "ok"), ("run_cubemx", "FAIL")]
       output:    CubeMX 的原始输出(会加分隔行)
-      extra:     附加说明(如工程目录、时钟警告)
+      extra:     附加说明(如工程目录)
+      warnings:  警告错误码列表(如 ["CLOCK_DEGRADED"]);成功但有隐患时用
     """
     head = ("[OK" if ok else "[FAIL") + (f" exit={exit_code}" if exit_code is not None else "") + "]"
     lines = []
@@ -116,6 +126,11 @@ def render(tool: str, ok: bool, exit_code=None, code: str = "", steps=None, outp
             lines.append(f"  建议: {hint}")
     if steps:
         lines.append("  步骤: " + " -> ".join(f"{name}({status})" for name, status in steps))
+    for warn in warnings or []:
+        _wstage, wdesc, whint = explain(warn)
+        lines.append(f"  警告 {warn}: {wdesc}")
+        if whint:
+            lines.append(f"    建议: {whint}")
     if extra:
         lines.append(extra)
     if output:
@@ -124,7 +139,7 @@ def render(tool: str, ok: bool, exit_code=None, code: str = "", steps=None, outp
     return "\n".join(lines)
 
 
-def render_run(tool: str, result: dict, steps=None, extra: str = "") -> str:
+def render_run(tool: str, result: dict, steps=None, extra: str = "", warnings=None) -> str:
     """渲染一次 CubeMX 调用的结果(参数就是 _run_script 的返回值)。"""
     return render(
         tool,
@@ -134,4 +149,5 @@ def render_run(tool: str, result: dict, steps=None, extra: str = "") -> str:
         steps=steps,
         output=result.get("output", ""),
         extra=extra,
+        warnings=warnings,
     )
