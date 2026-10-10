@@ -1,0 +1,35 @@
+# ADC:已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测方法:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
+#     set mode ADC1 IN0
+#     set pin PA0-WKUP ADC1_IN0
+# 结果是下面 ioc_result(探针差异:新增 12 行 / 修改 9 行)。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+command_examples:
+  - "set mode ADC1 IN0"
+  - "set pin PA0-WKUP ADC1_IN0"
+
+ioc_result:
+  - "PA0-WKUP.Locked=true"
+  - "PA0-WKUP.Signal=ADCx_IN0"
+  - "SH.ADCx_IN0.0=ADC1_IN0,IN0"
+  - "SH.ADCx_IN0.ConfNb=1"
+  - "ADC1.master=1"
+  - "ADC1.NbrOfConversionFlag=1"
+  - "ADC1.Rank-0\\#ChannelRegularConversion=1"
+  - "ADC1.Channel-0\\#ChannelRegularConversion=ADC_CHANNEL_0"
+  - "ADC1.SamplingTime-0\\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5"
+  - "ADC1.IPParameters=Rank-0\\#ChannelRegularConversion,Channel-0\\#ChannelRegularConversion,SamplingTime-0\\#ChannelRegularConversion,NbrOfConversionFlag,master"
+
+known_issues:
+  - "引脚侧信号名是 ADCx_IN0(带 x 占位符,是 CubeMX 自己写的),但 set pin 命令里要写 ADC1_IN0"
+  - "模式名是通道号:IN0 / IN1 / ...(PA0-WKUP->IN0、PA1->IN1、PA5->IN5)"
+  - "ADC 的键名里 # 要转义成 \\#(如 Channel-0\\#ChannelRegularConversion)"
+  - "默认采样时间 ADC_SAMPLETIME_1CYCLE_5;改采样时间/扫描/连续转换的写法都还没实测"
+
+parameters_from_db:
+  sampling_time:
+    key: "ADC{n}.SamplingTime-0\\#ChannelRegularConversion"
+    default: ADC_SAMPLETIME_1CYCLE_5

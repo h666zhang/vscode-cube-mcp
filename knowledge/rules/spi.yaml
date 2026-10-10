@@ -1,0 +1,46 @@
+# SPI:已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测方法:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
+#     set mode SPI1 Full_Duplex_Master
+#     set pin PA5 SPI1_SCK / set pin PA6 SPI1_MISO / set pin PA7 SPI1_MOSI
+# 结果是下面 ioc_result(探针差异:新增 19 行 / 修改 7 行)。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+modes:
+  full_duplex_master: Full_Duplex_Master
+  full_duplex_slave: Full_Duplex_Slave
+  rx_only_master: RX_Only_Simplex_Unidirect_Master
+  tx_only_master: TX_Only_Simplex_Unidirect_Master
+
+command_examples:
+  - "set mode SPI1 Full_Duplex_Master"
+  - "set pin PA5 SPI1_SCK"
+  - "set pin PA6 SPI1_MISO"
+  - "set pin PA7 SPI1_MOSI"
+
+ioc_result:
+  - "PA5.Locked=true"
+  - "PA5.Mode=Full_Duplex_Master"
+  - "PA5.Signal=SPI1_SCK"
+  - "PA6.Mode=Full_Duplex_Master"
+  - "PA6.Signal=SPI1_MISO"
+  - "PA7.Mode=Full_Duplex_Master"
+  - "PA7.Signal=SPI1_MOSI"
+  - "SPI1.VirtualType=VM_MASTER"
+  - "SPI1.Mode=SPI_MODE_MASTER"
+  - "SPI1.Direction=SPI_DIRECTION_2LINES"
+  - "SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_2"
+  - "SPI1.CalculateBaudRate=36.0 MBits/s"
+  - "SPI1.IPParameters=VirtualType,Mode,Direction,BaudRatePrescaler,CalculateBaudRate"
+
+known_issues:
+  - "模式名用下划线:Full_Duplex_Master(不是 GUI 里显示的那种写法)"
+  - "引脚侧的 Mode 也写 SPI 的模式名(如 PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种"
+  - "默认 BaudRatePrescaler=2(36 MBits/s);改频率的写法还没实测(NSS/硬件片选同理)"
+  - "全双工下 MISO/MOSI/SCK 三个引脚都要显式 set pin;只给 SCK 不完整(未实测)"
+
+parameters_from_db:
+  baudrate_prescaler:
+    key: "SPI{n}.BaudRatePrescaler"
+    default: SPI_BAUDRATEPRESCALER_2

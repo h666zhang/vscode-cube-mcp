@@ -1060,7 +1060,7 @@ class TestKnowledgeLoader(unittest.TestCase):
 
     def test_unknown_peripheral_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            knowledge_loader.rule("spi")
+            knowledge_loader.rule("can")
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
     def test_unverified_rule_blocked(self):
@@ -1276,7 +1276,7 @@ class TestIntentResolver(unittest.TestCase):
 
     def test_unsupported_peripheral_rejected(self):
         with self.assertRaises(ValueError) as ctx:
-            intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pin": "PA5"}])
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "CAN", "pin": "PA11"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
     def test_unknown_tim_mode_rejected(self):
@@ -1311,8 +1311,40 @@ class TestIntentResolver(unittest.TestCase):
     def test_cubemx_intent_rejects_unsupported_peripheral(self):
         with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
             with self.assertRaises(ValueError) as ctx:
-                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "SPI2", "pin": "PB13"}])
+                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "CAN", "pin": "PA11"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+
+    def test_spi_intent_commands(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]}])
+        self.assertIn("set mode SPI1 Full_Duplex_Master", plan["commands"])
+        self.assertIn("set pin PA5 SPI1_SCK", plan["commands"])
+        self.assertIn("set pin PA6 SPI1_MISO", plan["commands"])
+        self.assertIn("set pin PA7 SPI1_MOSI", plan["commands"])
+
+    def test_spi_unknown_mode_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "mode": "nope", "pins": ["PA5"]}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
+    def test_adc_channel_from_pin_table(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0-WKUP"}])
+        self.assertIn("set mode ADC1 IN0", plan["commands"])
+        self.assertIn("set pin PA0-WKUP ADC1_IN0", plan["commands"])
+        self.assertIn("set mode ADC1 IN5", intent_resolver.adc_commands({"peripheral": "ADC1", "pin": "PA5"}))
+
+    def test_adc_pin_without_channel_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA13"}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PIN_SIGNAL")
+
+    def test_dma_not_supported(self):
+        # DMA 的脚本写法没找到(knowledge/rules/dma.yaml 记着试过什么)
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "DMA", "mode": "SPI1_RX", "pin": "PA5"}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+
+    def test_dma_rule_is_unverified(self):
+        self.assertFalse(knowledge_loader.rule("dma").get("verified"))
 
 
 class TestIocDiff(unittest.TestCase):

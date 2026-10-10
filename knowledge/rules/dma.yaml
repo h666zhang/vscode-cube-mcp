@@ -1,0 +1,20 @@
+# DMA:脚本写法**没找到**(探针试过两种,都 KO)
+#
+# 实测(2026-10-10,CubeMX 6.18.0):下面两种写法都返回 KO,`.ioc` 里没出现任何 Dma.* 行:
+#     set mode DMA SPI1_RX     -> KO
+#     set mode DMA DMA1        -> KO
+# 结论:DMA 不能像普通外设那样用 `set mode` 配置。
+# verified 保持 false —— 在搞清楚之前,意图层不放 DMA,也不拿它写 .ioc。
+verified: false
+source: "探针实测 2026-10-10,CubeMX 6.18.0(set mode 两种写法都 KO)"
+
+tried:
+  - "set mode DMA SPI1_RX -> KO"
+  - "set mode DMA DMA1 -> KO"
+
+todo:
+  - "还没试过的思路:① 查 UM1718(安装目录 help/UM1718.pdf)的脚本命令参考;② 在 GUI 里给外设 Add 一次 DMA,看 .ioc 里写了哪些键,再想办法表达;③ 直接改 .ioc 文本(Dma.Request0=SPI1_RX / Dma.SPI1_RX.0=DMA1_ChannelN)后 load 验证"
+  - "需要 DMA 的工程,目前请先用 CubeMX GUI 配一次"
+
+dma_from_db:
+  note: "CubeMX 的 db 里 DMA 有 53 个模式名(DMA_Request / DMA1 / SPI1_RX / I2C1_RX / USART2_RX ...),但这些是'可用的请求名',不是 set mode 的参数"

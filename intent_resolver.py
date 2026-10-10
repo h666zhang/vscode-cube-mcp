@@ -179,6 +179,44 @@ def usart_commands(intent: dict) -> list:
     return commands
 
 
+def spi_commands(intent: dict) -> list:
+    """SPI 走 set 命令(实测:set mode SPI1 Full_Duplex_Master 有效)。
+
+    模式名用下划线形式,可选值见 knowledge/rules/spi.yaml 的 modes。
+    """
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    rules = knowledge_loader.require_rule_verified("spi")
+    modes = rules.get("modes") or {}
+    role = str(intent.get("mode", "full_duplex_master")).strip().lower()
+    mode = modes.get(role)
+    if not mode:
+        raise ToolError("UNKNOWN_PARAM", f"SPI 的 mode 要写其中之一: {', '.join(sorted(modes))}")
+    commands = [f"set mode {instance} {mode}"]
+    pins = intent_pins(intent)
+    if not pins:
+        raise ToolError("BAD_ARGUMENT", f'{instance} 意图需要 pins(如 ["PA5", "PA6", "PA7"])')
+    commands.extend(_pin_commands(instance, pins))
+    return commands
+
+
+def adc_commands(intent: dict) -> list:
+    """ADC 走 set 命令(实测:set mode ADC1 IN0 + set pin PA0-WKUP ADC1_IN0 有效)。
+
+    通道号从引脚表查:PA0-WKUP 支持 ADC1_IN0 -> 通道 0 -> 模式名 IN0。
+    """
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    knowledge_loader.require_rule_verified("adc")
+    pin = str(intent.get("pin", "")).strip()
+    if not pin:
+        raise ToolError("BAD_ARGUMENT", f"{instance} 意图需要 pin(如 PA0-WKUP)")
+    signals = knowledge_loader.pin_signals(pin)
+    hits = [s for s in signals if s.startswith(f"{instance}_IN")]
+    if not hits:
+        raise ToolError("UNKNOWN_PIN_SIGNAL", f"{pin} 上没有 {instance} 的输入通道;这个引脚支持: {', '.join(signals)}")
+    channel = hits[0].rsplit("_IN", 1)[-1]
+    return [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
+
+
 def intent_pins(intent: dict) -> list:
     """这个意图会用到哪些引脚(用于冲突检测)。"""
     pins = []
@@ -242,9 +280,16 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
     if re.fullmatch(r"USART\d+", peripheral):
         commands = usart_commands(intent)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if re.fullmatch(r"SPI\d+", peripheral):
+        commands = spi_commands(intent)
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if re.fullmatch(r"ADC\d+", peripheral):
+        commands = adc_commands(intent)
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     raise ToolError(
         "UNKNOWN_PERIPHERAL",
-        f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,以及 GPIO / I2Cx / USARTx)",
+        f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,"
+        f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx)。DMA 暂不支持,原因见 knowledge/rules/dma.yaml",
     )
 
 
