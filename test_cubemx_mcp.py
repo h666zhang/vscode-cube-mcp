@@ -12,6 +12,7 @@ from unittest import mock
 import cubemx_mcp
 import cubemx_result
 import intent_resolver
+import ioc_diff
 import ioc_editor
 import knowledge_loader
 
@@ -1301,6 +1302,73 @@ class TestIntentResolver(unittest.TestCase):
             with self.assertRaises(ValueError) as ctx:
                 cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "USART2", "mode": "asynchronous", "pin": "PA2"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+
+
+class TestIocDiff(unittest.TestCase):
+    """ioc_diff:结构化差异与噪音忽略(不依赖 CubeMX)。"""
+
+    def test_added_removed_changed(self):
+        diff = ioc_diff.diff_texts("A=1\nB=2\nC=3\n", "A=1\nB=9\nD=4\n", ignore=())
+        self.assertEqual(diff["added"], ["D=4"])
+        self.assertEqual(diff["removed"], ["C=3"])
+        self.assertEqual(diff["changed"], ["B: 2 -> 9"])
+
+    def test_noise_ignored_by_default(self):
+        old = "PCC.Vdd=3.3\nProjectManager.ProjectFileName=old.ioc\nUSART2.BaudRate=9600\n"
+        new = "PCC.Vdd=5.0\nProjectManager.ProjectFileName=new.ioc\nUSART2.BaudRate=115200\n"
+        diff = ioc_diff.diff_texts(old, new)
+        self.assertEqual(diff["changed"], ["USART2.BaudRate: 9600 -> 115200"])
+        self.assertEqual(diff["added"], [])
+        self.assertEqual(diff["removed"], [])
+
+    def test_diff_files_and_render(self):
+        with tempfile.TemporaryDirectory() as td:
+            old_path = os.path.join(td, "old.ioc")
+            new_path = os.path.join(td, "new.ioc")
+            with open(old_path, "w", encoding="utf-8") as f:
+                f.write("Mcu.IPNb=3\n")
+            with open(new_path, "w", encoding="utf-8") as f:
+                f.write("Mcu.IPNb=4\nUSART2.BaudRate=115200\n")
+            diff = ioc_diff.diff_files(old_path, new_path)
+            self.assertEqual(diff["summary"], "+1 -0 ~1")
+            text = ioc_diff.render_diff(diff)
+            self.assertIn("[OK", text)
+            self.assertIn("USART2.BaudRate=115200", text)
+
+
+class TestProbeTool(unittest.TestCase):
+    """cubemx_probe:在副本上试跑,输出差异(mock 掉 CubeMX)。"""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("Mcu.IPNb=3\nboard=custom\n")
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+        self.addCleanup(setattr, cubemx_mcp, "ALLOWED_ROOTS", [os.getcwd()])
+
+    def _fake_run(self, extra_lines):
+        def run(script, stage="run_cubemx"):
+            # 模拟 CubeMX 执行后,副本里多了几行
+            with open(os.path.join(self._td.name, "demo.probe.ioc"), "a", encoding="utf-8") as f:
+                f.write(extra_lines)
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        return run
+
+    def test_probe_reports_added_and_cleans_up(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=self._fake_run("USART2.BaudRate=115200\n")):
+            out = cubemx_mcp.cubemx_probe(self.ioc, ["set mode USART2 Asynchronous"])
+        self.assertIn("USART2.BaudRate=115200", out)
+        self.assertIn("+1", out)
+        self.assertFalse(os.path.exists(os.path.join(self._td.name, "demo.probe.ioc")))
+
+    def test_probe_keeps_copy_when_asked(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=self._fake_run("A=1\n")):
+            out = cubemx_mcp.cubemx_probe(self.ioc, ["x"], keep_copy=True)
+        self.assertIn("副本保留在", out)
+        self.assertTrue(os.path.exists(os.path.join(self._td.name, "demo.probe.ioc")))
 
 
 if __name__ == "__main__":

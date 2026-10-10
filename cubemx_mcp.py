@@ -12,6 +12,8 @@ Tools:
   cubemx_generate(ioc, project_dir) load + project generate
   cubemx_export_pinout(ioc)        csv pinout 导出(只读)
   cubemx_new_project(name, dir, mcu, cmds) 从零生成新工程(模板+set+generate)
+  cubemx_intent(ioc, intents)      按配置意图改 .ioc(内部名由知识库查出来)
+  cubemx_probe(ioc, cmds)          探针:在副本上试跑,输出改前改后的差异
   cubemx_remove_peripheral(ioc, peripheral) 文本方式移除外设
   cubemx_add_source(ioc, source_file) 自定义源文件加入 CMake 源列表
 
@@ -38,6 +40,7 @@ import threading
 from mcp.server import MCPServer
 
 import intent_resolver
+import ioc_diff
 import ioc_editor
 import knowledge_loader
 from cubemx_result import ToolError, render, render_run
@@ -538,6 +541,38 @@ def cubemx_new_project(
         extra=f"工程目录: {pd}{note}{note_internal}",
         warnings=warnings,
     )
+
+
+@mcp.tool()
+def cubemx_probe(ioc: str, commands: list, keep_copy: bool = False) -> str:
+    """跑一次探针:在副本上执行命令,对比改前改后,拿到可写进知识库的真实差异。
+
+    用在某个外设的写法还没收录的时候:先用它跑出真实差异,再把结果整理进
+    knowledge/rules/<外设>.yaml。基线 .ioc 只读,不会被改动。
+
+    参数:
+      ioc:       基线 .ioc 绝对路径(只读,不改)
+      commands:  CubeMX 脚本命令,如 ["set mode USART2 Asynchronous", "set ip parameters USART2 BaudRate 115200"]
+      keep_copy: 是否保留副本(默认执行完删掉);保留时会告诉你在哪
+    """
+    ap = _ioc_path(ioc)
+    probe = f"{ap[:-4]}.probe.ioc"
+    shutil.copy2(ap, probe)
+    try:
+        script = "\n".join([f'config load "{probe}"', *commands, f'config saveas "{probe}"'])
+        result = _run_script(script)
+        if not result["ok"]:
+            return render_run("cubemx_probe", result, steps=[("check_path", "ok"), ("run_cubemx", "FAIL")])
+        text = ioc_diff.render_diff(ioc_diff.diff_files(ap, probe))
+    finally:
+        if not keep_copy:
+            try:
+                os.remove(probe)
+            except OSError:
+                pass
+    if keep_copy:
+        text += f"\n(副本保留在: {probe})"
+    return text
 
 
 @mcp.tool()
