@@ -245,7 +245,8 @@ def switch_commands(intent: dict, rule_name: str) -> list:
     mode = modes.get(role, "")
     if not mode:
         raise ToolError("UNKNOWN_PARAM", f"{rule_name} 的 mode 要写其中之一: {', '.join(sorted(modes))}")
-    commands = [f"set mode {instance} {mode}"]
+    # 有的外设模式是"组合"(如 RTC 的 enabled_calendar 要连配两个),值写成列表就展开成多条命令
+    commands = [f"set mode {instance} {m}" for m in (mode if isinstance(mode, list) else [mode])]
     pins = intent_pins(intent)
     if pins:
         commands.extend(_pin_commands(instance, pins))
@@ -327,11 +328,14 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
     if re.fullmatch(r"CAN\d*", peripheral):
         commands = switch_commands(intent, "can")
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if peripheral == "RTC":
+        commands = switch_commands(intent, "rtc")
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     raise ToolError(
         "UNKNOWN_PERIPHERAL",
         f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,"
-        f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx / IWDG / WWDG / CAN)。"
-        f"DMA 与 NVIC 中断脚本配不了,原因见 knowledge/rules/dma.yaml 与 nvic.yaml",
+        f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx / IWDG / WWDG / CAN / RTC)。"
+        f"DMA 脚本配不了(见 knowledge/rules/dma.yaml);中断要在意图里写 interrupt 字段",
     )
 
 

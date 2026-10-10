@@ -1279,6 +1279,11 @@ class TestIntentResolver(unittest.TestCase):
             intent_resolver.apply_intents(self.ioc, [{"peripheral": "FOO1"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
+    def test_rtc_commands(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "RTC", "mode": "enabled_calendar"}])
+        self.assertIn("set mode RTC RTC_Enabled", plan["commands"])
+        self.assertIn("set mode RTC RTC_Calendar", plan["commands"])
+
     def test_unknown_tim_mode_rejected(self):
         with self.assertRaises(ValueError) as ctx:
             intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM3", "mode": "output_compare", "pin": "PA6"}])

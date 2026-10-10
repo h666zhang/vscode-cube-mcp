@@ -1,0 +1,33 @@
+# RTC:已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测:set mode RTC RTC_Enabled -> 写 VP_RTC_VS_RTC_Activate 两行;
+#       再叠加 set mode RTC RTC_Calendar -> 又写 VP_RTC_VS_RTC_Calendar 两行。
+# 也是虚拟引脚(VP_)表达,和 IWDG / WWDG 一个套路。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+modes:
+  enabled: RTC_Enabled
+  calendar: RTC_Calendar
+  enabled_calendar: [RTC_Enabled, RTC_Calendar]
+
+command_examples:
+  - "set mode RTC RTC_Enabled"
+  - "set mode RTC RTC_Calendar"
+
+ioc_result:
+  - "VP_RTC_VS_RTC_Activate.Mode=RTC_Enabled"
+  - "VP_RTC_VS_RTC_Activate.Signal=RTC_VS_RTC_Activate"
+  - "VP_RTC_VS_RTC_Calendar.Mode=RTC_Calendar"
+  - "VP_RTC_VS_RTC_Calendar.Signal=RTC_VS_RTC_Calendar"
+
+known_issues:
+  - "两个模式可以单独配,也可以叠在一起(见 modes.enabled_calendar)"
+  - "RTC 时钟源(LSE/LSI)与日历参数(AsynchPrediv/AutoPrediv/时间日期)的写法还没实测"
+  - "用 LSE 时 PC14/PC15 会被占用(OSC32_IN/OSC32_OUT),要先和别的用途协调"
+
+parameters_from_db:
+  asynch_prediv:
+    key: "RTC.AsynchPrediv"
+  auto_prediv:
+    key: "RTC.AutoPrediv"

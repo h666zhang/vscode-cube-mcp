@@ -38,8 +38,8 @@
 
 - **`cubemx_intent`**:只写"要什么"(外设 / 模式 / 引脚 / 频率 / 占空比),`.ioc` 内部名由知识库查出来 —— 优先用它。
   目前支持:`TIMx`(pwm / input_capture / internal_clock)、`GPIO`、`I2Cx`、`USARTx`、`SPIx`、`ADCx`、
-  `IWDG`、`WWDG`、`CAN`;**DMA 与 NVIC 中断不支持**(脚本接口没有对应命令,试过什么见
-  `knowledge/rules/dma.yaml` 与 `nvic.yaml`)。
+  `IWDG`、`WWDG`、`CAN`、`RTC`;中断在意图里写 `interrupt` 字段(靠注入 `.ioc` 键实现);
+  **DMA 不支持**(CubeMX 脚本接口没有对应命令,见 `knowledge/rules/dma.yaml`)。
 - **`cubemx_probe`**:在 `.ioc` 的副本上试跑命令,输出改前改后的差异;用于收录还没实测过的外设写法。
 
 ## 已知坑(实测结论,勿重踩)
