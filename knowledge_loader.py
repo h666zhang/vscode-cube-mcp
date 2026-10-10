@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
 
 import yaml
@@ -28,9 +29,19 @@ _CACHE: dict = {}
 
 
 def knowledge_dir() -> Path:
-    """知识库目录:环境变量 ST_CUBEMX_KNOWLEDGE 优先,默认与本模块同级的 knowledge/。"""
+    """知识库目录。优先级:环境变量 ST_CUBEMX_KNOWLEDGE > 源码目录 > 安装位置。
+
+    安装位置和 templates/ 一样有三种可能(见 cubemx_mcp._template_search_dirs):
+    模块同级、site-packages 的上级、以及 pip 装 wheel 时的 sys.prefix。
+    """
     raw = os.environ.get("ST_CUBEMX_KNOWLEDGE", "").strip()
-    return Path(raw) if raw else Path(__file__).resolve().parent / "knowledge"
+    if raw:
+        return Path(raw)
+    here = Path(__file__).resolve().parent
+    for candidate in (here / "knowledge", here.parent / "knowledge", Path(sys.prefix) / "knowledge"):
+        if candidate.is_dir():
+            return candidate
+    return here / "knowledge"  # 都不存在时返回源码位置,报错信息里能看到期望的路径
 
 
 def reload() -> None:

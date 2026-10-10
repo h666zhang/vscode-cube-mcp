@@ -22,11 +22,13 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 | 工具 | 说明 |
 |------|------|
 | `cubemx_help` | **server 内置帮助**:工具清单、可用模板、外设配置方法(陌生 agent 建议先调用) |
+| `cubemx_intent` | **按意图配置外设**:只写"要什么"(外设/模式/引脚/频率),`.ioc` 内部名由知识库查出来 —— 优先用它 |
+| `cubemx_new_project` | **从零生成新工程**(内置模板库,无需预先 .ioc) |
+| `cubemx_generate` | 加载 .ioc 并生成 HAL 工程 |
 | `cubemx_load` | 加载 .ioc 并回读关键配置(只读) |
 | `cubemx_configure` | 加载 .ioc,执行 `set` 命令序列并写回 |
-| `cubemx_generate` | 加载 .ioc 并生成 HAL 工程 |
+| `cubemx_probe` | **探针**:在 .ioc 副本上试跑命令,输出改前改后的差异(用来收录还没实测过的外设写法) |
 | `cubemx_export_pinout` | 导出引脚配置 CSV(只读) |
-| `cubemx_new_project` | **从零生成新工程**(内置模板库,无需预先 .ioc) |
 | `cubemx_remove_peripheral` | 从 .ioc 移除外设 |
 | `cubemx_add_source` | 把自定义源文件加入 CMake 源列表 |
 | `cubemx_script` | 任意 CubeMX 脚本命令序列(高级/原始脚本接口) |
@@ -105,17 +107,50 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\MINE\STM32Project"
 | `ST_CUBEMX_EXE` | PATH 中的 `STM32CubeMX` / 常见 Windows 安装位置 | STM32CubeMX 可执行文件完整路径 |
 | `ST_CUBEMX_ALLOWED_ROOTS` | 当前工作目录 | .ioc / 生成路径允许访问的根目录,`;` 分隔(Windows) |
 | `ST_CUBEMX_TIMEOUT` | `240` | 单次 CubeMX 调用超时秒数,机器慢可调大 |
+| `ST_CUBEMX_KNOWLEDGE` | 与代码同级的 `knowledge/` | 知识库目录;一般不用设(源码运行与 pip 安装都会自动找到) |
 
 > 安全设计:所有 .ioc / 生成路径**必须**在 `ST_CUBEMX_ALLOWED_ROOTS` 白名单内,白名单外的路径会被拒绝。
 
 ## 使用示例
 
-让 AI 助手做的事情都会通过上述 9 个工具完成,例如:
+让 AI 助手做的事情都会通过上述 11 个工具完成,例如:
 
 - 「第一次用你,先看看你能干什么、有哪些芯片模板」→ `cubemx_help`(陌生 agent 建议第一个调用)
-- 「加载 `D:\proj\Blink.ioc`,把 PB13 改成 GPIO_Output 并加标签 LED」→ `cubemx_configure`
-- 「用 STM32F103C8T6 从零建一个工程,LED 在 PB13,带 I2C1」→ `cubemx_new_project`
+- 「用 STM32F103C8T6 从零建一个工程」→ `cubemx_new_project`
+- 「TIM3 的 PA6 出 10kHz、占空比 50% 的 PWM;USART2 接 PA2/PA3,波特率 9600」→ **`cubemx_intent`**
+- 「把 PB13 改成 GPIO_Output 并加标签 LED」→ `cubemx_intent`(也可以直接发 `cubemx_configure` 的 set 命令)
 - 「把 OLED.c 加进编译,重新 generate 后也保留」→ `cubemx_add_source`
+
+### 用意图配置外设(推荐)
+
+`cubemx_intent` 只描述"要什么";`.ioc` 里的内部名(`S_TIM3_CH1`、`PWM Generation1 CH1` 这类)
+全部由知识库查出来,AI 不需要记住它们:
+
+```json
+[{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "freq_hz": 10000, "duty": 0.5},
+ {"peripheral": "TIM2", "mode": "input_capture", "pin": "PA0-WKUP"},
+ {"peripheral": "I2C1", "pins": ["PB8", "PB9"]},
+ {"peripheral": "USART2", "pins": ["PA2", "PA3"], "baudrate": 9600},
+ {"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}]
+```
+
+参数两种给法都行:业务参数(`freq_hz` / `duty`)由代码按定时器时钟换算,或者直接给寄存器参数
+(`prescaler` / `period` / `pulse`),显式给的优先。查不到的外设 / 引脚会被**拒绝执行**,
+并告诉你差什么、怎么补。
+
+## 知识库(`knowledge/`)
+
+工具不靠"记忆"写 `.ioc`:事实只有两个来源,都在 `knowledge/` 里(纯文本,可 diff、可审):
+
+| 目录 | 内容 | 来源 |
+|------|------|------|
+| `knowledge/ip/` | 每个 IP 的合法模式名、参数与取值范围 | 从 CubeMX 安装目录的 `db/mcu/IP/*.xml` **导出** |
+| `knowledge/mcu/` | 芯片引脚表:每个引脚支持哪些信号 | 从 CubeMX 的 `db/mcu/<芯片>.xml` **导出** |
+| `knowledge/rules/` | 命令写法、`.ioc` 片段、已知坑 | **用探针实测**,每条带 `verified` 与来源 |
+
+- 只有 `verified: true` 的规则会被执行;`false` 的会被拒绝(提示先用 `cubemx_probe` 验证)。
+- 换芯片 / 升级 CubeMX 后重新导出:`python tools/gen_knowledge_from_db.py --mcu STM32F103C8T6`
+- 目录可用 `ST_CUBEMX_KNOWLEDGE` 指定,一般不用设(源码运行与 pip 安装都会自动找到)。
 
 内置模板库(`templates/`,按芯片型号命名的**最小模板**:仅芯片标识 + 基础时钟 72MHz/SWD/SysTick,**无外设**,如 `STM32F103C8T6.ioc`);外设全部由 `cubemx_new_project` 的 `commands` set 命令现配,TIM 内部时钟由配置补丁自动处理。新增芯片只需把该芯片 6.18 原生 .ioc 放进 `templates/`。
 
@@ -173,10 +208,31 @@ python -m pip show vscode-cube-mcp   # 能显示才算装在当前 python 上
 **Q:CubeMX 弹「Resolve Clock Issues」**
 通常是 .ioc 时钟树不自洽(如 HSE 未启用但 PLL 选了 HSE)。这个属于工程配置问题,详见 [`README.dev-notes.md`](README.dev-notes.md) 的「从零配置时钟实战」。
 
+**Q:`cubemx_intent` 报 `UNKNOWN_PERIPHERAL` / `UNKNOWN_PARAM`**
+知识库还没收录这个外设或这种模式(不是查不到,是**故意不猜**)。三种办法:① 用 `cubemx_help`
+看已收录哪些;② 直接发 `cubemx_configure` 的 `set` 命令;③ 用 `cubemx_probe` 在副本上试跑一遍,
+把结果整理进 `knowledge/rules/<外设>.yaml`(见 dev-notes 的「加一个外设的 SOP」)。
+
+**Q:`cubemx_intent` 报 `UNKNOWN_PIN_SIGNAL` / `PIN_CONFLICT`**
+前者是这个引脚不支持你指定的信号(报错里会列出它支持哪些);后者是引脚已被占用(可能是当前
+`.ioc` 里已有,也可能是这一批意图里重复了)。按提示换引脚即可。
+
+**Q:报 `RULE_NOT_VERIFIED`**
+这条规则还没实测过(比如早期的 USART)。为避免写出 CubeMX 不认的东西,工具会拒绝执行。
+先用 `cubemx_probe` 验证,再把该规则改成 `verified: true`。
+
 ## 开发与测试
 
 ```bash
-python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
+python -m unittest test_cubemx_mcp             # 133 个测试(其中 5 个集成测试默认跳过)
+python -m pytest                              # 带覆盖率门槛(低于 80% 失败)
+ruff check . && ruff format --check .          # 风格
+```
+
+真跑 CubeMX 的集成测试(每个用例约 10s,会启动 CubeMX,用于验证"写出来的 .ioc CubeMX 真的认"):
+
+```powershell
+$env:ST_CUBEMX_RUN_INTEGRATION=1; python -m unittest test_cubemx_mcp.TestCubeMXIntegration
 ```
 
 技术栈:Python >= 3.10 + mcp SDK 2.x(stdio);打包 setuptools + build + twine;目标平台 Windows(跨平台可用)。
@@ -194,6 +250,23 @@ python -m unittest test_cubemx_mcp -v   # 运行单元测试(不依赖 CubeMX)
 - [`README.dev-notes.md`](README.dev-notes.md):开发笔记——ST 扩展识别工程踩坑、从零配置时钟实战、各外设实测状态与能力边界、TIM 配置补丁原理
 
 ## 更新日志
+
+### 0.4.4.1(2026-10-10)
+
+重构:把 STM32 的事实从代码里搬进知识库,并加了"配置意图"这一层。(**未发布**,版本号先定下来)
+
+- **新增知识库 `knowledge/`**:引脚 / 模式 / 参数从 CubeMX 自带的 `db/` 导出
+  (`tools/gen_knowledge_from_db.py`);实测规则放 `knowledge/rules/*.yaml`,每条带 `verified` 与来源
+- **新增 `cubemx_intent`**:只写"要什么"(外设 / 模式 / 引脚 / 频率 / 占空比),`.ioc` 内部名由知识库查出
+- **新增 `cubemx_probe`**:在 `.ioc` 副本上试跑命令并输出改前改后差异(用来收录没实测过的外设)
+- **报错可定位**:统一的步骤名 + 20 个错误码,失败时能看出卡在哪一步、为什么、怎么办
+- **`cubemx_help` 与 TIM 注入器改为读 YAML**:`cubemx_mcp.py` 里的硬编码事实全部删掉(1295 → 642 行)
+- **`.ioc` 编辑独立成层**(`ioc_editor.py`):写前自动备份 `.bak`,写后回读校验,不一致报 `READBACK_MISMATCH`
+- **探针实测收录 USART**:`set mode USARTx Asynchronous` 有效(与 TIM 不同);BaudRate 等于默认值
+  115200 时 CubeMX 不写出该行 —— 探针看不到不代表命令无效
+- **集成测试**:真跑 CubeMX 验证注入出的 `.ioc` 能被它接受(默认跳过,`ST_CUBEMX_RUN_INTEGRATION=1` 才跑)
+- 测试 72 → 133(含 5 个集成测试);覆盖率按 6 个模块统计为 92.7%
+- 依赖:新增 `pyyaml>=6.0`
 
 ### 0.4.2(2026-08-27)
 - **工程化补强**(非功能迭代,为「全外设完善」里程碑铺路):

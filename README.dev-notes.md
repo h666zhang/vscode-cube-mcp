@@ -399,3 +399,88 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 - 注入后的 .ioc 经 6.18 load+generate 后与基准样本逐行一致,生成 tim.c 参数正确(PWM 10kHz/50% + IC RISING)。
 
 **MCP 开发模式配置坑(2026-08-27)**:config.toml 的 `[[plugins]]` 用 `command = python.exe` + `args = ["-m", "cubemx_mcp"]` 时,server 从 site-packages 导入,**cwd 字段不被 MCP 启动器支持(静默忽略)**;可靠写法是 `args = ['C:\MINE\STM32Project\Vscode_cube_mcp\cubemx_mcp.py']` 直接执行开发目录脚本。改配置需重启会话生效。
+
+## 知识库是怎么来的(2026-10-10,重构后)
+
+事实只有两个来源,都不依赖人的记忆:
+
+| 目录 | 内容 | 怎么来的 |
+|------|------|----------|
+| `knowledge/ip/` | 每个 IP 的合法模式名、参数与取值范围、信号组名 | `tools/gen_knowledge_from_db.py` 解析 CubeMX 安装目录的 `db/mcu/IP/<Name>-<Version>_Modes.xml` |
+| `knowledge/mcu/` | 芯片引脚表(每个引脚支持哪些信号) | 同一个脚本解析 `db/mcu/<Mcu.Name>.xml`(文件名来自模板 `.ioc` 里的 `Mcu.Name`) |
+| `knowledge/rules/` | 命令写法、`.ioc` 片段、已知坑 | **探针实测**:`cubemx_probe` 在副本上跑命令,再用 `ioc_diff` 拿到真实差异 |
+
+几条实测结论(以前靠人记、现在靠查表):
+
+- `.ioc` 的内部枚举名就是 db 里 `RefMode` 的 `Name` 属性(如 `PWM Generation1 CH1`);
+  GUI 里显示的是另一个名字(`PWM Generation CH1`),写错会被 CubeMX **静默丢弃**;
+- 信号在 `.ioc` 里的名字来自 db 里 `RefSignal` 的组名:`ShareableGroupName` 形如
+  `S_$IpInstance_CH1`(把 `$IpInstance` 换成实例名),`ExclusiveGroupName` 形如
+  `S_TIM2_CH1_ETR:TIM2` —— PA0 的组合名 `S_TIM2_CH1_ETR` 就是这么来的,**不用猜**;
+- `verified: false` 的规则会被拒绝执行(防幻觉闸门);`source` 记着这条规则的实测日期与 CubeMX 版本。
+
+## 加一个外设的 SOP
+
+1. **先探针**:把猜的命令写出来,`cubemx_probe` 在模板副本上跑一遍,看 `ioc_diff` 给出的真实差异;
+2. **写规则**:`knowledge/rules/<外设>.yaml` 里写 `command_examples` + `ioc_result` + `known_issues`,
+   标 `verified: true` 与 `source`(日期 / CubeMX 版本);
+3. **加意图(可选)**:要让 `cubemx_intent` 支持它,就在 `intent_resolver.py` 加一个分支 ——
+   命令类(如 GPIO/I2C/USART)复用 `_pin_commands`;片段注入类(如 TIM)照 `_apply_tim` 的写法;
+4. **补测试**:单元测试(mock 掉 `_run_script`)+ 集成测试用例(`TestCubeMXIntegration`);
+5. **验证**:`python -m unittest` + `python -m pytest`,最后真跑一次集成测试确认 CubeMX 认。
+
+> ⚠️ 探针里**看不到差异 ≠ 命令无效**。实测例子:USART2 的 `BaudRate 115200` 正好等于 db 默认值,
+> CubeMX 就不写出 `USART2.BaudRate` 行;换成 9600 才出现。所以探针要用**非默认值**再试一遍。
+
+## 加一个芯片的 SOP
+
+1. 用 CubeMX GUI 新建该芯片工程,存成 `templates/{mcu}.ioc`(**必须 6.18 原生生成**,手写会被拒);
+2. 跑 `python tools/gen_knowledge_from_db.py --mcu <型号>` 导出引脚表与 IP 事实;
+3. 在 `pyproject.toml` 的 `[tool.setuptools.data-files]` 里登记新模板(和 `knowledge/` 一样要随包分发);
+4. 跑测试;`knowledge_loader` 会自动找到 `knowledge/mcu/<芯片>.pins.yaml`。
+
+> 注意:知识库里每颗芯片一份引脚表,`--mcu` 换芯片就是重新导出;当前导的是 `STM32F103C8T6`
+> (对应 `db/mcu/STM32F103C(8-B)Tx.xml`)。
+
+## 报错模型(错误码表)
+
+所有失败都带"卡在哪一步 + 错误码 + 建议"。错误码定义在 `cubemx_result.ERRORS`;
+参数 / 流程错误抛 `cubemx_result.ToolError`(继承 `ValueError`,消息形如
+`[check_path|PATH_NOT_ALLOWED] <原消息>` + 换行 + `建议: …`)。
+
+| 错误码 | 卡在哪一步 | 含义 | 建议 |
+|--------|-----------|------|------|
+| `BAD_ARGUMENT` | validate_args | 参数不合法 | 按提示改正 |
+| `PATH_NOT_ALLOWED` | check_path | 路径不在白名单 | 加进 `ST_CUBEMX_ALLOWED_ROOTS` |
+| `IOC_NOT_FOUND` / `NOT_IOC_FILE` | check_path | .ioc 不存在 / 不是 .ioc | 确认路径 |
+| `MCU_TEMPLATE_MISSING` | locate_template | 没有该芯片模板 | 放模板或用 `template` 指定 |
+| `UNKNOWN_PERIPHERAL` | load_knowledge | 知识库没收录这个外设 | 用 `cubemx_probe` 收录 |
+| `UNKNOWN_PARAM` | load_knowledge | 没这种模式 / 参数 | `cubemx_help` 看支持的清单 |
+| `UNKNOWN_PIN_SIGNAL` | resolve_intent | 引脚不支持该信号 | 换引脚(报错里列了支持的) |
+| `PIN_CONFLICT` | resolve_intent | 引脚已被占用 | 换引脚,或先移除占用者 |
+| `RULE_NOT_VERIFIED` | resolve_intent | 规则没实测过 | 先 probe 验证 |
+| `PERIPHERAL_NOT_FOUND` | compose_ioc | .ioc 里没有这个外设 | 确认外设名 |
+| `PROJECT_NOT_GENERATED` / `PROJECT_STRUCTURE_UNEXPECTED` | compose_ioc | 工程没生成 / 结构不符 | 先 `cubemx_generate` |
+| `CUBEMX_TIMEOUT` / `CUBEMX_EXIT_NONZERO` / `CUBEMX_KO` | run_cubemx | CubeMX 超时 / 退出非 0 / 返回 KO | 看原始输出 |
+| `READBACK_MISMATCH` | readback_verify | 写入后回读不一致 | 看列出的缺失行 |
+| `CLOCK_DEGRADED` | post_check | HSE 被降级(**警告**,不是失败) | GUI 里把 PLL Source 选回 HSE |
+
+## 本地开发:让宿主跑本地代码(补充上面那条旧记录)
+
+上面 2026-08-27 那条只对了一半:`cwd` 确实不被支持(**会被静默忽略**),但要点是
+`args` 必须指向**脚本文件本身**,而不是 `-m 模块名`:
+
+```toml
+[[plugins]]
+name    = "Vscode_cube_mcp"
+command = "C:\\...\\Python313\\python.exe"
+args    = ["C:\\MINE\\STM32Project\\Vscode_cube_mcp\\cubemx_mcp.py"]   # ← 不是 ["-m", "cubemx_mcp"]
+env     = { ST_CUBEMX_ALLOWED_ROOTS = "C:\\MINE\\STM32Project" }
+```
+
+直接执行脚本时,Python 会把**脚本所在目录**放进 `sys.path`,所以同目录的
+`cubemx_result` / `ioc_editor` / `intent_resolver` / `ioc_diff` / `knowledge_loader` 都能导入,
+`knowledge/` 也能被 `knowledge_loader` 找到。改完**重启宿主**才生效。
+
+> 另注意:`%APPDATA%\reasonix` 是宿主的运行时状态路径,agent 无权写入(会被直接拒绝),
+> 这类改动得自己动手。
