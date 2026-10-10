@@ -1063,9 +1063,9 @@ class TestKnowledgeLoader(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
     def test_unverified_rule_blocked(self):
-        # usart.yaml 顶层就是 verified: false —— USART 从没实测过
+        # 闸门本身:verified 不是 true 就拒绝(用构造数据测,不依赖某个具体规则当前的状态)
         with self.assertRaises(ValueError) as ctx:
-            knowledge_loader.require_rule_verified("usart")
+            knowledge_loader.require_verified({"verified": False, "source": "测试用例"}, "test")
         self.assertEqual(ctx.exception.code, "RULE_NOT_VERIFIED")
         self.assertEqual(ctx.exception.stage, "resolve_intent")
 
@@ -1297,10 +1297,20 @@ class TestIntentResolver(unittest.TestCase):
         self.assertIn("[OK", out)
         self.assertIn("cubemx_intent", out)
 
-    def test_cubemx_intent_rejects_unverified_rule(self):
+    def test_usart_intent_commands(self):
+        # usart 的规则已经探针实测过(verified: true),所以意图层放行
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "USART2", "pins": ["PA2", "PA3"], "baudrate": 9600}]
+        )
+        self.assertIn("set mode USART2 Asynchronous", plan["commands"])
+        self.assertIn("set ip parameters USART2 BaudRate 9600", plan["commands"])
+        self.assertIn("set pin PA2 USART2_TX", plan["commands"])
+        self.assertIn("set pin PA3 USART2_RX", plan["commands"])
+
+    def test_cubemx_intent_rejects_unsupported_peripheral(self):
         with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
             with self.assertRaises(ValueError) as ctx:
-                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "USART2", "mode": "asynchronous", "pin": "PA2"}])
+                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "SPI2", "pin": "PB13"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
 

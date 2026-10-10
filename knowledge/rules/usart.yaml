@@ -1,13 +1,36 @@
-# USART:还没有实测过(0.4.x 的验证范围只到 GPIO / I2C / TIM)
-# verified 为 false 的规则不应该被执行;先用 probe 验证再改成 true。
-verified: false
-source: "(未实测)命令写法来自 CubeMX 脚本语法与 db 导出,尚未在真机跑通"
+# USART:已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测方法:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
+#     set mode USART2 Asynchronous
+#     set ip parameters USART2 BaudRate 115200     <- 这一次 .ioc 里没有出现 BaudRate 行
+#     set pin PA2 USART2_TX / set pin PA3 USART2_RX
+#   再用非默认值 9600 重跑一次,才看到 USART2.BaudRate=9600。
+# 下面的 ioc_result 是这两次探针的并集。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0(MxCube.Version=6.18.0)"
 
 command_examples:
-  - "set mode USART1 Asynchronous"
-  - "set ip parameters USART1 BaudRate 115200"
-  - "set pin PA9 USART1_TX"
-  - "set pin PA10 USART1_RX"
+  - "set mode USART2 Asynchronous"
+  - "set ip parameters USART2 BaudRate 9600"
+  - "set pin PA2 USART2_TX"
+  - "set pin PA3 USART2_RX"
+
+ioc_result:
+  - "Mcu.IP3=USART2"
+  - "PA2.Locked=true"
+  - "PA2.Mode=Asynchronous"
+  - "PA2.Signal=USART2_TX"
+  - "PA3.Locked=true"
+  - "PA3.Mode=Asynchronous"
+  - "PA3.Signal=USART2_RX"
+  - "USART2.IPParameters=VirtualMode,BaudRate"
+  - "USART2.VirtualMode=VM_ASYNC"
+  - "USART2.BaudRate=9600"
+
+known_issues:
+  - "BaudRate 等于 db 里的默认值(115200)时,CubeMX 不写出 USARTx.BaudRate 行;探针里看不到不代表命令无效(实测:换成 9600 就出现了)"
+  - "和 TIM 不一样:USART 的 set mode USART2 Asynchronous 有效;TIM 的 set mode TIMx 一律 KO"
+  - "引脚侧写法是 {pin}.Mode=Asynchronous + {pin}.Signal=USARTx_TX/RX,不是 GPIO 那种 GPIO_Output"
 
 parameters_from_db:
   baudrate:
@@ -18,5 +41,5 @@ parameters_from_db:
     unit: Bits/s
 
 todo:
-  - "先跑 cubemx_probe(USART2, 115200 + PA2/PA3) 拿到真实 diff,再补上 .ioc 片段并改成 verified: true"
-  - "确认 DMA 收发、NVIC 中断的写法(目前完全没收录)"
+  - "DMA 收发、NVIC 中断的写法还没收录(完全没探过)"
+  - "同步/半双工等其它 VirtualMode 还没探"

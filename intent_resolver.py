@@ -136,14 +136,8 @@ def gpio_commands(intent: dict) -> list:
     return commands
 
 
-def i2c_commands(intent: dict) -> list:
-    """I2C 走 set 命令;引脚角色(SCL/SDA)从引脚表里查,不靠调用方指定顺序。"""
-    instance = str(intent.get("peripheral", "")).strip().upper()
-    pins = [str(p).strip() for p in (intent.get("pins") or []) if str(p).strip()]
-    if intent.get("pin"):
-        pins.insert(0, str(intent["pin"]).strip())
-    if not pins:
-        raise ToolError("BAD_ARGUMENT", f'{instance} 意图需要 pins(如 ["PB8", "PB9"])')
+def _pin_commands(instance: str, pins: list) -> list:
+    """把一组引脚换成 set pin 命令;角色(TX/RX、SCL/SDA)从引脚表里查,不靠调用方指定。"""
     commands = []
     for pin in pins:
         signals = knowledge_loader.pin_signals(pin)
@@ -154,7 +148,34 @@ def i2c_commands(intent: dict) -> list:
                 f"{pin} 上没有 {instance} 的信号;这个引脚支持: {', '.join(signals)}",
             )
         commands.append(f"set pin {pin} {hit[0]}")
-    commands.append(f"set mode {instance} I2C")
+    return commands
+
+
+def i2c_commands(intent: dict) -> list:
+    """I2C 走 set 命令;引脚角色(SCL/SDA)从引脚表里查。"""
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    pins = intent_pins(intent)
+    if not pins:
+        raise ToolError("BAD_ARGUMENT", f'{instance} 意图需要 pins(如 ["PB8", "PB9"])')
+    return [*_pin_commands(instance, pins), f"set mode {instance} I2C"]
+
+
+def usart_commands(intent: dict) -> list:
+    """USART 走 set 命令。
+
+    实测(CubeMX 6.18,见 knowledge/rules/usart.yaml):set mode USARTx Asynchronous 有效,
+    引脚写成 {pin}.Mode=Asynchronous + {pin}.Signal=USARTx_TX/RX。
+    BaudRate 等于默认值 115200 时 .ioc 里不写出这一行,但不影响配置生效。
+    """
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    knowledge_loader.require_rule_verified("usart")  # 防幻觉闸门:没实测过就拒绝
+    commands = [f"set mode {instance} Asynchronous"]
+    baudrate = intent.get("baudrate")
+    if baudrate:
+        commands.append(f"set ip parameters {instance} BaudRate {int(baudrate)}")
+    pins = intent_pins(intent)
+    if pins:
+        commands.extend(_pin_commands(instance, pins))
     return commands
 
 
@@ -218,9 +239,12 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
     if re.fullmatch(r"I2C\d+", peripheral):
         commands = i2c_commands(intent)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if re.fullmatch(r"USART\d+", peripheral):
+        commands = usart_commands(intent)
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     raise ToolError(
         "UNKNOWN_PERIPHERAL",
-        f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,以及 GPIO / I2Cx)",
+        f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,以及 GPIO / I2Cx / USARTx)",
     )
 
 
@@ -228,7 +252,7 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
     """把一组意图落到 .ioc:先查引脚冲突,再逐个执行。
 
     返回 {"notes": [每条说明...], "commands": [要交给 CubeMX 脚本的 set 命令...]}。
-    TIM 是就地注入 .ioc;GPIO / I2C 返回命令,由上层拼进 config load / saveas 里跑。
+    TIM 是就地注入 .ioc;GPIO / I2C / USART 返回命令,由上层拼进 config load / saveas 里跑。
     """
     if not intents:
         raise ToolError("BAD_ARGUMENT", "intents 是空的")
