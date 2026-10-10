@@ -4,6 +4,7 @@
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -1379,6 +1380,66 @@ class TestProbeTool(unittest.TestCase):
             out = cubemx_mcp.cubemx_probe(self.ioc, ["x"], keep_copy=True)
         self.assertIn("副本保留在", out)
         self.assertTrue(os.path.exists(os.path.join(self._td.name, "demo.probe.ioc")))
+
+
+# ---------------------------------------------------------------- 集成测试(默认跳过)
+INTEGRATION = os.environ.get("ST_CUBEMX_RUN_INTEGRATION") == "1"
+TEMPLATE_IOC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "STM32F103C8T6.ioc")
+
+
+@unittest.skipUnless(
+    INTEGRATION,
+    "集成测试默认跳过;要跑就设 ST_CUBEMX_RUN_INTEGRATION=1(会启动 CubeMX,每个用例约 15s)",
+)
+class TestCubeMXIntegration(unittest.TestCase):
+    """真跑 CubeMX:验证意图层写出的 .ioc 能被 CubeMX 接受、set 命令能被执行。
+
+    单元测试只能证明"代码逻辑对",这个类才证明"写出来的东西 CubeMX 认"。
+    默认跳过(慢,而且会启动外部程序)。
+    运行: $env:ST_CUBEMX_RUN_INTEGRATION=1; python -m unittest test_cubemx_mcp.TestCubeMXIntegration
+    """
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "it.ioc")
+        shutil.copy(TEMPLATE_IOC, self.ioc)
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+        self.addCleanup(setattr, cubemx_mcp, "ALLOWED_ROOTS", [os.getcwd()])
+
+    def test_template_loads(self):
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+
+    def test_pwm_ioc_accepted(self):
+        intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "prescaler": 72, "period": 100, "pulse": 50}]
+        )
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+
+    def test_internal_clock_ioc_accepted(self):
+        intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM2", "mode": "internal_clock"}])
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+
+    def test_input_capture_ioc_accepted(self):
+        intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM2", "mode": "input_capture", "pin": "PA0-WKUP"}])
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+
+    def test_gpio_i2c_usart_commands_accepted(self):
+        out = cubemx_mcp.cubemx_configure(
+            self.ioc,
+            [
+                "set pin PB13 GPIO_Output",
+                "set gpio parameters PB13 GPIO_Label LED",
+                "set pin PB8 I2C1_SCL",
+                "set pin PB9 I2C1_SDA",
+                "set mode I2C1 I2C",
+                "set mode USART2 Asynchronous",
+                "set ip parameters USART2 BaudRate 9600",
+                "set pin PA2 USART2_TX",
+                "set pin PA3 USART2_RX",
+            ],
+        )
+        self.assertIn("[OK", out)
 
 
 if __name__ == "__main__":
