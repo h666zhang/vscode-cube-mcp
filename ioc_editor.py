@@ -56,6 +56,29 @@ def used_pins(ioc_path: str) -> dict:
     return out
 
 
+def add_lines(ioc_path: str, lines) -> list:
+    """把若干 .ioc 行插到 board=custom 之前(锚点和 TIM 注入一致)。
+
+    已经存在的行跳过(幂等);写前备份、写后回读校验。返回真正新增的行。
+    """
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    have = {ln.strip() for ln in text.splitlines()}
+    wanted = [ln for ln in lines if ln.strip() and ln.strip() not in have]
+    if not wanted:
+        return []
+    block = "".join(ln if ln.endswith("\n") else ln + "\n" for ln in wanted)
+    if "board=custom" in text:
+        text = text.replace("board=custom", block + "board=custom", 1)
+    else:
+        text += block
+    backup(ioc_path)
+    with open(ioc_path, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    verify_written(ioc_path, wanted)
+    return wanted
+
+
 def _ensure_ip_param(text: str, name: str) -> str:
     """确保 RCC.IPParameters 列表包含 name(CubeMX 只加载列表里声明的字段)。"""
     m = re.search(r"^RCC\.IPParameters=(.*)$", text, flags=re.MULTILINE)

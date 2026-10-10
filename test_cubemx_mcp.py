@@ -1329,9 +1329,45 @@ class TestIntentResolver(unittest.TestCase):
         self.assertIn("set pin PA11 CAN_RX", plan["commands"])
         self.assertIn("set pin PA12 CAN_TX", plan["commands"])
 
-    def test_nvic_rule_is_unverified(self):
-        # 中断的脚本写法没找到(knowledge/rules/nvic.yaml 记着试过哪三种)
-        self.assertFalse(knowledge_loader.rule("nvic").get("verified"))
+    def test_nvic_rule_is_verified(self):
+        # 中断:脚本 set 配不了,但注入 .ioc 键实测有效(见 knowledge/rules/nvic.yaml)
+        self.assertTrue(knowledge_loader.rule("nvic").get("verified"))
+
+    def test_interrupt_line_from_rule(self):
+        line = intent_resolver.interrupt_line({"peripheral": "USART2", "interrupt": True})
+        self.assertIn("NVIC.USART2_IRQn=", line)
+        self.assertIn("\\:", line)
+
+    def test_interrupt_explicit_name(self):
+        line = intent_resolver.interrupt_line({"peripheral": "I2C1", "interrupt": "I2C1_EV_IRQn"})
+        self.assertIn("NVIC.I2C1_EV_IRQn=", line)
+
+    def test_no_interrupt_no_line(self):
+        self.assertEqual(intent_resolver.interrupt_line({"peripheral": "USART2"}), "")
+
+    def test_apply_intents_returns_ioc_lines(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "USART2", "pins": ["PA2"], "interrupt": True}])
+        self.assertTrue(any("NVIC.USART2_IRQn" in line for line in plan["ioc_lines"]))
+
+    def test_add_lines_injects_before_board_custom_and_is_idempotent(self):
+        path = os.path.join(self._td.name, "lines.ioc")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("A=1\nboard=custom\n")
+        self.assertEqual(ioc_editor.add_lines(path, ["B=2\n"]), ["B=2\n"])
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("B=2\nboard=custom", text)
+        self.assertEqual(ioc_editor.add_lines(path, ["B=2\n"]), [])
+
+    def test_cubemx_intent_injects_interrupt_line(self):
+        with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
+            with mock.patch.object(
+                cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}
+            ):
+                out = cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "USART2", "pins": ["PA2"], "interrupt": True}])
+        self.assertIn("NVIC.USART2_IRQn", out)
+        with open(self.ioc, encoding="utf-8") as f:
+            self.assertIn("NVIC.USART2_IRQn", f.read())
 
     def test_spi_intent_commands(self):
         plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]}])

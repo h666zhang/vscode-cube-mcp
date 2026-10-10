@@ -614,6 +614,10 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
         if not result["ok"]:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
         steps.append(("run_cubemx", "ok"))
+    # 中断这类"脚本配不了"的,靠注入 .ioc 行;必须放在 CubeMX saveas 之后,否则会被覆盖
+    added = ioc_editor.add_lines(ap, plan.get("ioc_lines") or [])
+    if added:
+        plan["notes"].append("已注入 .ioc 行: " + "; ".join(added))
     return render("cubemx_intent", True, steps=steps, extra="\n".join(plan["notes"]))
 
 

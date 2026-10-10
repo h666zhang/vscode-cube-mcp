@@ -217,6 +217,25 @@ def adc_commands(intent: dict) -> list:
     return [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
 
 
+def interrupt_line(intent: dict) -> str:
+    """意图里带 interrupt 时,返回要注入的 NVIC 行(没有就返回空串)。
+
+    interrupt 可以写 true(用 `{实例}_IRQn`)或直接写中断名(如 I2C1_EV_IRQn)。
+    行的形态取自 knowledge/rules/nvic.yaml —— 实测有效:注入后 generate,
+    Core/Src/stm32f1xx_it.c 里会出现对应的 <IRQ>Handler。
+    """
+    flag = intent.get("interrupt")
+    if not flag:
+        return ""
+    rules = knowledge_loader.require_rule_verified("nvic")
+    pattern = (rules.get("ioc_key") or {}).get("pattern", "")
+    if not pattern:
+        raise ToolError("UNKNOWN_PARAM", "knowledge/rules/nvic.yaml 里没有 ioc_key.pattern")
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    irq = f"{instance}_IRQn" if flag is True else str(flag).strip()
+    return pattern.replace("{irq}", irq)
+
+
 def switch_commands(intent: dict, rule_name: str) -> list:
     """给"开/关型"外设(IWDG / WWDG / CAN)生成命令:set mode <实例> <模式名> [set pin ...]。"""
     instance = str(intent.get("peripheral", "")).strip().upper()
@@ -338,8 +357,12 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
             planned[pin] = who
     notes = []
     commands = []
+    ioc_lines = []
     for intent in intents:
         result = apply_one(ioc_path, intent)
         notes.append(result["note"])
         commands.extend(result["commands"])
-    return {"notes": notes, "commands": commands}
+        line = interrupt_line(intent)
+        if line:
+            ioc_lines.append(line)
+    return {"notes": notes, "commands": commands, "ioc_lines": ioc_lines}
