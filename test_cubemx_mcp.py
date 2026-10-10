@@ -375,6 +375,16 @@ class TestHelp(unittest.TestCase):
         out = cubemx_mcp.cubemx_help(topic="bogus")
         self.assertIn("工具一览", out)
 
+    def test_help_guide_lists_every_registered_tool(self):
+        # help 自述必须覆盖 server 实际注册的每个工具(数量也要对),防止加了工具忘同步文档
+        import asyncio
+
+        names = [t.name for t in asyncio.run(cubemx_mcp.mcp.list_tools())]
+        guide = knowledge_loader.help_text()
+        self.assertIn(f"【工具一览({len(names)} 个)】", guide)
+        for name in names:
+            self.assertIn(name, guide)
+
     def test_missing_template_error_lists_available(self):
         # 请求不存在的芯片模板时,错误信息应列出可用模板并给自举指引
         with self.assertRaises(ValueError) as ctx:

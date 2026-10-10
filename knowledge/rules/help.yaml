@@ -1,6 +1,6 @@
 # cubemx_help 的返回值:工具与外设的使用说明
-# 逐字搬运自 cubemx_mcp.py 的 help 常量(2.2);改这里等于改 cubemx_help 的输出
-source: 逐字搬运自 cubemx_mcp.py 的 help 常量(_GUIDE / _NEW_PROJECT_HELP / _PERIPHERAL_HELP / _REMOVE_HELP / _ADDSOURCE_HELP)
+# 本文件是 cubemx_help 的唯一知识源(knowledge_loader 读取);改这里等于改 cubemx_help 的输出
+source: 本文件即来源 —— 0.4.4.1 起 help 文本由 knowledge_loader 直接读本 YAML;cubemx_mcp.py 里原有的硬编码 help 常量(_GUIDE 等)已删除
 guide: |-
   Vscode_cube_mcp — 封装 STM32CubeMX 命令行(-q)的 MCP server
   =============================================================
@@ -10,9 +10,11 @@ guide: |-
   **不生成应用业务代码**（LED 闪烁、OLED 显示内容、传感器驱动、中断处理逻辑等），
   这些请在生成后的工程里自行编写——配置到骨架为止，剩下是你的代码。
 
-  【工具一览(9 个)】
+  【工具一览(11 个)】
     cubemx_help                本指南(当前)
     cubemx_new_project         从零生成 HAL 工程(首选入口)
+    cubemx_intent              按"配置意图"改 .ioc(只说要什么,内部名查知识库;0.4.4.1 新增)
+    cubemx_probe               在 .ioc 副本上试跑命令并给出差异(收录新外设用;0.4.4.1 新增)
     cubemx_load                加载 .ioc 回读配置(只读)
     cubemx_configure           加载 .ioc,执行 set 命令序列并写回
     cubemx_generate            加载 .ioc 生成 HAL 代码

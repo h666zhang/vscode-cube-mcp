@@ -260,7 +260,8 @@ def cubemx_help(topic: str = "") -> str:
     可用 topic(大小写不敏感):
       new_project  从零生成工程的流程与参数
       templates    可用芯片模板列表与各自内容
-      gpio / i2c / tim / rcc / clock  外设配置命令与已知坑
+      gpio / i2c / tim / rcc(或 clock)  常用外设配置命令与已知坑
+      usart / spi / adc / can / rtc / iwdg / wwdg / dma / nvic  其余已收录外设与功能
       remove       移除外设
       add_source   自定义源文件加入 CMake 源列表
     """
