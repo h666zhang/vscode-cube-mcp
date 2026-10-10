@@ -56,6 +56,21 @@ def used_pins(ioc_path: str) -> dict:
     return out
 
 
+def read_key(ioc_path: str, key: str) -> str:
+    """读 .ioc 里某个键的原始值(如 RCC.APB2Freq_Value);没有该键或文件不可读时返回空串。"""
+    if not ioc_path or not key:
+        return ""
+    try:
+        with open(ioc_path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                head, sep, value = line.strip().partition("=")
+                if sep and head == key:
+                    return value
+    except OSError:
+        return ""
+    return ""
+
+
 def add_lines(ioc_path: str, lines) -> list:
     """把若干 .ioc 行插到 board=custom 之前(锚点和 TIM 注入一致)。
 

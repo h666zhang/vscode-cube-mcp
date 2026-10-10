@@ -137,14 +137,39 @@ def mcu_pins(mcu: str = "") -> dict:
     return data
 
 
-def pin_signals(pin: str, mcu: str = "") -> list:
-    """查某个引脚支持哪些信号(名字来自 CubeMX db,如 PA6 -> [..., TIM3_CH1, ...])。"""
+def resolve_pin_name(pin: str, mcu: str = "") -> str:
+    """把用户写的引脚名归一化成引脚表里的键(不猜:有歧义就报错)。
+
+    三级匹配:① 精确 ② 忽略大小写 ③ 唯一前缀别名(PA0 -> PA0-WKUP、PB4 -> PB4-NJTRST)。
+    这样意图里可以写硬件图上常见的短名(PA0),不必迁就 CubeMX 的长名。
+    """
     pins = mcu_pins(mcu).get("pins") or {}
-    item = pins.get(pin)
-    if item is None:
-        examples = ", ".join(sorted(pins)[:12])
-        raise ToolError("UNKNOWN_PIN_SIGNAL", f"{pin} 不在这颗芯片的引脚表里。引脚名示例: {examples} ...")
-    return list(item.get("signals") or [])
+    name = str(pin).strip()
+    if name in pins:
+        return name
+    upper = name.upper()
+    if upper in pins:
+        return upper
+    hits = sorted(k for k in pins if k.upper().startswith(upper + "-"))
+    examples = ", ".join(sorted(pins)[:12])
+    if len(hits) == 1:
+        return hits[0]
+    if hits:
+        raise ToolError(
+            "UNKNOWN_PIN_SIGNAL",
+            f"{name} 有多个候选引脚: {', '.join(hits)};请写全名。引脚名示例: {examples} ...",
+        )
+    raise ToolError("UNKNOWN_PIN_SIGNAL", f"{name} 不在这颗芯片的引脚表里。引脚名示例: {examples} ...")
+
+
+def pin_signals(pin: str, mcu: str = "") -> list:
+    """查某个引脚支持哪些信号(名字来自 CubeMX db,如 PA6 -> [..., TIM3_CH1, ...])。
+
+    引脚名支持别名(PA0 -> PA0-WKUP)与大小写,见 resolve_pin_name。
+    """
+    key = resolve_pin_name(pin, mcu)
+    pins = mcu_pins(mcu).get("pins") or {}
+    return list((pins.get(key) or {}).get("signals") or [])
 
 
 # ------------------------------------------------------------------ db 事实(ip/)

@@ -1,15 +1,20 @@
 # ADC:已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
 #
-# 实测方法:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
+# 第一轮实测:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
 #     set mode ADC1 IN0
 #     set pin PA0-WKUP ADC1_IN0
 # 结果是下面 ioc_result(探针差异:新增 12 行 / 修改 9 行)。
+#
+# 第二轮实测(ADCTest 工程):采样时间与 ADC 时钟分频 —— 两者都实测过,
+# 其中时钟分频是 generate 能否通过的必要条件(见 known_issues 第 1 条)。
 verified: true
-source: "探针实测 2026-10-10,CubeMX 6.18.0"
+source: "探针实测 2026-10-10(两轮),CubeMX 6.18.0"
 
 command_examples:
   - "set mode ADC1 IN0"
   - "set pin PA0-WKUP ADC1_IN0"
+  - "set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5"
+  - "set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6"
 
 ioc_result:
   - "PA0-WKUP.Locked=true"
@@ -23,11 +28,36 @@ ioc_result:
   - "ADC1.SamplingTime-0\\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5"
   - "ADC1.IPParameters=Rank-0\\#ChannelRegularConversion,Channel-0\\#ChannelRegularConversion,SamplingTime-0\\#ChannelRegularConversion,NbrOfConversionFlag,master"
 
+# 采样时间:意图字段 sampling_time 用这个模板渲染(命令已实测)
+sampling_time:
+  command: "set ip parameters {instance} SamplingTime-0#ChannelRegularConversion {value}"
+  example_value: ADC_SAMPLETIME_55CYCLES_5
+  # 55.5 周期 @12MHz ADCCLK ≈ 4.6us,等于标准外设库的 ADC_SampleTime_55Cycles5
+
+# ADC 时钟:配 ADC 时必须同时设预分频,否则 CubeMX 判定时钟参数非法,
+# generate 时弹 "Warning: Code Generation ... [Clock]" 对话框 → -q 下没人点 → 卡到超时。
+clock:
+  set_ip: RCC
+  parameter: ADCPresc
+  max_hz: 14000000                    # STM32F103 的 ADCCLK 上限 14MHz(参考手册)
+  pclk2_key: "RCC.APB2Freq_Value"     # 从 .ioc 读 PCLK2(ADC 挂在 APB2)
+  pclk2_default_hz: 72000000          # 读不到时按最小模板的 72MHz 估算
+  prescalers:                         # 取值 -> 相对 PCLK2 的分频比
+    RCC_ADCPCLK2_DIV2: 2
+    RCC_ADCPCLK2_DIV4: 4
+    RCC_ADCPCLK2_DIV6: 6
+    RCC_ADCPCLK2_DIV8: 8
+
 known_issues:
   - "引脚侧信号名是 ADCx_IN0(带 x 占位符,是 CubeMX 自己写的),但 set pin 命令里要写 ADC1_IN0"
   - "模式名是通道号:IN0 / IN1 / ...(PA0-WKUP->IN0、PA1->IN1、PA5->IN5)"
-  - "ADC 的键名里 # 要转义成 \\#(如 Channel-0\\#ChannelRegularConversion)"
-  - "默认采样时间 ADC_SAMPLETIME_1CYCLE_5;改采样时间/扫描/连续转换的写法都还没实测"
+  - "ADC 的键名里 # 要转义成 \\#(如 Channel-0\\#ChannelRegularConversion);但 set ip parameters 命令里直接写 # 即可"
+  - "默认采样时间 ADC_SAMPLETIME_1CYCLE_5;改采样时间用 set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion <枚举>(实测有效)"
+  - "**必须同时配 ADC 时钟**:72MHz PCLK2 下要用 RCC_ADCPCLK2_DIV6(12MHz ≤ 14MHz 上限)。不配时 generate 会弹 'Warning: Code Generation ... [Clock]' 对话框,-q 批处理没人点 → 进程卡死到 240s 超时(实测);被强杀的 CubeMX 进程还会残留,需手动 taskkill"
+  - "RCC.ADCFreqValue 由 CubeMX 在 generate 时重算:load/saveas 阶段即使设了 ADCPresc 也不会立刻变成 12000000,别当成命令没生效"
+  - "顺序:先 set mode / set pin 激活外设,再 set ip parameters 改参数;外设未激活时 set ip parameters 会被静默忽略"
+  - "所有外设生成 MHZ 时钟树自洽后 generate 才会静默通过;判定标准是 GUI 里 Main Config 没有标红的 [Clock]"
+  - "还没实测:多通道扫描(Rank-1/ NbrOfConversion>1)、连续转换、外部触发、ADC 中断"
 
 parameters_from_db:
   sampling_time:

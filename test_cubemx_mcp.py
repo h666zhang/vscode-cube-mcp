@@ -395,6 +395,85 @@ class TestHelp(unittest.TestCase):
         self.assertIn("cubemx_help", msg)
 
 
+class TestPinAlias(unittest.TestCase):
+    """引脚别名:意图里可以写硬件图上的短名(PA0),工具归一化到引脚表的键。"""
+
+    def test_exact_and_case_insensitive(self):
+        self.assertEqual(knowledge_loader.resolve_pin_name("PA1"), "PA1")
+        self.assertEqual(knowledge_loader.resolve_pin_name("pa1"), "PA1")
+
+    def test_unique_prefix_alias(self):
+        # 引脚表里叫 PA0-WKUP,唯一候选时允许写短名
+        self.assertEqual(knowledge_loader.resolve_pin_name("PA0"), "PA0-WKUP")
+        self.assertEqual(knowledge_loader.resolve_pin_name("pa0-wkup"), "PA0-WKUP")
+
+    def test_alias_signals_resolve(self):
+        self.assertIn("ADC1_IN0", knowledge_loader.pin_signals("PA0"))
+
+    def test_unknown_pin_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            knowledge_loader.resolve_pin_name("PX9")
+        self.assertIn("UNKNOWN_PIN_SIGNAL", str(ctx.exception))
+
+
+class TestAdcIntent(unittest.TestCase):
+    """ADC 意图:自动补 ADC 时钟分频(缺它 CubeMX generate 会卡在 [Clock] 弹窗)。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self.root = tempfile.mkdtemp(prefix="adc_intent_")
+        self.ioc = os.path.join(self.root, "proj.ioc")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _seed(self, apb2: str = "72000000") -> None:
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("Mcu.Name=STM32F103C(8-B)Tx\nMcu.IPNb=1\nMcu.IP0=RCC\n")
+            f.write(f"RCC.APB2Freq_Value={apb2}\n")
+            f.write("Mcu.Pin0=PA13\nPA13.Signal=SYS_JTMS-SWDIO\n")
+
+    def test_short_pin_name_and_clock_prescaler(self):
+        self._seed()
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0"}])
+        joined = "; ".join(plan["commands"])
+        self.assertIn("set mode ADC1 IN0", joined)
+        self.assertIn("set pin PA0-WKUP ADC1_IN0", joined)  # 短名归一化
+        # 72MHz PCLK2:/2=36、/4=18 都超 14MHz 上限 -> 选 DIV6(12MHz)
+        self.assertIn("set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6", joined)
+
+    def test_clock_prescaler_follows_apb2(self):
+        self._seed(apb2="24000000")
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA1"}])
+        # 24MHz:/2=12 已合法 -> 用最小分频
+        self.assertIn("set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV2", "; ".join(plan["commands"]))
+
+    def test_explicit_clock_prescaler_wins(self):
+        self._seed()
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "adc_clock_div": "RCC_ADCPCLK2_DIV8"}]
+        )
+        self.assertIn("set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV8", "; ".join(plan["commands"]))
+
+    def test_bad_clock_prescaler_rejected(self):
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(
+                self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "adc_clock_div": "RCC_ADCPCLK2_DIV3"}]
+            )
+        self.assertIn("BAD_ARGUMENT", str(ctx.exception))
+
+    def test_sampling_time_field(self):
+        self._seed()
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "sampling_time": "ADC_SAMPLETIME_55CYCLES_5"}]
+        )
+        self.assertIn(
+            "set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5",
+            "; ".join(plan["commands"]),
+        )
+
+
 # 薄种子 + TIM 内部时钟片段注入测试(0.4.0)
 SEED_IOC = """#MicroXplorer Configuration settings - do not modify
 File.Version=6

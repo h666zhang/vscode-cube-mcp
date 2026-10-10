@@ -147,11 +147,18 @@ peripheral:
     - 引脚侧的 Mode 也写 SPI 的模式名(PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种。
     - 默认 BaudRatePrescaler=2 -> 36 MBits/s。
   adc: |-
-    【ADC(探针实测 2026-10-10)】
+    【ADC(探针实测 2026-10-10,含时钟坑)】
     - 命令:set mode ADC1 IN0;set pin PA0-WKUP ADC1_IN0
     - 模式名就是通道号:PA0-WKUP->IN0、PA1->IN1、PA5->IN5。
+    - 引脚可以写短名:cubemx_intent 里写 "PA0" 会自动归一化成 PA0-WKUP(大小写也不敏感)。
     - CubeMX 写回 .ioc 时引脚信号名是 ADCx_IN0(带 x 占位符),但命令里要写 ADC1_IN0。
-    - 默认采样时间 ADC_SAMPLETIME_1CYCLE_5。
+    - 采样时间(默认 ADC_SAMPLETIME_1CYCLE_5;意图里给 sampling_time 即可改):
+      set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5
+    - **必配 ADC 时钟**:不配的话 generate 会弹 "Warning: Code Generation ... [Clock]"
+      对话框,-q 批处理没人点 → 进程卡死到超时。72MHz PCLK2 下用:
+      set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6   (12MHz ≤ F103 上限 14MHz)
+      cubemx_intent 配 ADC 时会按 .ioc 里的 APB2 频率自动补这一条。
+    - 还没实测:多通道扫描、连续转换、外部触发、ADC 中断。
   can: |-
     【CAN(探针实测 2026-10-10)】
     - 命令:set mode CAN CAN_Activate;set pin PA11 CAN_RX / set pin PA12 CAN_TX

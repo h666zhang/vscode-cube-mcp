@@ -199,22 +199,81 @@ def spi_commands(intent: dict) -> list:
     return commands
 
 
-def adc_commands(intent: dict) -> list:
+def _read_int(text: str, default) -> int:
+    """把 .ioc 里读到的值转成整数;读不到或不合法时用默认值。"""
+    try:
+        return int(str(text).strip())
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def adc_clock_command(intent: dict, ioc_path: str) -> str:
+    """ADC 预分频命令 —— 缺它必踩的坑:CubeMX 判定时钟参数非法,generate 时弹
+    "Warning: Code Generation ... [Clock]" 对话框;-q 批处理下没人点,进程卡到超时。
+
+    依据 knowledge/rules/adc.yaml 的 clock 段(上限 / 候选分频 / PCLK2 键名),
+    从 .ioc 读当前 APB2 频率,选满足 ADCCLK ≤ 上限的最小分频。
+    意图里给 adc_clock_div 可显式覆盖(默认值而非强制);yaml 没有 clock 段则返回空串。
+    """
+    clock = knowledge_loader.require_rule_verified("adc").get("clock") or {}
+    prescalers = clock.get("prescalers") or {}
+    if not prescalers:
+        return ""
+    explicit = str(intent.get("adc_clock_div", "")).strip()
+    if explicit:
+        if explicit not in prescalers:
+            raise ToolError(
+                "BAD_ARGUMENT",
+                f"adc_clock_div 只能写 {', '.join(sorted(prescalers))};收到 {explicit!r}",
+            )
+        chosen = explicit
+    else:
+        max_hz = int(clock.get("max_hz") or 0)
+        pclk2 = _read_int(
+            ioc_editor.read_key(ioc_path, clock.get("pclk2_key", "")), clock.get("pclk2_default_hz", 72000000)
+        )
+        chosen = ""
+        for name, div in sorted(prescalers.items(), key=lambda kv: int(kv[1])):
+            if max_hz and pclk2 / int(div) > max_hz:
+                continue
+            chosen = name
+            break
+        if not chosen:  # 理论上到不了:候选里最大的分频仍超限,退到最大分频
+            chosen = max(prescalers, key=lambda k: int(prescalers[k]))
+    return f"set ip parameters {clock.get('set_ip', 'RCC')} {clock.get('parameter', 'ADCPresc')} {chosen}"
+
+
+def adc_commands(intent: dict, ioc_path: str = "") -> list:
     """ADC 走 set 命令(实测:set mode ADC1 IN0 + set pin PA0-WKUP ADC1_IN0 有效)。
 
     通道号从引脚表查:PA0-WKUP 支持 ADC1_IN0 -> 通道 0 -> 模式名 IN0。
+    引脚可写短名(PA0 会自动归一化成 PA0-WKUP)。
+    另外自动补两件实测过的必做项(见 knowledge/rules/adc.yaml):
+      ① ADC 时钟分频 —— 不补会让 generate 卡在弹窗;
+      ② 采样时间 —— 只在意图给了 sampling_time 时写,否则交给 CubeMX 默认值。
     """
     instance = str(intent.get("peripheral", "")).strip().upper()
     knowledge_loader.require_rule_verified("adc")
-    pin = str(intent.get("pin", "")).strip()
-    if not pin:
-        raise ToolError("BAD_ARGUMENT", f"{instance} 意图需要 pin(如 PA0-WKUP)")
+    raw_pin = str(intent.get("pin", "")).strip()
+    if not raw_pin:
+        raise ToolError("BAD_ARGUMENT", f"{instance} 意图需要 pin(如 PA0-WKUP 或 PA0)")
+    pin = knowledge_loader.resolve_pin_name(raw_pin)
     signals = knowledge_loader.pin_signals(pin)
     hits = [s for s in signals if s.startswith(f"{instance}_IN")]
     if not hits:
         raise ToolError("UNKNOWN_PIN_SIGNAL", f"{pin} 上没有 {instance} 的输入通道;这个引脚支持: {', '.join(signals)}")
     channel = hits[0].rsplit("_IN", 1)[-1]
-    return [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
+    commands = [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
+    sampling = str(intent.get("sampling_time", "")).strip()
+    if sampling:
+        tpl = (knowledge_loader.require_rule_verified("adc").get("sampling_time") or {}).get("command") or ""
+        if not tpl:
+            raise ToolError("UNKNOWN_PARAM", "knowledge/rules/adc.yaml 里没有 sampling_time.command,写不了采样时间")
+        commands.append(tpl.format(instance=instance, value=sampling))
+    clock = adc_clock_command(intent, ioc_path)
+    if clock:
+        commands.append(clock)
+    return commands
 
 
 def interrupt_line(intent: dict) -> str:
@@ -254,12 +313,12 @@ def switch_commands(intent: dict, rule_name: str) -> list:
 
 
 def intent_pins(intent: dict) -> list:
-    """这个意图会用到哪些引脚(用于冲突检测)。"""
+    """这个意图会用到哪些引脚(用于冲突检测)。引脚名归一化:PA0 -> PA0-WKUP。"""
     pins = []
     if intent.get("pin"):
         pins.append(str(intent["pin"]).strip())
     pins.extend(str(p).strip() for p in (intent.get("pins") or []) if str(p).strip())
-    return pins
+    return [knowledge_loader.resolve_pin_name(p) for p in pins]
 
 
 def _apply_tim(ioc_path: str, instance: str, intent: dict) -> dict:
@@ -275,9 +334,10 @@ def _apply_tim(ioc_path: str, instance: str, intent: dict) -> dict:
         return {"note": note, "commands": []}
     if mode not in ("pwm", "input_capture"):
         raise ToolError("UNKNOWN_PARAM", f"意图层还不支持 TIM 的 {mode}(已收录: pwm / input_capture / internal_clock)")
-    pin = str(intent.get("pin", "")).strip()
-    if not pin:
+    raw_pin = str(intent.get("pin", "")).strip()
+    if not raw_pin:
         raise ToolError("BAD_ARGUMENT", f"{instance} 的 {mode} 需要 pin(如 PA6)")
+    pin = knowledge_loader.resolve_pin_name(raw_pin)  # PA0 -> PA0-WKUP 这类别名
     channel = find_channel(instance, pin)
     signal = ioc_signal_name(instance, channel)
     params = tim_params(mode, intent)
@@ -320,7 +380,7 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
         commands = spi_commands(intent)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     if re.fullmatch(r"ADC\d+", peripheral):
-        commands = adc_commands(intent)
+        commands = adc_commands(intent, ioc_path)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     if peripheral in ("IWDG", "WWDG"):
         commands = switch_commands(intent, peripheral.lower())
