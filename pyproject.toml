@@ -45,12 +45,13 @@ py-modules = ["cubemx_mcp", "cubemx_result", "intent_resolver", "ioc_diff", "ioc
     "AGENTS.md",
 ]
 # knowledge/ 知识库必须随包分发(cubemx_help / cubemx_intent 都依赖它)
-"knowledge" = [
-    "knowledge/meta.yaml",
-    "knowledge/mcu/*.yaml",
-    "knowledge/ip/*.yaml",
-    "knowledge/rules/*.yaml",
-]
+# 注意:这里的 key 是"装到哪个目录",所以必须按子目录分别写 ——
+# 全写成 "knowledge" 会把子目录展平(装完变成 knowledge/tim.yaml),
+# 那样 knowledge_loader 就找不到 knowledge/rules/*.yaml 了。
+"knowledge" = ["knowledge/meta.yaml"]
+"knowledge/mcu" = ["knowledge/mcu/*.yaml"]
+"knowledge/ip" = ["knowledge/ip/*.yaml"]
+"knowledge/rules" = ["knowledge/rules/*.yaml"]
 
 [tool.pytest.ini_options]
 # 覆盖率门槛:核心逻辑 <80% 视为失败(本地与 CI 同一配置)
