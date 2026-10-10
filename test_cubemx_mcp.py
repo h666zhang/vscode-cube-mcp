@@ -1060,7 +1060,7 @@ class TestKnowledgeLoader(unittest.TestCase):
 
     def test_unknown_peripheral_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            knowledge_loader.rule("can")
+            knowledge_loader.rule("no_such_peripheral")
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
     def test_unverified_rule_blocked(self):
@@ -1276,7 +1276,7 @@ class TestIntentResolver(unittest.TestCase):
 
     def test_unsupported_peripheral_rejected(self):
         with self.assertRaises(ValueError) as ctx:
-            intent_resolver.apply_intents(self.ioc, [{"peripheral": "CAN", "pin": "PA11"}])
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "FOO1"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
 
     def test_unknown_tim_mode_rejected(self):
@@ -1311,8 +1311,27 @@ class TestIntentResolver(unittest.TestCase):
     def test_cubemx_intent_rejects_unsupported_peripheral(self):
         with mock.patch.object(cubemx_mcp, "ALLOWED_ROOTS", [self._td.name]):
             with self.assertRaises(ValueError) as ctx:
-                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "CAN", "pin": "PA11"}])
+                cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "FOO1"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+
+    def test_iwdg_wwdg_can_commands(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc,
+            [
+                {"peripheral": "IWDG"},
+                {"peripheral": "WWDG"},
+                {"peripheral": "CAN", "pins": ["PA11", "PA12"]},
+            ],
+        )
+        self.assertIn("set mode IWDG IWDG_Activate", plan["commands"])
+        self.assertIn("set mode WWDG WWDG_Activate", plan["commands"])
+        self.assertIn("set mode CAN CAN_Activate", plan["commands"])
+        self.assertIn("set pin PA11 CAN_RX", plan["commands"])
+        self.assertIn("set pin PA12 CAN_TX", plan["commands"])
+
+    def test_nvic_rule_is_unverified(self):
+        # 中断的脚本写法没找到(knowledge/rules/nvic.yaml 记着试过哪三种)
+        self.assertFalse(knowledge_loader.rule("nvic").get("verified"))
 
     def test_spi_intent_commands(self):
         plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]}])

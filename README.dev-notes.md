@@ -419,6 +419,12 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
   `S_TIM2_CH1_ETR:TIM2` —— PA0 的组合名 `S_TIM2_CH1_ETR` 就是这么来的,**不用猜**;
 - `verified: false` 的规则会被拒绝执行(防幻觉闸门);`source` 记着这条规则的实测日期与 CubeMX 版本。
 
+> **技巧:CubeMX 认哪些脚本命令,可以直接问它** —— `cubemx_script("help")` 会列出全部命令。
+> 实测(6.18)给出的 `set` 子命令是:`mode` / `username` / `pin` / `pinreservation` / `gpio` /
+> `ip` / `AllIpInContext` / `context*` / `noparam` / `userconst` / `bsp` / `tpl_path` / `dest_path` ——
+> **里面没有 DMA,也没有中断相关项**,这正是 DMA 与 NVIC 脚本配不了的原因(见 `rules/dma.yaml`、`rules/nvic.yaml`)。
+> 另外 `help` 里的 `possible_value ip` 可以查某个 IP 的合法取值。
+
 ## 加一个外设的 SOP
 
 1. **先探针**:把猜的命令写出来,`cubemx_probe` 在模板副本上跑一遍,看 `ioc_diff` 给出的真实差异;

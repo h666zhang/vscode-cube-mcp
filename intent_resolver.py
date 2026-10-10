@@ -217,6 +217,22 @@ def adc_commands(intent: dict) -> list:
     return [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
 
 
+def switch_commands(intent: dict, rule_name: str) -> list:
+    """给"开/关型"外设(IWDG / WWDG / CAN)生成命令:set mode <实例> <模式名> [set pin ...]。"""
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    rules = knowledge_loader.require_rule_verified(rule_name)
+    modes = rules.get("modes") or {}
+    role = str(intent.get("mode", "activate")).strip().lower()
+    mode = modes.get(role, "")
+    if not mode:
+        raise ToolError("UNKNOWN_PARAM", f"{rule_name} 的 mode 要写其中之一: {', '.join(sorted(modes))}")
+    commands = [f"set mode {instance} {mode}"]
+    pins = intent_pins(intent)
+    if pins:
+        commands.extend(_pin_commands(instance, pins))
+    return commands
+
+
 def intent_pins(intent: dict) -> list:
     """这个意图会用到哪些引脚(用于冲突检测)。"""
     pins = []
@@ -286,10 +302,17 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
     if re.fullmatch(r"ADC\d+", peripheral):
         commands = adc_commands(intent)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if peripheral in ("IWDG", "WWDG"):
+        commands = switch_commands(intent, peripheral.lower())
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+    if re.fullmatch(r"CAN\d*", peripheral):
+        commands = switch_commands(intent, "can")
+        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     raise ToolError(
         "UNKNOWN_PERIPHERAL",
         f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,"
-        f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx)。DMA 暂不支持,原因见 knowledge/rules/dma.yaml",
+        f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx / IWDG / WWDG / CAN)。"
+        f"DMA 与 NVIC 中断脚本配不了,原因见 knowledge/rules/dma.yaml 与 nvic.yaml",
     )
 
 

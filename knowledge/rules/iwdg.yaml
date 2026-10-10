@@ -1,0 +1,27 @@
+# IWDG(独立看门狗):已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测:set mode IWDG IWDG_Activate -> 写进下面两行(探针差异:新增 4 行 / 修改 7 行)。
+# 注意它是"虚拟引脚(VP_)"表达,和 TIM 内部时钟一个套路。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+modes:
+  activate: IWDG_Activate
+
+command_examples:
+  - "set mode IWDG IWDG_Activate"
+
+ioc_result:
+  - "Mcu.IP3=IWDG"
+  - "VP_IWDG_VS_IWDG.Mode=IWDG_Activate"
+  - "VP_IWDG_VS_IWDG.Signal=IWDG_VS_IWDG"
+
+known_issues:
+  - "不需要引脚,写的是虚拟引脚 VP_IWDG_VS_IWDG(CubeMX 自己生成的)"
+  - "Prescaler / Reload 的写法还没实测;默认值见 parameters_from_db"
+
+parameters_from_db:
+  prescaler:
+    key: "IWDG.Prescaler"
+  reload:
+    key: "IWDG.Reload"

@@ -1,0 +1,41 @@
+# CAN(bxCAN):已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测方法:在 templates/STM32F103C8T6.ioc 的副本上(基线只读)跑
+#     set mode CAN CAN_Activate
+#     set pin PA11 CAN_RX / set pin PA12 CAN_TX
+# 结果是下面 ioc_result(探针差异:新增 13 行 / 修改 9 行)。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+modes:
+  activate: CAN_Activate
+
+command_examples:
+  - "set mode CAN CAN_Activate"
+  - "set pin PA11 CAN_RX"
+  - "set pin PA12 CAN_TX"
+
+ioc_result:
+  - "PA11.Locked=true"
+  - "PA11.Mode=CAN_Activate"
+  - "PA11.Signal=CAN_RX"
+  - "PA12.Locked=true"
+  - "PA12.Mode=CAN_Activate"
+  - "PA12.Signal=CAN_TX"
+  - "CAN.CalculateBaudRate=749999"
+  - "CAN.CalculateTimeBit=1333"
+  - "CAN.CalculateTimeQuantum=444.44444444444446"
+  - "CAN.IPParameters=CalculateTimeQuantum,CalculateTimeBit,CalculateBaudRate"
+
+known_issues:
+  - "实例名是 CAN(不是 CAN1):STM32F103C8T6 只有一个 bxCAN"
+  - "默认波特率算出来是 749999 bit/s(CubeMX 自己算的);Prescaler/SJW/BS1/BS2 的写法还没实测"
+  - "不像 USART 那样在 set mode 里带实例号,命令就是 set mode CAN CAN_Activate"
+
+parameters_from_db:
+  prescaler:
+    key: "CAN.Prescaler"
+  bs1:
+    key: "CAN.BS1"
+  bs2:
+    key: "CAN.BS2"

@@ -1,0 +1,28 @@
+# WWDG(窗口看门狗):已用探针实测(CubeMX 6.18.0,STM32F103C8T6)
+#
+# 实测:set mode WWDG WWDG_Activate -> 写进下面两行(探针差异:新增 4 行 / 修改 3 行)。
+verified: true
+source: "探针实测 2026-10-10,CubeMX 6.18.0"
+
+modes:
+  activate: WWDG_Activate
+
+command_examples:
+  - "set mode WWDG WWDG_Activate"
+
+ioc_result:
+  - "Mcu.IP3=WWDG"
+  - "VP_WWDG_VS_WWDG.Mode=WWDG_Activate"
+  - "VP_WWDG_VS_WWDG.Signal=WWDG_VS_WWDG"
+
+known_issues:
+  - "和 IWDG 一样用虚拟引脚表达"
+  - "WWDG 中断(EWIMode)与窗口值的写法还没实测"
+
+parameters_from_db:
+  prescaler:
+    key: "WWDG.Prescaler"
+  window:
+    key: "WWDG.Window"
+  counter:
+    key: "WWDG.Counter"

@@ -1,0 +1,32 @@
+# NVIC(中断):脚本 set 写法**没找到**;但直接写 .ioc 键是可行的
+#
+# 探针实测(2026-10-10,CubeMX 6.18.0):下面三种写法都**没有**写进 .ioc(差异里没有 NVIC.* 行):
+#     set ip parameters NVIC USART2_IRQn true:0:0:false:false:true:true:true:true
+#     set ip parameters NVIC USART2_IRQn true
+#     set ip parameters NVIC IRQn USART2_IRQn
+# 结合 `help` 给出的命令表(CubeMX 自己列的 set 子命令里没有中断相关项),
+# 判断:**脚本接口配不了中断**。
+verified: false
+source: "探针实测 2026-10-10,CubeMX 6.18.0(三种 set 写法都没生效)"
+
+tried:
+  - "set ip parameters NVIC USART2_IRQn true:0:0:false:false:true:true:true:true -> 没写进 .ioc"
+  - "set ip parameters NVIC USART2_IRQn true -> 没写进 .ioc"
+  - "set ip parameters NVIC IRQn USART2_IRQn -> 没写进 .ioc"
+
+ioc_key:
+  # 但直接往 .ioc 里写这一行是可行的 —— TIM 的内部时钟/PWM/输入捕获注入就是这么干的,
+  # 而且集成测试(TestCubeMXIntegration)证明 CubeMX 认这种写法(见 ioc_editor.py)。
+  pattern: 'NVIC.{irq}_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true'
+  example: 'NVIC.TIM2_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true'
+
+todo:
+  - "给非 TIM 外设(如 USART2_IRQn)加中断时,可以照 TIM 的写法直接注入这一行,但要先探针实测确认"
+  - "搞清楚那串值的含义(实测看到的是 true:0:0:false:false:true:true:true:true)"
+
+parameters_from_db:
+  irqn:
+    key: "NVIC.{irq}_IRQn"
+  priority_group:
+    key: "NVIC.PriorityGroup"
+    default: NVIC_PRIORITYGROUP_4
