@@ -243,43 +243,122 @@ def adc_clock_command(intent: dict, ioc_path: str) -> str:
     return f"set ip parameters {clock.get('set_ip', 'RCC')} {clock.get('parameter', 'ADCPresc')} {chosen}"
 
 
-def adc_commands(intent: dict, ioc_path: str = "") -> list:
-    """ADC 走 set 命令(实测:set mode ADC1 IN0 + set pin PA0-WKUP ADC1_IN0 有效)。
+def _adc_channels(instance: str, intent: dict) -> list:
+    """解析 ADC 意图的通道:pin(单个)或 pins(多个,顺序即 Rank 顺序)。
 
-    通道号从引脚表查:PA0-WKUP 支持 ADC1_IN0 -> 通道 0 -> 模式名 IN0。
-    引脚可写短名(PA0 会自动归一化成 PA0-WKUP)。
-    另外自动补两件实测过的必做项(见 knowledge/rules/adc.yaml):
-      ① ADC 时钟分频 —— 不补会让 generate 卡在弹窗;
-      ② 采样时间 —— 只在意图给了 sampling_time 时写,否则交给 CubeMX 默认值。
+    返回 [(引脚归一化名, 信号名, 通道号), ...];引脚可写短名(PA0 -> PA0-WKUP)。
+    """
+    raw = []
+    if str(intent.get("pin", "")).strip():
+        raw.append(str(intent["pin"]).strip())
+    raw.extend(str(p).strip() for p in (intent.get("pins") or []) if str(p).strip())
+    if not raw:
+        raise ToolError("BAD_ARGUMENT", f'{instance} 意图需要 pin 或 pins(如 PA0 或 ["PA0", "PA1"])')
+    out = []
+    for name in raw:
+        pin = knowledge_loader.resolve_pin_name(name)
+        signals = knowledge_loader.pin_signals(pin)
+        hits = [s for s in signals if s.startswith(f"{instance}_IN")]
+        if not hits:
+            raise ToolError(
+                "UNKNOWN_PIN_SIGNAL", f"{pin} 上没有 {instance} 的输入通道;这个引脚支持: {', '.join(signals)}"
+            )
+        out.append((pin, hits[0], hits[0].rsplit("_IN", 1)[-1]))
+    return out
+
+
+def adc_commands(intent: dict, ioc_path: str = "") -> list:
+    """ADC 走 set 命令(全部实测,见 knowledge/rules/adc.yaml)。
+
+    意图字段(默认值而非强制):
+      pin / pins     单通道写 pin;多通道写 pins,顺序即 Rank 顺序。引脚可写短名 PA0
+      sampling_time  采样时间;多通道不给时用 db 默认值补齐各通道
+      continuous     连续转换(默认 False)
+      scan           扫描模式;多通道默认 True,单通道默认 False
+      trigger        外部触发源:简写 T2_TRGO 或完整枚举 ADC_EXTERNALTRIGCONV_T2_TRGO
+      adc_clock_div  ADC 预分频;默认按 .ioc 里的 APB2 频率自动选合法值
+      interrupt      写 true 时由上层注入 NVIC.ADC1_2_IRQn(见 adc.yaml 的 interrupt_irq)
+
+    实测要点:第 2 个通道起 `set mode INn` 只挂引脚、不写转换序列,必须补
+    NbrOfConversion + 每个通道一组 Rank-n / Channel-n / SamplingTime-n。
     """
     instance = str(intent.get("peripheral", "")).strip().upper()
-    knowledge_loader.require_rule_verified("adc")
-    raw_pin = str(intent.get("pin", "")).strip()
-    if not raw_pin:
-        raise ToolError("BAD_ARGUMENT", f"{instance} 意图需要 pin(如 PA0-WKUP 或 PA0)")
-    pin = knowledge_loader.resolve_pin_name(raw_pin)
-    signals = knowledge_loader.pin_signals(pin)
-    hits = [s for s in signals if s.startswith(f"{instance}_IN")]
-    if not hits:
-        raise ToolError("UNKNOWN_PIN_SIGNAL", f"{pin} 上没有 {instance} 的输入通道;这个引脚支持: {', '.join(signals)}")
-    channel = hits[0].rsplit("_IN", 1)[-1]
-    commands = [f"set mode {instance} IN{channel}", f"set pin {pin} {hits[0]}"]
-    sampling = str(intent.get("sampling_time", "")).strip()
-    if sampling:
-        tpl = (knowledge_loader.require_rule_verified("adc").get("sampling_time") or {}).get("command") or ""
+    rules = knowledge_loader.require_rule_verified("adc")
+    channels = _adc_channels(instance, intent)
+    db_default = ((rules.get("parameters_from_db") or {}).get("sampling_time") or {}).get("default", "")
+    sampling = str(intent.get("sampling_time", "")).strip() or str(db_default)
+    commands = []
+    for pin, signal, channel in channels:
+        commands += [f"set mode {instance} IN{channel}", f"set pin {pin} {signal}"]
+    if len(channels) > 1:
+        # 多通道:补转换序列(实测:set mode INn 不写 Rank-n)
+        commands.append(f"set ip parameters {instance} NbrOfConversion {len(channels)}")
+        for rank, (_pin, _signal, channel) in enumerate(channels[1:], start=1):
+            commands += [
+                f"set ip parameters {instance} Rank-{rank}#ChannelRegularConversion {rank + 1}",
+                f"set ip parameters {instance} Channel-{rank}#ChannelRegularConversion ADC_CHANNEL_{channel}",
+                f"set ip parameters {instance} SamplingTime-{rank}#ChannelRegularConversion {sampling}",
+            ]
+    if str(intent.get("sampling_time", "")).strip():
+        tpl = (rules.get("sampling_time") or {}).get("command") or ""
         if not tpl:
             raise ToolError("UNKNOWN_PARAM", "knowledge/rules/adc.yaml 里没有 sampling_time.command,写不了采样时间")
         commands.append(tpl.format(instance=instance, value=sampling))
+    want_scan = intent.get("scan")
+    if want_scan is None:
+        want_scan = len(channels) > 1
+    if want_scan:
+        commands.append(f"set ip parameters {instance} ScanConvMode ADC_SCAN_ENABLE")
+    if intent.get("continuous"):
+        commands.append(f"set ip parameters {instance} ContinuousConvMode ENABLE")
+    trigger = str(intent.get("trigger", "")).strip()
+    if trigger:
+        prefix = str(rules.get("trigger_prefix") or "ADC_EXTERNALTRIGCONV_")
+        value = trigger if trigger.upper().startswith("ADC_") else f"{prefix}{trigger.upper()}"
+        commands.append(f"set ip parameters {instance} ExternalTrigConv {value}")
     clock = adc_clock_command(intent, ioc_path)
     if clock:
         commands.append(clock)
     return commands
 
 
+# 实例名 -> 规则文件名(用来查该外设自己的默认中断向量名)
+_RULE_PATTERNS = (
+    (re.compile(r"ADC\d+"), "adc"),
+    (re.compile(r"USART\d+"), "usart"),
+    (re.compile(r"SPI\d+"), "spi"),
+    (re.compile(r"I2C\d+"), "i2c"),
+    (re.compile(r"TIM\d+"), "tim"),
+    (re.compile(r"CAN\d*"), "can"),
+    (re.compile(r"RTC"), "rtc"),
+    (re.compile(r"GPIO"), "gpio"),
+)
+
+
+def default_irq_name(instance: str) -> str:
+    """中断向量名:优先取规则文件里的 interrupt_irq,没有就用 {instance}_IRQn。
+
+    F103 上 ADC1/ADC2 共用一个向量(ADC1_2_IRQn),这类"实例名推导不出向量名"的情况
+    由 knowledge/rules/<外设>.yaml 的 interrupt_irq 声明,不靠猜。
+    """
+    for pattern, name in _RULE_PATTERNS:
+        if not pattern.fullmatch(instance):
+            continue
+        try:
+            irq = str(knowledge_loader.rule(name).get("interrupt_irq") or "").strip()
+        except ToolError:
+            irq = ""
+        if irq:
+            return irq
+        break
+    return f"{instance}_IRQn"
+
+
 def interrupt_line(intent: dict) -> str:
     """意图里带 interrupt 时,返回要注入的 NVIC 行(没有就返回空串)。
 
-    interrupt 可以写 true(用 `{实例}_IRQn`)或直接写中断名(如 I2C1_EV_IRQn)。
+    interrupt 可以写 true(用规则里的 interrupt_irq,否则 `{实例}_IRQn`)
+    或直接写中断名(如 I2C1_EV_IRQn)。
     行的形态取自 knowledge/rules/nvic.yaml —— 实测有效:注入后 generate,
     Core/Src/stm32f1xx_it.c 里会出现对应的 <IRQ>Handler。
     """
@@ -291,7 +370,7 @@ def interrupt_line(intent: dict) -> str:
     if not pattern:
         raise ToolError("UNKNOWN_PARAM", "knowledge/rules/nvic.yaml 里没有 ioc_key.pattern")
     instance = str(intent.get("peripheral", "")).strip().upper()
-    irq = f"{instance}_IRQn" if flag is True else str(flag).strip()
+    irq = default_irq_name(instance) if flag is True else str(flag).strip()
     return pattern.replace("{irq}", irq)
 
 
@@ -381,7 +460,13 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     if re.fullmatch(r"ADC\d+", peripheral):
         commands = adc_commands(intent, ioc_path)
-        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+        note = f"{peripheral} 用 set 命令配置: {'; '.join(commands)}"
+        if intent.get("trigger"):
+            note += (
+                "\n警告:外部触发要触发源外设自己配好(如 TIM2 的 TRGO 输出);"
+                "只设 ADC 的 ExternalTrigConv 会让 generate 卡死到超时(实测)"
+            )
+        return {"note": note, "commands": commands}
     if peripheral in ("IWDG", "WWDG"):
         commands = switch_commands(intent, peripheral.lower())
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}

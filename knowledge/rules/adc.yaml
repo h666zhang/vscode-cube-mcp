@@ -7,14 +7,27 @@
 #
 # 第二轮实测(ADCTest 工程):采样时间与 ADC 时钟分频 —— 两者都实测过,
 # 其中时钟分频是 generate 能否通过的必要条件(见 known_issues 第 1 条)。
+#
+# 第三轮实测(ADCTest2 工程副本,探针):多通道序列 / 连续转换 / 扫描模式 / 外部触发。
+# 第四轮(ADCTest3 工程,generate 回读):双通道+连续+EOC 中断全部生效;外部触发
+# 无配套 TIM2 TRGO 时会卡死(generate 超时),见 known_issues。
 verified: true
-source: "探针实测 2026-10-10(两轮),CubeMX 6.18.0"
+source: "探针实测 + generate 回读验证 2026-10-10,CubeMX 6.18.0"
 
 command_examples:
   - "set mode ADC1 IN0"
   - "set pin PA0-WKUP ADC1_IN0"
   - "set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5"
   - "set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6"
+  # 多通道:第 2 个通道起必须显式补序列(set mode INn 只挂引脚,不会写 Rank-n)
+  - "set ip parameters ADC1 NbrOfConversion 2"
+  - "set ip parameters ADC1 Rank-1#ChannelRegularConversion 2"
+  - "set ip parameters ADC1 Channel-1#ChannelRegularConversion ADC_CHANNEL_1"
+  - "set ip parameters ADC1 SamplingTime-1#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5"
+  # 连续转换 / 扫描模式 / 外部触发
+  - "set ip parameters ADC1 ContinuousConvMode ENABLE"
+  - "set ip parameters ADC1 ScanConvMode ADC_SCAN_ENABLE"
+  - "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T2_TRGO"
 
 ioc_result:
   - "PA0-WKUP.Locked=true"
@@ -48,6 +61,13 @@ clock:
     RCC_ADCPCLK2_DIV6: 6
     RCC_ADCPCLK2_DIV8: 8
 
+# 中断:F103 上 ADC1/ADC2 共用一个中断向量,脚本配不了,靠注入 NVIC 键(见 rules/nvic.yaml)。
+# cubemx_intent 里写 {"interrupt": true} 时用的就是这个中断名。
+interrupt_irq: ADC1_2_IRQn
+
+# 外部触发:意图里可写简写(如 T2_TRGO),补成 ADC_EXTERNALTRIGCONV_T2_TRGO
+trigger_prefix: ADC_EXTERNALTRIGCONV_
+
 known_issues:
   - "引脚侧信号名是 ADCx_IN0(带 x 占位符,是 CubeMX 自己写的),但 set pin 命令里要写 ADC1_IN0"
   - "模式名是通道号:IN0 / IN1 / ...(PA0-WKUP->IN0、PA1->IN1、PA5->IN5)"
@@ -57,7 +77,14 @@ known_issues:
   - "RCC.ADCFreqValue 由 CubeMX 在 generate 时重算:load/saveas 阶段即使设了 ADCPresc 也不会立刻变成 12000000,别当成命令没生效"
   - "顺序:先 set mode / set pin 激活外设,再 set ip parameters 改参数;外设未激活时 set ip parameters 会被静默忽略"
   - "所有外设生成 MHZ 时钟树自洽后 generate 才会静默通过;判定标准是 GUI 里 Main Config 没有标红的 [Clock]"
-  - "还没实测:多通道扫描(Rank-1/ NbrOfConversion>1)、连续转换、外部触发、ADC 中断"
+  - "多通道(实测):set mode ADC1 IN1 + set pin PA1 ADC1_IN1 只把引脚挂上,**不会**写出 Rank-1 序列;必须再补 NbrOfConversion + 每个通道一组 Rank-n#ChannelRegularConversion / Channel-n#ChannelRegularConversion / SamplingTime-n#ChannelRegularConversion"
+  - "连续转换 ContinuousConvMode ENABLE、扫描 ScanConvMode ADC_SCAN_ENABLE 均实测写入成功(取名:scan 用 ADC_SCAN_ENABLE,continuous 用 ENABLE)"
+  - "generate 回读验证(ADCTest3,双通道+连续+中断):adc.c 里 NbrOfConversion=2、ScanConvMode=ADC_SCAN_ENABLE、ContinuousConvMode=ENABLE;两次 HAL_ADC_ConfigChannel 分别配 ADC_CHANNEL_0 / ADC_CHANNEL_1;注入 NVIC.ADC1_2_IRQn 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler 并调 HAL_ADC_IRQHandler"
+  - "ScanConvMode 不必手写:.ioc 里不保留这一行(saveas 时被清理),但 CubeMX 在 NbrOfConversion>1 时会自动生成 ADC_SCAN_ENABLE —— 写了也没坏处,只是冗余"
+  - "**外部触发必须配套触发源**:只把 ExternalTrigConv 设成 ADC_EXTERNALTRIGCONV_T2_TRGO、而 TIM2 没配 TRGO 输出时,generate 会卡死到 240s 超时(实测)。要用外部触发,先用 TIM 把触发源配好(MasterConfig/TRGO),再设 ADC 的 ExternalTrigConv"
+  - "db 导出的 NbrOfConversion 写着 max: '1',那是 XML 里 Visible=false 的那份定义;真正可见的定义是 Max=16,实测能设 2 —— 别被 parameters_from_db 的 max 误导"
+  - "中断:注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler"
+  - "还没实测:注入通道(InjectedConv)、模拟看门狗、DMA 搬运 ADC 数据(DMA 本身脚本配不了)"
 
 parameters_from_db:
   sampling_time:

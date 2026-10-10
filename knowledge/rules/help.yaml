@@ -147,18 +147,23 @@ peripheral:
     - 引脚侧的 Mode 也写 SPI 的模式名(PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种。
     - 默认 BaudRatePrescaler=2 -> 36 MBits/s。
   adc: |-
-    【ADC(探针实测 2026-10-10,含时钟坑)】
+    【ADC(实测 + generate 回读验证 2026-10-10)】
+    - 意图字段(默认值而非强制):pin / pins(多通道) / sampling_time / continuous /
+      scan / trigger / adc_clock_div / interrupt
     - 命令:set mode ADC1 IN0;set pin PA0-WKUP ADC1_IN0
-    - 模式名就是通道号:PA0-WKUP->IN0、PA1->IN1、PA5->IN5。
-    - 引脚可以写短名:cubemx_intent 里写 "PA0" 会自动归一化成 PA0-WKUP(大小写也不敏感)。
-    - CubeMX 写回 .ioc 时引脚信号名是 ADCx_IN0(带 x 占位符),但命令里要写 ADC1_IN0。
-    - 采样时间(默认 ADC_SAMPLETIME_1CYCLE_5;意图里给 sampling_time 即可改):
-      set ip parameters ADC1 SamplingTime-0#ChannelRegularConversion ADC_SAMPLETIME_55CYCLES_5
-    - **必配 ADC 时钟**:不配的话 generate 会弹 "Warning: Code Generation ... [Clock]"
-      对话框,-q 批处理没人点 → 进程卡死到超时。72MHz PCLK2 下用:
-      set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6   (12MHz ≤ F103 上限 14MHz)
-      cubemx_intent 配 ADC 时会按 .ioc 里的 APB2 频率自动补这一条。
-    - 还没实测:多通道扫描、连续转换、外部触发、ADC 中断。
+    - 模式名就是通道号:PA0-WKUP->IN0、PA1->IN1、PA5->IN5;引脚可写短名 PA0(自动归一化)。
+    - 多通道(实测):pins 顺序即 Rank 顺序,工具自动补 NbrOfConversion + 每个通道一组
+      Rank-n / Channel-n / SamplingTime-n(set mode INn 本身不写转换序列)。
+    - 采样时间:sampling_time="ADC_SAMPLETIME_55CYCLES_5"(默认 1.5 周期)。
+    - **必配 ADC 时钟**:不配 generate 会弹 [Clock] 对话框把 -q 批处理卡死;72MHz PCLK2 下
+      用 RCC_ADCPCLK2_DIV6(12MHz ≤ F103 的 14MHz 上限)。工具按 .ioc 的 APB2 频率自动补。
+    - 连续/扫描:continuous=True、scan=True(多通道默认开);ScanConvMode 由 CubeMX 按
+      NbrOfConversion 自己推导,.ioc 里不保留该行。
+    - 中断:写 interrupt=true → 注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),
+      generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler。
+    - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
+      generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
+    - 还没实测:注入通道(InjectedConv)、模拟看门狗。
   can: |-
     【CAN(探针实测 2026-10-10)】
     - 命令:set mode CAN CAN_Activate;set pin PA11 CAN_RX / set pin PA12 CAN_TX

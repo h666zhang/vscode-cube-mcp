@@ -473,6 +473,61 @@ class TestAdcIntent(unittest.TestCase):
             "; ".join(plan["commands"]),
         )
 
+    def test_multichannel_sequence(self):
+        # 多通道:pins 顺序即 Rank 顺序;第 2 个通道起必须补 Rank/Channel/SamplingTime
+        self._seed()
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pins": ["PA0", "PA1"]}])
+        joined = "; ".join(plan["commands"])
+        for want in (
+            "set mode ADC1 IN0",
+            "set mode ADC1 IN1",
+            "set pin PA0-WKUP ADC1_IN0",
+            "set pin PA1 ADC1_IN1",
+            "set ip parameters ADC1 NbrOfConversion 2",
+            "set ip parameters ADC1 Rank-1#ChannelRegularConversion 2",
+            "set ip parameters ADC1 Channel-1#ChannelRegularConversion ADC_CHANNEL_1",
+            "set ip parameters ADC1 SamplingTime-1#ChannelRegularConversion ADC_SAMPLETIME_1CYCLE_5",
+            "set ip parameters ADC1 ScanConvMode ADC_SCAN_ENABLE",  # 多通道默认开扫描
+        ):
+            self.assertIn(want, joined)
+
+    def test_continuous_and_trigger(self):
+        self._seed()
+        plan = intent_resolver.apply_intents(
+            self.ioc,
+            [{"peripheral": "ADC1", "pin": "PA0", "continuous": True, "trigger": "T2_TRGO", "scan": False}],
+        )
+        joined = "; ".join(plan["commands"])
+        self.assertIn("set ip parameters ADC1 ContinuousConvMode ENABLE", joined)
+        self.assertIn("set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T2_TRGO", joined)
+        self.assertNotIn("ScanConvMode", joined)  # 单通道 + 显式 scan=False -> 不写
+
+    def test_full_trigger_enum_passthrough(self):
+        # 已经写全枚举时不重复加前缀
+        self._seed()
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "trigger": "ADC_EXTERNALTRIGCONV_T1_CC1"}]
+        )
+        self.assertIn(
+            "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T1_CC1", "; ".join(plan["commands"])
+        )
+
+    def test_interrupt_uses_shared_adc_vector(self):
+        # F103 上 ADC1/ADC2 共用一个向量:interrupt=true 要用 ADC1_2_IRQn,不是 ADC1_IRQn
+        self._seed()
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "interrupt": True}])
+        self.assertTrue(any("NVIC.ADC1_2_IRQn" in line for line in plan["ioc_lines"]), plan["ioc_lines"])
+
+    def test_default_irq_name(self):
+        self.assertEqual(intent_resolver.default_irq_name("ADC1"), "ADC1_2_IRQn")
+        self.assertEqual(intent_resolver.default_irq_name("USART2"), "USART2_IRQn")
+
+    def test_trigger_warns_about_trigger_source(self):
+        # 实测:只设 ADC 的 ExternalTrigConv、不配触发源外设 -> generate 卡死,所以要提示
+        self._seed()
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "trigger": "T2_TRGO"}])
+        self.assertTrue(any("触发源" in n for n in plan["notes"]), plan["notes"])
+
 
 # 薄种子 + TIM 内部时钟片段注入测试(0.4.0)
 SEED_IOC = """#MicroXplorer Configuration settings - do not modify

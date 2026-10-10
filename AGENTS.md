@@ -53,6 +53,14 @@
 - **USART(探针实测 2026-10-10)**:`set mode USARTx Asynchronous` 是有效的(和 TIM 的 `set mode TIMx`
   一律 KO 不同);BaudRate 等于 db 默认值 115200 时 CubeMX 不写出 `USARTx.BaudRate` 行 —— 探针里
   看不到不代表命令无效(换成 9600 就出现了)。详见 `knowledge/rules/usart.yaml`。
+- **ADC 时钟必配(generate 会被弹窗卡死)**:配 ADC 后必须把 ADC 时钟压到上限内(F103 是 14MHz;
+  72MHz PCLK2 下用 `RCC_ADCPCLK2_DIV6` = 12MHz),否则 CubeMX 判定时钟非法,generate 时弹
+  `Warning: Code Generation ... [Clock]` 对话框,`-q` 批处理没人点 → 卡到 240s 超时(强杀后
+  `javaw` 还会残留,要手动 taskkill)。`cubemx_intent` 配 ADC 时已按 `.ioc` 的 APB2 频率自动补。
+- **ADC 多通道 / 外部触发**:多通道用 `pins`(`set mode INn` 只挂引脚,转换序列靠
+  `NbrOfConversion` + `Rank-n`/`Channel-n`/`SamplingTime-n`,工具已自动补);**外部触发必须配套
+  触发源外设**(如 TIM2 的 TRGO 输出),只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死。
+  详见 `knowledge/rules/adc.yaml`。
 - **generate 覆盖 CMakeLists**:`cmake/stm32cubemx/CMakeLists.txt` 会被重新 generate 覆盖,自定义
   源文件需重新调 `cubemx_add_source` 加入(幂等)。
 - **模板必须 6.18 原生生成**:手写/非原生 .ioc 会被 6.18 拒绝。请求的芯片无模板时,报错会给出
@@ -60,7 +68,7 @@
 
 ## 开发 / 验证
 
-- 单元测试:`python -m unittest test_cubemx_mcp`(133 个,其中 5 个集成测试默认跳过;都不依赖 CubeMX)
+- 单元测试:`python -m unittest test_cubemx_mcp`(165 个,其中 5 个集成测试默认跳过;都不依赖 CubeMX)
 - 集成测试(真启动 CubeMX,每个用例约 10s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
 - 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 90%+)
 - 风格:`ruff check .` / `ruff format --check .`

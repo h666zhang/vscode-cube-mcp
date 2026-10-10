@@ -21,6 +21,30 @@
 - 测试 72 → 149(含 5 个集成测试);覆盖率按 6 个模块统计约 92.7%
 - 依赖:新增 `pyyaml>=6.0`
 
+### 实测补强(2026-10-10)
+
+- **`cubemx_help` 自述修正**:工具一览 9 → 11(此前漏了 `cubemx_intent` / `cubemx_probe`),
+  docstring 的 topic 列表补齐;新增"help 必须覆盖所有已注册工具"的回归测试
+- **ADC 完整化**:意图层支持多通道(`pins` 顺序即 Rank 顺序,自动补 `NbrOfConversion` +
+  每个通道的 `Rank-n` / `Channel-n` / `SamplingTime-n`)、连续转换(`continuous`)、
+  扫描(`scan`,多通道默认开)、外部触发(`trigger`,简写 `T2_TRGO` 自动补前缀)、
+  采样时间(`sampling_time`)与 EOC 中断(`interrupt`)
+- **ADC 时钟自动分频(重要坑)**:配 ADC 时按 `.ioc` 里的 APB2 频率自动选合法预分频并写
+  `RCC.ADCPresc`。不配的话 ADC 时钟 36MHz 超 F103 的 14MHz 上限,CubeMX 会弹
+  `Warning: Code Generation ... [Clock]` 对话框,`-q` 批处理没人点 → generate 卡死到超时
+  (实测:强杀后 `javaw` 还会残留,需手动 taskkill)
+- **引脚别名容错**:`PA0` / 小写写法会自动归一化成引脚表里的 `PA0-WKUP`(唯一前缀匹配,
+  有歧义则报错不猜);TIM / I2C / SPI / USART 路径同样受益
+- **中断向量名按外设查**:`interrupt: true` 不再一律用 `{实例}_IRQn`,而是读规则文件里的
+  `interrupt_irq`(如 F103 的 ADC 用共用向量 `ADC1_2_IRQn`)
+- 新实测结论:多通道必须显式补转换序列(`set mode INn` 只挂引脚);`ScanConvMode` 由 CubeMX
+  按 `NbrOfConversion` 自行推导;外部触发必须配套触发源外设(如 TIM2 的 TRGO 输出),
+  否则 generate 卡死;db XML 里 `NbrOfConversion` 有两份定义,导出的 `max: 1` 来自
+  `Visible=false` 那份,实测可设 2
+- 验证:用 `ADCTest`(手工配)/ `ADCTest2`(纯单通道意图)/ `ADCTest3`(双通道+连续+中断)
+  三个工程走完"只给意图 → generate → 回读 `adc.c`/`main.c`/`stm32f1xx_it.c`"
+- 测试 149 → **165**;覆盖率约 92.7%
+
 ## 0.4.2(2026-08-27)
 - **工程化补强**(非功能迭代,为「全外设完善」里程碑铺路):
   - CI:新增 GitHub Actions(windows-latest,Python 3.10-3.13 矩阵;`ruff check` + `ruff format --check` + `pytest` 覆盖率门槛 **80%**)

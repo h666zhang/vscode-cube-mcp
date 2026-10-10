@@ -124,12 +124,21 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
  {"peripheral": "TIM2", "mode": "input_capture", "pin": "PA0-WKUP"},
  {"peripheral": "I2C1", "pins": ["PB8", "PB9"]},
  {"peripheral": "USART2", "pins": ["PA2", "PA3"], "baudrate": 9600},
+ {"peripheral": "ADC1", "pins": ["PA0", "PA1"], "sampling_time": "ADC_SAMPLETIME_55CYCLES_5",
+  "continuous": true, "interrupt": true},
  {"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}]
 ```
 
 参数两种给法都行:业务参数(`freq_hz` / `duty`)由代码按定时器时钟换算,或者直接给寄存器参数
 (`prescaler` / `period` / `pulse`),显式给的优先。查不到的外设 / 引脚会被**拒绝执行**,
-并告诉你差什么、怎么补。
+并告诉你差什么、怎么补。引脚可以写短名(`PA0` 会自动归一化成 `PA0-WKUP`)。
+
+有些"必做但容易漏"的项,工具会**自己补上**(依据都写在 `knowledge/rules/*.yaml` 里,带实测来源):
+
+- 配 ADC 时按 `.ioc` 里的 APB2 频率自动选合法的 ADC 预分频 —— 不配的话 CubeMX 会弹
+  `[Clock]` 对话框,`-q` 批处理没人点 → generate 卡死到超时;
+- ADC 多通道时自动补转换序列(`NbrOfConversion` + 每个通道的 `Rank-n` / `Channel-n` / `SamplingTime-n`);
+- `interrupt: true` 自动注入对应的 NVIC 键,并按外设选对向量名(如 ADC 用共用的 `ADC1_2_IRQn`)。
 
 ## 知识库(`knowledge/`)
 
