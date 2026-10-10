@@ -1,28 +1,15 @@
 # Vscode_cube_mcp
 
 > ## ⚠️ 已废弃(Deprecated)
-> 本项目已停止维护、存在已知缺陷,不建议使用;待作者补齐 MCP 开发能力后再考虑继续。详见 [DEPRECATED.md](DEPRECATED.md)。
+> 本项目已停止维护、存在已知缺陷,不建议使用;待作者想好改进措施后再考虑继续。详见 [DEPRECATED.md](DEPRECATED.md)。
 
 [![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **项目定位**：对于48脚的芯片来说，就算打开GUI界面配置端口，也消耗不了多长时间。
->但是对于100脚甚至144脚的芯片来说，此项目就能提供方便。
-
-## 为什么用(用之前 vs 用之后)
-
-**用之前**：配置一个 STM32 工程，你得打开 CubeMX 图形界面——选芯片、拖时钟树、
-点引脚、配外设，每一步都在 GUI 里点，重复劳动多，还容易漏。
-
-**用之后**：在 AI 对话里直接说一句：
-
-> 「使用 vscode-cube-mcp 的内置 Tool，参考 SPL_OLED 工程下的文件；
-> 用 STM32F103C8T6 生成一个工程：PB14 配成 GPIO 输出（接 LED）、
-> PB8 做 SCL、PB9 做 SDA 配 I2C1、TIM2 配内部时钟（1s 周期）。
-> 配置到 HAL 骨架为止，LED 闪烁和 OLED 显示的业务代码我自己写。」
-
-工具自动生成整个 HAL 工程；想改配置，继续说就行，全程不用打开 GUI。
-
-<!-- 演示 GIF（待补）：10 秒展示「说一句话 → 工程生成完成」；作者暂无录屏环境，欢迎 PR 补充 -->
+> **项目定位**：
+· 自动化流水线：CI/CD中根据配置文件自动生成初始化代码。
+· 自然语言配置：用聊天描述硬件需求，直接产出可编译的工程。
+· 批量变体：为不同板子快速生成不同配置。
+· 版本控制友好：.ioc文本可diff，比GUI点来点去可追溯。
 
 MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本模式(`-q`),
 让 AI 助手可以直接加载 .ioc 工程、改引脚/外设配置、生成 HAL 代码、导出引脚表,全程无需打开 CubeMX GUI。
@@ -159,7 +146,7 @@ python -m pip install -U vscode-cube-mcp
 python -m pip show vscode-cube-mcp   # 确认版本号
 ```
 
-升级后**必须重启客户端**(Reasonix / VS Code 等),MCP server 进程才会加载新代码;
+升级后**必须重启客户端**(Reasonix / Claude 等),MCP server 进程才会加载新代码;
 若重启后工具参数仍是旧的,等几秒或新开一个会话(host 侧工具快照可能滞后)。
 
 > 维护者发布新版流程(改版本号 → `python -m build` → `twine upload` → `git tag` + push)
