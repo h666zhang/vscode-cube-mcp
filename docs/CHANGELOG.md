@@ -141,8 +141,9 @@
 - 文档同步:AGENTS.md(测试数字、三个工具的新能力)、`help.yaml`(新增 `probe` topic、
   `new_project` 的 intents 示例)、README(工具表与参数表)、dev-notes(探针 SOP、写入双保险);
   修 `rules/usart.yaml` 里已过期的 todo
-- **`pyproject.toml` 的 authors 重复条目合并**:此前发到 PyPI 的元数据里 `author_email` 显示成
-  "F1ZyCAO_3286 <3286266250@qq.com>"(姓名重复了一次),现在只剩一条
+- **`pyproject.toml` 的 authors(两条款式是有意的,别当重复合并)**:第一条 `{ name = "…" }` 喂
+  `Author` 字段、第二条带 email 的喂 `Author-email`。0.4.4.1 发布时误把它们当成重复条目合并,
+  线上 `Author` 因此为空 —— 已在本仓库改回两条,下一版发布时恢复(0.4.4.1 已上传且不可覆盖)
 - 测试 189 → **206**(198 单元/协议 + 8 集成);覆盖率 92.4% → **93.0%**
 - 仍未验证:真机烧录、F1 之外的芯片
 
