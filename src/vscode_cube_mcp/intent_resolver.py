@@ -286,6 +286,9 @@ def adc_commands(intent: dict, ioc_path: str = "") -> list:
     channels = _adc_channels(instance, intent)
     db_default = ((rules.get("parameters_from_db") or {}).get("sampling_time") or {}).get("default", "")
     sampling = str(intent.get("sampling_time", "")).strip() or str(db_default)
+    if str(intent.get("sampling_time", "")).strip():
+        # 写错的采样时间 CubeMX 会静默忽略 ⇒ 对着 db 的取值表先拦一道
+        _check_db_enum(sampling, "ADC1", "SamplingTime", f"{instance} 的 sampling_time")
     commands = []
     for pin, signal, channel in channels:
         commands += [f"set mode {instance} IN{channel}", f"set pin {pin} {signal}"]
@@ -322,6 +325,23 @@ def adc_commands(intent: dict, ioc_path: str = "") -> list:
     return commands
 
 
+def _check_db_enum(value: str, instance: str, name_prefix: str, what: str) -> None:
+    """把取值对照 CubeMX db 校验:不合法直接报错并列出合法值。
+
+    CubeMX 对不认识的枚举**静默忽略**(不报错,但配置无效),所以这类值必须在改 .ioc
+    之前拦下来;知识库里查不到该参数的取值时放行(不能因此把工具卡死)。
+    """
+    try:
+        values = knowledge_loader.ip_parameter_values(instance, name_prefix)
+    except ToolError:
+        return
+    if values and value not in values:
+        raise ToolError(
+            "BAD_ARGUMENT",
+            f"{what} 取值 '{value}' 不在 CubeMX 允许的列表里;可用: " + "、".join(values),
+        )
+
+
 def _check_adc_trigger(value: str, prefix: str) -> None:
     """校验 ADC 外部触发取值:必须是 CubeMX db 里 ExternalTrigConv 的合法值之一。
 
@@ -329,7 +349,7 @@ def _check_adc_trigger(value: str, prefix: str) -> None:
     所以这里直接对着 knowledge/ip/ 导出的取值表拦下来,并把合法值列给调用方。
     """
     try:
-        values = list((knowledge_loader.ip_parameter("ADC1", "ExternalTrigConv") or {}).get("values") or [])
+        values = knowledge_loader.ip_parameter_values("ADC1", "ExternalTrigConv")
     except ToolError:
         return  # 知识库里查不到就不拦(不能因为这个把工具卡死)
     if not values or value in values:
@@ -494,7 +514,7 @@ def _apply_tim(ioc_path: str, instance: str, intent: dict) -> dict:
         note = ioc_editor.inject_tim_internal_clock(
             ioc_path, instance, prescaler=params["prescaler"], period=params["period"], irq=bool(irq)
         )
-        return {"note": note, "commands": []}
+        return {"note": note, "commands": [], "decisions": tim_decisions(instance, mode, intent)}
     if mode not in ("pwm", "input_capture"):
         raise ToolError("UNKNOWN_PARAM", f"意图层还不支持 TIM 的 {mode}(已收录: pwm / input_capture / internal_clock)")
     raw_pin = str(intent.get("pin", "")).strip()
@@ -518,7 +538,59 @@ def _apply_tim(ioc_path: str, instance: str, intent: dict) -> dict:
         note = ioc_editor.inject_tim_input_capture(
             ioc_path, instance, pin, signal, prescaler=params["prescaler"], period=params["period"]
         )
-    return {"note": f"{note};引脚 {pin} -> {signal}(通道 {channel} 由引脚表查出)", "commands": []}
+    return {
+        "note": f"{note};引脚 {pin} -> {signal}(通道 {channel} 由引脚表查出)",
+        "commands": [],
+        "decisions": tim_decisions(instance, mode, intent),
+    }
+
+
+def tim_decisions(instance: str, mode: str, intent: dict) -> list:
+    """TIM 意图实际采用的值(含默认与推导) —— 给返回值"自报"用,不参与配置。"""
+    params = tim_params(mode, intent)
+    clock = tim_clock_mhz()
+    if mode == "internal_clock":
+        irq = intent.get("irq", intent.get("interrupt", True))
+        return [
+            f"{instance}: 定时器时钟 {clock}MHz × 分频比 {params['prescaler']} → 计数 {params['period']}"
+            f"(寄存器 Prescaler={params['prescaler'] - 1}、Period={params['period'] - 1})",
+            f"{instance}: 更新中断{'开(注入 NVIC,会生成 TIMx_IRQHandler)' if irq else '关(只当触发源、不注入 NVIC)'}",
+        ]
+    return [
+        f"{instance}({mode}): 定时器时钟 {clock}MHz,Prescaler={params['prescaler']} / "
+        f"Period={params['period']}(寄存器 {params['prescaler'] - 1}/{params['period'] - 1})"
+    ]
+
+
+def adc_decisions(instance: str, intent: dict, ioc_path: str) -> list:
+    """ADC 意图实际采用的值:默认的、推导的、工具自动补的,全写出来(省得调用方回读)。"""
+    rules = knowledge_loader.require_rule_verified("adc")
+    db_default = ((rules.get("parameters_from_db") or {}).get("sampling_time") or {}).get("default", "")
+    channels = _adc_channels(instance, intent)
+    sampling = str(intent.get("sampling_time", "")).strip() or str(db_default)
+    want_scan = intent.get("scan")
+    if want_scan is None:
+        want_scan = len(channels) > 1
+    out = [
+        f"{instance}: {len(channels)} 个通道(" + ", ".join(f"IN{c}" for _p, _s, c in channels) + ")",
+        f"{instance}: 采样时间 {sampling}" + ("" if intent.get("sampling_time") else "(默认值)"),
+        f"{instance}: ContinuousConvMode="
+        + ("ENABLE" if intent.get("continuous") else "DISABLE(默认;有外部触发时=每个触发转一轮)"),
+        f"{instance}: ScanConvMode=" + ("ENABLE" if want_scan else "DISABLE") + "(多通道默认开)",
+    ]
+    clock = adc_clock_command(intent, ioc_path)
+    out.append(f"{instance}: ADC 时钟 " + (clock.split()[-1] if clock else "(模板已配,未改)"))
+    if intent.get("trigger"):
+        out.append(f'{instance}: 外部触发 {intent["trigger"]}(触发源 TIM 的 TRGO 要自己配,见 topic="tim")')
+    return out
+
+
+def dma_decisions(plan: dict) -> list:
+    """DMA 请求实际采用的值(通道/方向/模式/通道中断都是工具推导或默认的)。"""
+    return [
+        f"DMA({plan['request']}) → {plan['channel']}: Mode={plan['mode'] or '(CubeMX 默认)'}, "
+        f"Direction={plan['direction']}, 通道中断{'注入(NVIC 里有该通道)' if plan['nvic'] else '不注入'}"
+    ]
 
 
 def apply_one(ioc_path: str, intent: dict) -> dict:
@@ -550,7 +622,11 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
                 "\n警告:外部触发要触发源外设自己配好(如 TIM2 的 TRGO 输出);"
                 "只设 ADC 的 ExternalTrigConv 会让 generate 卡死到超时(实测)"
             )
-        return {"note": note, "commands": commands}
+        return {
+            "note": note,
+            "commands": commands,
+            "decisions": adc_decisions(peripheral, intent, ioc_path),
+        }
     if peripheral in ("IWDG", "WWDG"):
         commands = switch_commands(intent, peripheral.lower())
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
@@ -595,18 +671,30 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
     commands = []
     ioc_lines = []
     dma_plans = []
+    decisions = []
     for intent in intents:
         result = apply_one(ioc_path, intent)
         notes.append(result["note"])
         commands.extend(result["commands"])
+        # 自报"本次采用了哪些默认值/推导值":没有专门解释的外设给一条通用说明,
+        # 省得调用方去猜"我没写的那几个字段是什么"(实测:agent 会为此反复回读/追问)
+        who = str(intent.get("peripheral", "?")).upper()
+        decisions.extend(result.get("decisions") or [f"{who}: 只配引脚/模式,其余参数保持 CubeMX 默认(本工具未改动)"])
         line = interrupt_line(intent)
         if line:
             ioc_lines.append(line)
         plan = dma_fields(intent)
         if plan:
             dma_plans.append(plan)
+            decisions.extend(dma_decisions(plan))
             notes.append(
                 f"DMA 请求 {plan['request']} → 通道 {plan['channel']}"
                 f"({'含' if plan['nvic'] else '不含'}通道中断;注入 .ioc 键组,见 rules/dma.yaml)"
             )
-    return {"notes": notes, "commands": commands, "ioc_lines": ioc_lines, "dma": dma_plans}
+    return {
+        "notes": notes,
+        "decisions": decisions,
+        "commands": commands,
+        "ioc_lines": ioc_lines,
+        "dma": dma_plans,
+    }

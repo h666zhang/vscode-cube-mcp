@@ -45,6 +45,8 @@
   (如 `"dma": {"mode": "circular"}`)—— 两者都靠注入 `.ioc` 键实现,见 `knowledge/rules/dma.yaml`。
 - **`cubemx_new_project`**:从零建工程,**也能直接吃 `intents`**(与 cubemx_intent 同一套解析)——
   推荐用意图而不是在 `commands` 里手写 set 命令(手写 `set mode ADC1 IN0` 不会自动补 ADC 时钟,会卡死 generate)。
+  成功返回里会附一段**「本次采用的默认值/推导值」**(哪些字段是默认的、哪些是工具推导/自动补的),
+  所以"我没写的字段最终是什么"不必再问文档或回读。
 - **`cubemx_probe`**:在 `.ioc` 副本上试跑并给出差异。`commands` 跑脚本命令,`inject` 跑**键注入类**写法
   (`{"type": "dma"|"tim_internal_clock"|"tim_pwm"|"tim_input_capture"|"lines", ...}`);给了 `inject` 时
   会让 CubeMX load + saveas 走一遍,并明确告诉你它是**原样保留**还是**改写/丢弃**了注入内容。
@@ -99,7 +101,7 @@
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**239 个:229 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**243 个:233 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
   —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
 - **改了 `src/` 之后必须重启宿主**:Reasonix 把本 server 当长驻进程**复用**,开新会话并不会

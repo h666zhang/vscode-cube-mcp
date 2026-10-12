@@ -292,6 +292,23 @@ def ip_facts(instance: str) -> dict:
     return data
 
 
+def ip_parameter_values(instance: str, name_prefix: str) -> list:
+    """某 IP 下名字以 name_prefix 开头的参数的**合法取值**(多份定义取并集,去重保序)。
+
+    例:`ip_parameter_values("ADC1", "SamplingTime")` → 8 个 `ADC_SAMPLETIME_*`。
+    CubeMX 对不认识的枚举是**静默忽略**(不报错、配置无效),所以这类值要在改 .ioc 前校验。
+    """
+    params = ip_facts(instance).get("parameters") or {}
+    out: list = []
+    for name, item in params.items():
+        if not name.startswith(name_prefix):
+            continue
+        for value in (item or {}).get("values") or []:
+            if value not in out:
+                out.append(value)
+    return out
+
+
 def ip_mode_names(instance: str) -> list:
     """这个 IP 在 CubeMX db 里定义的合法模式名(用来核对 .ioc 片段里写的枚举名)。"""
     return [m.get("name", "") for m in ip_facts(instance).get("modes") or []]

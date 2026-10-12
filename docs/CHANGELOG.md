@@ -64,7 +64,16 @@
   `.ioc` 且不产生 `.bak`、ADC 的 `TRGO_UPDATE ↔ T3_TRGO` 常用配对
 - `cubemx_inspect_output` 两处措辞:折叠第三方目录时不再误报"明细被截断"(实测踩过);
   `pattern` 的搜索范围改成"整个 `Core/` 下",避免被误读成只搜 `Core/Src`
-- 测试 209 → **239**(229 单元/协议 + 10 集成);顺手修集成测试失修:8 个用例里 5 个的
+- **工具开始"自报决策"**(第四轮盲测暴露的第二类缺口):`cubemx_intent` / `cubemx_new_project`
+  的成功返回里新增一段「本次采用的默认值/推导值」—— 凡是没显式指定、由默认值或推导得出的都列出来:
+  `ContinuousConvMode=DISABLE(默认;有外部触发时=每个触发转一轮)`、`ScanConvMode=ENABLE(多通道默认开)`、
+  `ADC 时钟 RCC_ADCPCLK2_DIV6`、`TIM3 定时器时钟 72MHz × 分频比 → Prescaler/Period`、
+  `DMA(ADC1) → DMA1_Channel1 Mode/Direction/通道中断`;只配引脚的外设则明说"其余保持 CubeMX 默认"。
+  **"我没写的那几个字段是什么"从此不必查文档、也不必回读 .ioc/代码**
+- **ADC `sampling_time` 也对着 db 校验**:写错的采样时间 CubeMX 会**静默忽略**,现在直接报错并列出
+  8 个合法 `ADC_SAMPLETIME_*`。新接口 `knowledge_loader.ip_parameter_values(ip, 参数名前缀)`
+  按前缀取并集(多份定义) —— DMA 的 mode/direction/priority 与 `adc_clock_div` 早就有同类校验
+- 测试 209 → **243**(233 单元/协议 + 10 集成);顺手修集成测试失修:8 个用例里 5 个的
   断言在 `cubemx_load` 改成默认 `via_cubemx=False` 后就过时了(默认跳过所以一直没暴露),
   已改用真加载断言;新增 1 条覆盖 `project_dir` 生成路径
 

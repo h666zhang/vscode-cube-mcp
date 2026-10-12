@@ -545,6 +545,33 @@ class TestAdcIntent(unittest.TestCase):
             "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T1_CC1", "; ".join(plan["commands"])
         )
 
+    def test_sampling_time_rejects_unknown_value(self):
+        # 写错的采样时间 CubeMX 会静默忽略 ⇒ 对着 db 的取值表先拦下并列出合法值
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(
+                self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "sampling_time": "ADC_SAMPLETIME_99CYCLES"}]
+            )
+        msg = str(ctx.exception)
+        self.assertIn("ADC_SAMPLETIME_99CYCLES", msg)
+        self.assertIn("ADC_SAMPLETIME_55CYCLES_5", msg)
+
+    def test_plan_reports_defaults_and_derived_values(self):
+        # 工具自报"本次采用了什么":没显式给的字段也要有明确说法(不用调用方猜/回读)
+        self._seed()
+        plan = intent_resolver.apply_intents(
+            self.ioc,
+            [
+                {"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}},
+                {"peripheral": "I2C1", "pins": ["PB8", "PB9"]},
+            ],
+        )
+        joined = "\n".join(plan["decisions"])
+        self.assertIn("ContinuousConvMode=DISABLE", joined)
+        self.assertIn("ScanConvMode=ENABLE", joined)
+        self.assertIn("DMA(ADC1)", joined)
+        self.assertIn("I2C1: 只配引脚/模式", joined)
+
     def test_trigger_rejects_unknown_value(self):
         # 非法触发值必须在改 .ioc 之前拦下并列出合法取值(CubeMX 对不认识的枚举是静默忽略)
         self._seed()
@@ -1264,6 +1291,13 @@ class TestToolWrappers(unittest.TestCase):
         with self.assertRaises(ValueError):
             cubemx_mcp.cubemx_inspect_output("C:/Windows")
 
+    def test_intent_reports_defaults(self):
+        # 返回值里要有"本次采用的默认值/推导值"这一段(工具自报,不靠文档)
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            out = cubemx_mcp.cubemx_intent(self.ioc, [{"peripheral": "ADC1", "pins": ["PA0", "PA1"]}])
+        self.assertIn("本次采用的默认值/推导值", out)
+        self.assertIn("ContinuousConvMode=DISABLE", out)
+
     def test_load_via_cubemx_gives_verdict(self):
         # via_cubemx=True 要明确给出"CubeMX 认不认"的结论,而不是只回显原始日志
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
@@ -1470,6 +1504,13 @@ class TestKnowledgeLoader(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             knowledge_loader.dma_channel("ADC9")
         self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
+    def test_ip_parameter_values_from_db(self):
+        # 枚举取值从 db 导出的知识库查(不硬编码),用来校验 ADC 采样时间这类参数
+        vals = knowledge_loader.ip_parameter_values("ADC1", "SamplingTime")
+        self.assertIn("ADC_SAMPLETIME_55CYCLES_5", vals)
+        self.assertIn("ADC_SAMPLETIME_1CYCLE_5", vals)
+        self.assertEqual(knowledge_loader.ip_parameter_values("ADC1", "NoSuchParamPrefix"), [])
 
     def test_help_topics_from_yaml(self):
         # 可用 topic 从 help.yaml 的键算出来(不硬编码);别名与流程 topic 都算

@@ -698,6 +698,7 @@ def cubemx_new_project(
     r = r2
     note_internal = "\n".join(tim_notes) if tim_notes else ""
     note_intent = "\n".join(plan["notes"]) if plan["notes"] else ""
+    note_decisions = _decisions_block(plan)
     # 生成后:若工程被生成到 project_dir 的同级目录(以工程名命名),把 .ioc 移到工程目录,
     # 保证 .ioc 与 HAL 工程在同一目录(cubemx generate 默认行为)。
     gen_dir = os.path.join(os.path.dirname(pd), project_name)
@@ -731,6 +732,7 @@ def cubemx_new_project(
         extra += f"\n{note_intent}"
     if note_internal:
         extra += f"\n{note_internal}"
+    extra += note_decisions
     # 产出校验:CubeMX 报 OK 也可能一个文件都没生成(残留实例占着单实例锁时会这样),
     # 这种情况必须显式失败 —— 否则调用方会拿着一个空目录继续往下走。
     arts = _generated_artifacts(pd) or _generated_artifacts(gen_dir)
@@ -861,6 +863,14 @@ def cubemx_probe(ioc: str, commands: list = None, inject: list = None, keep_copy
     return text
 
 
+def _decisions_block(plan: dict) -> str:
+    """渲染"本次采用的默认值/推导值" —— 工具自报,省得调用方去猜没写的那几个字段。"""
+    items = plan.get("decisions") or []
+    if not items:
+        return ""
+    return "\n本次采用的默认值/推导值(没显式指定的都在这里):\n" + "\n".join(f"  - {d}" for d in items)
+
+
 @mcp.tool()
 def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
     """按"配置意图"改 .ioc:意图里只说要什么,内部名由知识库查出来。
@@ -923,7 +933,7 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
                 extra=f"生成目录: {os.path.dirname(ap)}",
             )
         steps.append(("run_cubemx", "ok"))
-    extra = "\n".join(plan["notes"])
+    extra = "\n".join(plan["notes"]) + _decisions_block(plan)
     problems = ioc_editor.check_semantics(ap)
     if problems:
         extra += f"\n⚠ 离线预检(纯文本,不需要 CubeMX)发现 {len(problems)} 处问题:\n" + "\n".join(
