@@ -1092,7 +1092,7 @@ class TestToolWrappers(unittest.TestCase):
 
     def test_load_ok(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
-            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_load(self.ioc))
+            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_load(self.ioc, via_cubemx=True))
 
     def test_configure_passes_commands(self):
         with mock.patch.object(
@@ -1512,18 +1512,26 @@ board=custom
         self.assertNotIn("RCC", s["peripherals"])
         self.assertEqual(s["init_order"], ["SystemClock_Config", "MX_DMA_Init", "MX_ADC1_Init"])
 
-    def test_cubemx_load_appends_summary(self):
-        ok = {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": "run_cubemx"}
-        with mock.patch.object(cubemx_mcp, "_run_script", return_value=ok):
+    def test_cubemx_load_default_is_text_only_and_fast(self):
+        # 默认不启 CubeMX(纯文本解析 → 秒回);这是"回读配置"的常用路径
+        with mock.patch.object(cubemx_mcp, "_run_script") as m:
             out = cubemx_mcp.cubemx_load(self.ioc)
+        self.assertFalse(m.called, "默认路径不应启动 CubeMX")
         self.assertIn("结构化摘要", out)
         self.assertIn('"cpn": "STM32F103C8T6"', out)
 
-    def test_cubemx_load_summary_can_be_skipped(self):
+    def test_cubemx_load_via_cubemx_adds_its_output(self):
         ok = {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": "run_cubemx"}
-        with mock.patch.object(cubemx_mcp, "_run_script", return_value=ok):
-            out = cubemx_mcp.cubemx_load(self.ioc, summary=False)
-        self.assertNotIn("结构化摘要", out)
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value=ok) as m:
+            out = cubemx_mcp.cubemx_load(self.ioc, via_cubemx=True)
+        self.assertTrue(m.called)
+        self.assertIn("[OK exit=0]", out)
+        self.assertIn("结构化摘要", out)
+
+    def test_cubemx_load_needs_at_least_one_output(self):
+        with self.assertRaises(ValueError) as ctx:
+            cubemx_mcp.cubemx_load(self.ioc, summary=False)
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
 
 
 class TestInjectDma(unittest.TestCase):
@@ -1779,6 +1787,23 @@ class TestIntentResolver(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             intent_resolver.tim_params("pwm", {"prescaler": 0})
         self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_tim_internal_clock_irq_can_be_disabled(self):
+        # 意图里写 irq: false → 注入片段不带 NVIC 行(只想拿它当触发源时用)
+        intent_resolver.apply_intents(
+            self.ioc,
+            [{"peripheral": "TIM2", "mode": "internal_clock", "prescaler": 72, "period": 100, "irq": False}],
+        )
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", text)
+        self.assertNotIn("NVIC.TIM2_IRQn", text)
+
+    def test_tim_internal_clock_irq_defaults_on(self):
+        intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM2", "mode": "internal_clock"}])
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("NVIC.TIM2_IRQn", text)
 
     def test_apply_pwm_writes_ioc(self):
         plan = intent_resolver.apply_intents(

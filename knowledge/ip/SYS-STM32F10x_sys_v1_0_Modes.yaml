@@ -4,6 +4,32 @@ parameters:
   instance:
     type: list
     default: TIM1
+    values:
+    - TIM1
+    - TIM2
+    - TIM3
+    - TIM4
+    - TIM5
+    - TIM6
+    - TIM7
+    - TIM8
+    - TIM9
+    - TIM10
+    - TIM11
+    - TIM12
+    - TIM13
+    - TIM14
+    - TIM15
+    - TIM16
+    - TIM17
+    - TIM18
+    - TIM19
+    - TIM20
+    - TIM21
+    - TIM22
+    - TIM23
+    - RTC
+    - SysTick
 signals:
   JTCK-SWCLK:
     io_mode: System

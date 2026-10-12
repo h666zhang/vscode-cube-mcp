@@ -10,6 +10,11 @@ parameters:
     type: list
     default: WWDG_PRESCALER_1
     group: Watchdog Clocking
+    values:
+    - WWDG_PRESCALER_1
+    - WWDG_PRESCALER_2
+    - WWDG_PRESCALER_4
+    - WWDG_PRESCALER_8
   Window:
     comment: WWDG window value
     type: integer
@@ -29,6 +34,9 @@ parameters:
     type: list
     default: WWDG_EWI_DISABLE
     group: Watchdog Interrupt
+    values:
+    - WWDG_EWI_DISABLE
+    - WWDG_EWI_ENABLE
 signals:
   VS_WWDG: {}
 modes:

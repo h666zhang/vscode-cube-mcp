@@ -9,6 +9,8 @@ parameters:
     type: List
     default: PCD_SPEED_FULL
     group: Basic Parameters
+    values:
+    - PCD_SPEED_FULL
   dev_endpoints:
     comment: Device endpoints number
     type: integer
@@ -20,6 +22,8 @@ parameters:
     type: List
     default: 'null'
     group: Basic Parameters
+    values:
+    - PCD_PHY_EMBEDDED
   Sof_enable:
     comment: Sof Enable
     type: List
@@ -30,16 +34,24 @@ parameters:
     type: List
     default: DISABLE
     group: Power Parameters
+    values:
+    - ENABLE
+    - DISABLE
   lpm_enable:
     comment: Link Power Management
     type: List
     default: DISABLE
     group: Power Parameters
+    values:
+    - ENABLE
+    - DISABLE
   battery_charging_enable:
     comment: Battery Charging
     type: List
     default: DISABLE
     group: Power Parameters
+    values:
+    - DISABLE
 signals:
   DM:
     io_mode: System

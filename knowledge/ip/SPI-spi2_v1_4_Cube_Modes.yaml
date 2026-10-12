@@ -8,40 +8,72 @@ parameters:
     type: list
     default: VM_NSSSOFT
     group: Basic Parameters
+    values:
+    - VM_NSSSOFT
+    - VM_NSSHARD
   VirtualType:
     type: list
     default: VM_MASTER
     group: Basic Parameters
+    values:
+    - VM_MASTER
+    - VM_SLAVE
   Mode:
     comment: Mode
     type: list
     default: SPI_MODE_SLAVE
     group: Basic Parameters
+    values:
+    - SPI_MODE_SLAVE
+    - SPI_MODE_MASTER
   Direction:
     comment: Direction
     type: list
     default: SPI_DIRECTION_2LINES
     group: Basic Parameters
+    values:
+    - SPI_DIRECTION_2LINES
+    - SPI_DIRECTION_2LINES_RXONLY
+    - SPI_DIRECTION_1LINE
   TIMode:
     comment: Frame Format
     type: list
     default: SPI_TIMODE_DISABLE
     group: Basic Parameters
+    values:
+    - SPI_TIMODE_DISABLE
   DataSize:
     comment: Data Size
     type: list
     default: SPI_DATASIZE_8BIT
     group: Basic Parameters
+    values:
+    - SPI_DATASIZE_8BIT
+    - SPI_DATASIZE_16BIT
   FirstBit:
     comment: First Bit
     type: list
     default: SPI_FIRSTBIT_MSB
     group: Basic Parameters
+    values:
+    - SPI_FIRSTBIT_MSB
+    - SPI_FIRSTBIT_LSB
+    min: '0'
+    max: '1'
   BaudRatePrescaler:
     comment: Prescaler (for Baud Rate)
     type: list
     default: SPI_BAUDRATEPRESCALER_2
     group: Clock Parameters
+    values:
+    - SPI_BAUDRATEPRESCALER_2
+    - SPI_BAUDRATEPRESCALER_4
+    - SPI_BAUDRATEPRESCALER_8
+    - SPI_BAUDRATEPRESCALER_16
+    - SPI_BAUDRATEPRESCALER_32
+    - SPI_BAUDRATEPRESCALER_64
+    - SPI_BAUDRATEPRESCALER_128
+    - SPI_BAUDRATEPRESCALER_256
   CalculateBaudRate:
     comment: Baud Rate
     type: string
@@ -54,27 +86,46 @@ parameters:
     type: list
     default: SPI_POLARITY_LOW
     group: Clock Parameters
+    values:
+    - SPI_POLARITY_LOW
+    - SPI_POLARITY_HIGH
+    min: '0'
+    max: '1'
   CLKPhase:
     comment: Clock Phase (CPHA)
     type: list
     default: SPI_PHASE_1EDGE
     group: Clock Parameters
+    values:
+    - SPI_PHASE_1EDGE
+    - SPI_PHASE_2EDGE
+    min: '0'
+    max: '1'
   CRCCalculation:
     comment: CRC Calculation
     type: list
     default: SPI_CRCCALCULATION_DISABLE
     group: Advanced Parameters
+    values:
+    - SPI_CRCCALCULATION_DISABLE
+    - SPI_CRCCALCULATION_ENABLE
   CRCPolynomial:
     comment: CRC Polynomial
     type: polynomial
     default: X1+X3
     max: '8'
     group: Advanced Parameters
+    values:
+    - '10'
   NSS:
     comment: NSS Signal Type
     type: list
     default: SPI_NSS_HARD_OUTPUT
     group: Advanced Parameters
+    values:
+    - SPI_NSS_HARD_OUTPUT
+    - SPI_NSS_HARD_INPUT
+    - SPI_NSS_SOFT
 signals:
   MISO:
     io_mode: AlternateFunctionPushPull

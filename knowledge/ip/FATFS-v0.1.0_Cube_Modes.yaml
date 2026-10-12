@@ -6,10 +6,16 @@ parameters:
     type: uniqueElementList
     default: '11'
     group: Version
+    values:
+    - '11'
+    - '12'
+    - '13'
   MAX_VOLUMES_VALUE:
     comment: Max value for the volumes parameter
     type: integer
     default: '9'
+    values:
+    - '9'
   SD_MODE:
     comment: SD MODE
     type: integer
@@ -30,21 +36,34 @@ parameters:
     type: list
     default: hsd1
     group: SDIO/SDMMC
+    values:
+    - hsd1
+    - hsd2
+    - hsd
   _HUSBH:
     comment: USBH instance
     type: list
     default: hUsbHostFS
     group: USBH
+    values:
+    - hUsbHostFS
+    - hUsbHostHS
   _HNAND:
     comment: NandFlash instance
     type: list
     default: hnand1
     group: Nand
+    values:
+    - hnand1
+    - hnand2
   _HSDRAM:
     comment: SDRAM instance
     type: list
     default: hsdram1
     group: SDRAM
+    values:
+    - hsdram1
+    - hsdram2
   VIRTUAL_SRAM1:
     comment: SRAM1 on
     type: integer
@@ -70,36 +89,65 @@ parameters:
     type: list
     default: hsram1
     group: SRAM
+    values:
+    - hsram1
+    - hsram2
+    - hsram3
+    - hsram4
   USE_DMA_CODE_SD:
     comment: Use dma template
     type: list
     default: '1'
     group: SDIO/SDMMC
+    values:
+    - '1'
+    - '0'
   USE_DMA_CODE_USBH:
     comment: Use dma template
     type: list
     default: '1'
     group: USBH
+    values:
+    - '1'
+    - '0'
   DISKIO_CODE:
     comment: Diskio code
     type: list
     default: '0'
     group: User Defined
+    values:
+    - '0'
+    - '1'
   SRAM_BSP_CODE:
     comment: BSP code for SRAM
     type: list
     default: '0'
     group: SRAM
+    values:
+    - '0'
+    - '1'
   SD_BSP_CODE:
     comment: BSP code for SD
     type: list
     default: '0'
     group: SDIO/SDMMC
+    values:
+    - '0'
   BOARD_NAME:
     comment: Name
     type: list
     default: none
     group: Board
+    values:
+    - none
+    - stm32g070rb
+    - stm32g071rb
+    - stm32g081b
+    - stm32wb55rg
+    - stm32wb35ce
+    - stm32g474e
+    - stm32g474re
+    - stm32g431rb
   VIRTUAL_CS:
     comment: At least one CS set
     type: integer
@@ -110,69 +158,153 @@ parameters:
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _FS_MINIMIZE:
     comment: FS_MINIMIZE (Minimization level)
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
   _USE_STRFUNC:
     comment: USE_STRFUNC (String functions)
     type: list
     default: '2'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
   _USE_FIND:
     comment: USE_FIND (Find functions)
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _USE_MKFS:
     comment: USE_MKFS (Make filesystem function)
     type: list
     default: '1'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _USE_FORWARD:
     comment: USE_FORWARD (Forward function)
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _USE_LABEL:
     comment: USE_LABEL (Volume label functions)
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _USE_FASTSEEK:
     comment: USE_FASTSEEK (Fast seek function)
     type: list
     default: '1'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   HS_DMA_ENABLED:
     type: integer
     default: '1'
     group: Function Parameters
+    values:
+    - '1'
+    - '0'
   FS_DMA_ENABLED:
     type: integer
     default: '1'
     group: Function Parameters
+    values:
+    - '1'
+    - '0'
   _USE_BUFF_WO_ALIGNMENT:
     comment: USE_BUFF_WO_ALIGNMENT (Data alignment management)
     type: uniqueElementList
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
   VIRTUAL_CODE_PAGE:
     comment: VIRTUAL_CODE_PAGE
     type: uniqueElementList
     default: '932'
     group: Locale and Namespace Parameters
+    values:
+    - '932'
+    - '936'
+    - '949'
+    - '950'
+    - '850'
+    - '12345'
   _CODE_PAGE:
     comment: CODE_PAGE (Code page on target)
     type: list
     default: '850'
     group: Locale and Namespace Parameters
+    values:
+    - '0'
+    - '437'
+    - '720'
+    - '737'
+    - '771'
+    - '775'
+    - '850'
+    - '852'
+    - '855'
+    - '857'
+    - '860'
+    - '861'
+    - '862'
+    - '863'
+    - '864'
+    - '865'
+    - '866'
+    - '869'
+    - '932'
+    - '936'
+    - '949'
+    - '950'
+    - '1'
+    - '858'
+    - '874'
+    - '1250'
+    - '1251'
+    - '1252'
+    - '1253'
+    - '1254'
+    - '1255'
+    - '1256'
+    - '1257'
+    - '1258'
   _USE_LFN:
     comment: USE_LFN (Use Long Filename)
     type: list
     default: '3'
     group: Locale and Namespace Parameters
+    values:
+    - '1'
+    - '2'
+    - '3'
+    - '0'
   _MAX_LFN:
     comment: MAX_LFN (Max Long Filename)
     type: integer
@@ -185,16 +317,30 @@ parameters:
     type: list
     default: '0'
     group: Locale and Namespace Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
   _STRF_ENCODE:
     comment: STRF_ENCODE (Character encoding)
     type: list
     default: '3'
     group: Locale and Namespace Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
   _FS_RPATH:
     comment: FS_RPATH (Relative Path)
     type: list
     default: '0'
     group: Locale and Namespace Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
   _VOLUMES:
     comment: VOLUMES (Logical drives)
     type: integer
@@ -207,36 +353,63 @@ parameters:
     type: list
     default: '512'
     group: Physical Drive Parameters
+    values:
+    - '512'
+    - '1024'
+    - '2048'
+    - '4096'
   _MIN_SS:
     comment: MIN_SS (Minimum Sector Size)
     type: list
     default: '512'
     group: Physical Drive Parameters
+    values:
+    - '512'
+    - '1024'
+    - '2048'
+    - '4096'
   _MULTI_PARTITION:
     comment: MULTI_PARTITION (Volume partitions feature)
     type: list
     default: '0'
     group: Physical Drive Parameters
+    values:
+    - '0'
+    - '1'
   _USE_TRIM:
     comment: USE_TRIM (Erase feature)
     type: list
     default: '0'
     group: Physical Drive Parameters
+    values:
+    - '0'
+    - '1'
   _FS_NOFSINFO:
     comment: FS_NOFSINFO (Force full FAT scan)
     type: list
     default: '0'
     group: Physical Drive Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
   _FS_TINY:
     comment: FS_TINY (Tiny mode)
     type: list
     default: '0'
     group: System Parameters
+    values:
+    - '0'
+    - '1'
   _FS_NORTC:
     comment: FS_NORTC (Timestamp feature)
     type: list
     default: '0'
     group: System Parameters
+    values:
+    - '1'
+    - '0'
   _NORTC_YEAR:
     comment: '      NORTC_YEAR (Year for timestamp)'
     type: integer
@@ -263,11 +436,17 @@ parameters:
     type: list
     default: '0'
     group: System Parameters
+    values:
+    - '0'
+    - '1'
   _FS_REENTRANT:
     comment: FS_REENTRANT (Re-Entrancy)
     type: list
     default: '1'
     group: System Parameters
+    values:
+    - '0'
+    - '1'
   _FS_TIMEOUT:
     comment: FS_TIMEOUT (Timeout ticks)
     type: integer
@@ -280,11 +459,20 @@ parameters:
     type: list
     default: '0'
     group: System Parameters
+    values:
+    - '0'
+    - '1'
   _SYNC_t:
     comment: SYNC_t (O/S sync object)
     type: uniqueElementList
     default: osMutexId_t
     group: System Parameters
+    values:
+    - osMutexId_t
+    - osMutexId
+    - osSemaphoreId_t
+    - osSemaphoreId
+    - 'NULL'
   _FS_LOCK:
     comment: FS_LOCK (Number of files opened simultaneously)
     type: integer
@@ -297,16 +485,25 @@ parameters:
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _USE_CHMOD:
     comment: USE_CHMOD (Change attributes function)
     type: list
     default: '0'
     group: Function Parameters
+    values:
+    - '0'
+    - '1'
   _FS_EXFAT:
     comment: FS_EXFAT (Support of exFAT file system)
     type: list
     default: '0'
     group: System Parameters
+    values:
+    - '0'
+    - '1'
   _LFN_BUF:
     comment: LFN_BUF
     type: integer
@@ -314,6 +511,8 @@ parameters:
     min: '12'
     max: '255'
     group: Locale and Namespace Parameters
+    values:
+    - '255'
   _SFN_BUF:
     comment: SFN_BUF
     type: integer
@@ -325,22 +524,37 @@ parameters:
     comment: SD mode
     type: integer
     default: '1'
+    values:
+    - '1'
+    - '0'
   _FS_FATFS_SDRAM:
     comment: SDRAM mode
     type: integer
     default: '1'
+    values:
+    - '1'
+    - '0'
   _FS_FATFS_SRAM:
     comment: SRAM mode
     type: integer
     default: '1'
+    values:
+    - '1'
+    - '0'
   _FS_FATFS_USB:
     comment: USB mode
     type: integer
     default: '1'
+    values:
+    - '1'
+    - '0'
   _FS_FATFS_USER:
     comment: USER mode
     type: integer
     default: '1'
+    values:
+    - '1'
+    - '0'
 signals:
   VS_SDIO: {}
   VS_FMC_SDRAM: {}

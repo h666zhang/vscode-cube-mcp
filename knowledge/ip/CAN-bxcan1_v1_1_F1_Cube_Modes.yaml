@@ -17,16 +17,47 @@ parameters:
     type: list
     default: CAN_SJW_1TQ
     group: Bit Timings Parameters
+    values:
+    - CAN_SJW_1TQ
+    - CAN_SJW_2TQ
+    - CAN_SJW_3TQ
+    - CAN_SJW_4TQ
   BS1:
     comment: Time Quanta in Bit Segment 1
     type: list
     default: CAN_BS1_1TQ
     group: Bit Timings Parameters
+    values:
+    - CAN_BS1_1TQ
+    - CAN_BS1_2TQ
+    - CAN_BS1_3TQ
+    - CAN_BS1_4TQ
+    - CAN_BS1_5TQ
+    - CAN_BS1_6TQ
+    - CAN_BS1_7TQ
+    - CAN_BS1_8TQ
+    - CAN_BS1_9TQ
+    - CAN_BS1_10TQ
+    - CAN_BS1_11TQ
+    - CAN_BS1_12TQ
+    - CAN_BS1_13TQ
+    - CAN_BS1_14TQ
+    - CAN_BS1_15TQ
+    - CAN_BS1_16TQ
   BS2:
     comment: Time Quanta in Bit Segment 2
     type: list
     default: CAN_BS2_1TQ
     group: Bit Timings Parameters
+    values:
+    - CAN_BS2_1TQ
+    - CAN_BS2_2TQ
+    - CAN_BS2_3TQ
+    - CAN_BS2_4TQ
+    - CAN_BS2_5TQ
+    - CAN_BS2_6TQ
+    - CAN_BS2_7TQ
+    - CAN_BS2_8TQ
   CalculateTimeQuantum:
     comment: Time Quantum
     type: string
@@ -50,41 +81,67 @@ parameters:
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   ABOM:
     comment: Automatic Bus-Off Management
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   AWUM:
     comment: Automatic Wake-Up Mode
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   NART:
     comment: Automatic Retransmission
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   RFLM:
     comment: Receive Fifo Locked Mode
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   TXFP:
     comment: Transmit Fifo Priority
     type: list
     default: DISABLE
     group: Basic Parameters
+    values:
+    - DISABLE
+    - ENABLE
   FilterFIFOAssignment:
     comment: Filter Fifo Assignment
     type: list
     default: CAN_FILTER_FIFO0
     group: Filter Parameters
+    values:
+    - CAN_FILTER_FIFO0
+    - CAN_FILTER_FIFO1
   Mode:
     comment: Operating Mode
     type: list
     default: CAN_MODE_NORMAL
     group: Advanced Parameters
+    values:
+    - CAN_MODE_NORMAL
+    - CAN_MODE_LOOPBACK
+    - CAN_MODE_SILENT
+    - CAN_MODE_SILENT_LOOPBACK
 signals:
   RX:
     io_mode: InputFloatingAndPullUp

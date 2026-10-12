@@ -139,9 +139,15 @@ def parse_modes_xml(path: Path) -> dict:
         tag = local_name(el.tag)
         if tag == "RefParameter":
             name = el.get("Name", "")
-            if not name or name in data["parameters"]:
+            if not name:
                 continue
-            item = {}
+            # 同名参数在 XML 里可能有多份定义(其中一份是 Visible=false 的精简副本,
+            # 坑:之前 NbrOfConversion 的 max 就被它带偏过)。所以属性和取值域都要**合并**:
+            # 属性取先出现的非空值,values 取并集 —— 只取第一份会丢掉大部分合法值。
+            item = data["parameters"].get(name)
+            if item is None:
+                item = {}
+                data["parameters"][name] = item
             for attr, key in (
                 ("Comment", "comment"),
                 ("Type", "type"),
@@ -152,9 +158,13 @@ def parse_modes_xml(path: Path) -> dict:
                 ("Group", "group"),
             ):
                 value = el.get(attr, "")
-                if value:
+                if value and not item.get(key):
                     item[key] = value
-            data["parameters"][name] = item
+            possible = [pv.get("Value") for pv in el if local_name(pv.tag) == "PossibleValue" and pv.get("Value")]
+            if possible:
+                merged = list(item.get("values") or [])
+                merged += [v for v in possible if v not in merged]
+                item["values"] = merged
         elif tag == "RefSignal":
             name = el.get("Name", "")
             if not name or name in data["signals"]:

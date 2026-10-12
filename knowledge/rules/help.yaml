@@ -15,7 +15,7 @@ guide: |-
     cubemx_new_project         从零生成 HAL 工程(首选入口)
     cubemx_intent              按"配置意图"改 .ioc(只说要什么,内部名查知识库;0.4.4.1 新增)
     cubemx_probe               在 .ioc 副本上试跑(commands 脚本命令 / inject 键注入)并给出差异(收录新外设用)
-    cubemx_load                加载 .ioc 回读配置 + 结构化摘要(只读)
+    cubemx_load                回读配置 + 结构化摘要(默认只解析文本、秒回;via_cubemx=True 才让 CubeMX 真加载)
     cubemx_configure           加载 .ioc,执行 set 命令序列并写回
     cubemx_generate            加载 .ioc 生成 HAL 代码
     cubemx_export_pinout       导出引脚配置 CSV(只读)
@@ -33,6 +33,21 @@ guide: |-
      commands(原始 set 命令)仍可用,两者可以混用(intent 的命令排在前面)
   3) 自己的库(如 SPL_OLED/Src/OLED.c + SPL_OLED/Inc)写进工程根 CMakeLists.txt 的用户区
      (# Add sources to executable / # Add include paths);该文件 CubeMX 只生成一次,不会被覆盖
+
+  【执行顺序与注入时机(重要:写意图/命令前先读)】
+  new_project 与 intent 的内部顺序固定,不要假设:
+  1) 意图(intents)先执行:TIM 内部时钟是**就地注入 .ioc**(在 CubeMX 脚本之前),
+     所以意图里的 TIM 在这一步就已写进 .ioc;
+  2) 然后才跑 CubeMX 脚本:`config load` → 执行 commands 里的 set 命令 → `config saveas`
+     —— 因此 **commands 中针对某 TIM 的 set 命令(如 TIM_MasterOutputTrigger)能生效的前提,
+        是该 TIM 已经存在于 .ioc**(意图注入的,或模板里本来就有);
+        外设未激活时 `set ip parameters ...` 会被 CubeMX **静默忽略**(不报错,白设);
+  3) 最后注入"脚本配不了"的键(NVIC 中断行、DMA 键组),时机是 **saveas 之后、generate 之前**;
+  4) 若 commands 里含 "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
+     server 会在第 3 步再注入一次 TIM 内部时钟(**幂等**:已存在就跳过)。
+  实践结论(实测):让 TIM 当触发源 → TIM 用 intent 配(先落进 .ioc),
+    `set ip parameters TIMx TIM_MasterOutputTrigger TIM_TRGO_UPDATE` 放 commands;
+    顺序反了 TRGO 会静默丢失(硬件不触发,但 generate 不报错)。
 
   【cubemx_new_project 参数(默认值而非强制)】
     mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
@@ -120,6 +135,8 @@ peripheral:
       server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
     - 1s 中断参数:72MHz 下 Prescaler=7199 + Period=9999(工具接口上传的是"分频比/计数"
       7200 / 10000,注入时自动减 1 落成寄存器值)。
+    - 更新中断:注入片段默认带 NVIC(会生成 TIMx_IRQHandler);只拿它当触发源、不要中断时,
+      意图里写 "irq": false(写 "interrupt": false 同义)。
     - TRGO 输出(给别的外设当触发源,如 ADC 的外部触发):可以用 set 命令配 ——
       set ip parameters TIM3 TIM_MasterOutputTrigger TIM_TRGO_UPDATE
       实测有效(2026-10-12):CubeMX 会自动把 TIM_MasterOutputTrigger 补进 TIMx.IPParameters。

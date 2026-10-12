@@ -16,6 +16,12 @@ parameters:
     type: list
     default: TIM_COUNTERMODE_UP
     group: Counter Settings
+    values:
+    - TIM_COUNTERMODE_UP
+    - TIM_COUNTERMODE_DOWN
+    - TIM_COUNTERMODE_CENTERALIGNED1
+    - TIM_COUNTERMODE_CENTERALIGNED2
+    - TIM_COUNTERMODE_CENTERALIGNED3
   Period:
     comment: Counter Period (AutoReload Register - 16 bits value )
     type: integer
@@ -28,6 +34,10 @@ parameters:
     type: list
     default: TIM_CLOCKDIVISION_DIV1
     group: Counter Settings
+    values:
+    - TIM_CLOCKDIVISION_DIV1
+    - TIM_CLOCKDIVISION_DIV2
+    - TIM_CLOCKDIVISION_DIV4
   RepetitionCounter:
     comment: Repetition Counter (RCR - 8 bits value)
     type: integer
@@ -40,37 +50,81 @@ parameters:
     type: list
     default: TIM_AUTORELOAD_PRELOAD_DISABLE
     group: Counter Settings
+    values:
+    - TIM_AUTORELOAD_PRELOAD_DISABLE
+    - TIM_AUTORELOAD_PRELOAD_ENABLE
   Channel:
     comment: Channel
     type: list
     default: TIM_CHANNEL_1
+    values:
+    - TIM_CHANNEL_1
+    - TIM_CHANNEL_2
+    - TIM_CHANNEL_3
+    - TIM_CHANNEL_4
   Output_Channel:
     comment: Output Channel
     type: list
     default: TIM_CHANNEL_1
+    values:
+    - TIM_CHANNEL_1
+    - TIM_CHANNEL_2
+    - TIM_CHANNEL_3
+    - TIM_CHANNEL_4
+    - TIM_CHANNEL_ALL
   Input_Channel:
     comment: Input Channel
     type: list
     default: TIM_CHANNEL_3
+    values:
+    - TIM_CHANNEL_1
+    - TIM_CHANNEL_2
+    - TIM_CHANNEL_3
+    - TIM_CHANNEL_4
+    - TIM_CHANNEL_ALL
   TIM_OnePulse_Mode:
     comment: One Pulse Mode
     type: list
     default: TIM_OPMODE_SINGLE
     group: Counter Settings
+    values:
+    - TIM_OPMODE_SINGLE
   ClockSource:
     comment: ClockSource
     type: list
     default: TIM_CLOCKSOURCE_INTERNAL
+    values:
+    - TIM_CLOCKSOURCE_INTERNAL
+    - TIM_CLOCKSOURCE_ITR0
+    - TIM_CLOCKSOURCE_ITR1
+    - TIM_CLOCKSOURCE_ITR2
+    - TIM_CLOCKSOURCE_ITR3
+    - TIM_CLOCKSOURCE_ETRMODE1
+    - TIM_CLOCKSOURCE_ETRMODE2
+    - TIM_CLOCKSOURCE_TI1ED
+    - TIM_CLOCKSOURCE_TI1
+    - TIM_CLOCKSOURCE_TI2
   ClockPrescaler:
     comment: Clock Prescaler
     type: list
     default: TIM_CLOCKPRESCALER_DIV1
     group: Clock
+    values:
+    - TIM_CLOCKPRESCALER_DIV1
+    - TIM_CLOCKPRESCALER_DIV2
+    - TIM_CLOCKPRESCALER_DIV4
+    - TIM_CLOCKPRESCALER_DIV8
   ClockPolarity:
     comment: Clock Polarity
     type: list
     default: TIM_CLOCKPOLARITY_BOTHEDGE
     group: Clock
+    values:
+    - TIM_CLOCKPOLARITY_RISING
+    - TIM_CLOCKPOLARITY_FALLING
+    - TIM_CLOCKPOLARITY_BOTHEDGE
+    - TIM_CLOCKPOLARITY_INVERTED
+    - TIM_CLOCKPOLARITY_NONINVERTED
   ClockFilter:
     comment: Clock Filter (4 bits value)
     type: integer
@@ -83,11 +137,22 @@ parameters:
     type: list
     default: TIM_TRIGGERPRESCALER_DIV1
     group: Trigger
+    values:
+    - TIM_TRIGGERPRESCALER_DIV1
+    - TIM_TRIGGERPRESCALER_DIV2
+    - TIM_TRIGGERPRESCALER_DIV4
+    - TIM_TRIGGERPRESCALER_DIV8
   Slave_TriggerPolarity:
     comment: Trigger Polarity
     type: list
     default: TIM_TRIGGERPOLARITY_RISING
     group: Trigger
+    values:
+    - TIM_TRIGGERPOLARITY_RISING
+    - TIM_TRIGGERPOLARITY_FALLING
+    - TIM_TRIGGERPOLARITY_BOTHEDGE
+    - TIM_TRIGGERPOLARITY_INVERTED
+    - TIM_TRIGGERPOLARITY_NONINVERTED
   Slave_TriggerFilter:
     comment: Trigger Filter
     type: integer
@@ -99,38 +164,66 @@ parameters:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_CH3:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_CH4:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_CH1:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_CH2:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_TRC:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
   ICSelection:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_DIRECTTI
+    values:
+    - TIM_ICSELECTION_DIRECTTI
+    - TIM_ICSELECTION_INDIRECTTI
+    - TIM_ICSELECTION_TRC
   ICSelection_TRC:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_TRC
+    values:
+    - TIM_ICSELECTION_TRC
   ICPrescaler:
     comment: Prescaler Division Ratio
     type: list
     default: TIM_ICPSC_DIV1
+    values:
+    - TIM_ICPSC_DIV1
+    - TIM_ICPSC_DIV2
+    - TIM_ICPSC_DIV4
+    - TIM_ICPSC_DIV8
   ICFilter:
     comment: Input Filter (4 bits value)
     type: integer
@@ -189,49 +282,109 @@ parameters:
     comment: 'Input Trigger '
     type: list
     default: TIM_TS_ITR0
+    values:
+    - TIM_TS_ITR0
+    - TIM_TS_ITR1
+    - TIM_TS_ITR2
+    - TIM_TS_ITR3
+    - TIM_TS_TI1F_ED
+    - TIM_TS_TI1FP1
+    - TIM_TS_TI2FP2
+    - TIM_TS_ETRF
   TIM_InputTrigger:
     comment: TIM_InputTrigger
     type: list
     default: TIM_TS_ITR0
+    values:
+    - TIM_TS_ITR0
+    - TIM_TS_ITR1
+    - TIM_TS_ITR2
+    - TIM_TS_ITR3
+    - TIM_TS_ITR4
+    - TIM_TS_ITR5
+    - TIM_TS_ITR6
+    - TIM_TS_ITR7
+    - TIM_TS_ITR8
+    - TIM_TS_ITR9
+    - TIM_TS_ITR10
+    - TIM_TS_ITR11
+    - TIM_TS_ITR12
+    - TIM_TS_ITR13
+    - TIM_TS_TI1F_ED
+    - TIM_TS_TI1FP1
+    - TIM_TS_TI2FP2
+    - TIM_TS_ETRF
   TIM_SlaveMode_List:
     comment: Slave Mode Controller
     type: list
     default: TIM_SLAVEMODE_DISABLE
     group: Counter Settings
+    values:
+    - TIM_SLAVEMODE_DISABLE
+    - TIM_SLAVEMODE_RESET
+    - TIM_SLAVEMODE_GATED
+    - TIM_SLAVEMODE_TRIGGER
+    - TIM_SLAVEMODE_EXTERNAL1
   TIM_SlaveMode:
     comment: Slave Mode Controller
     type: list
     default: TIM_SLAVEMODE_RESET
     group: Counter Settings
+    values:
+    - TIM_SLAVEMODE_RESET
+    - TIM_SLAVEMODE_GATED
+    - TIM_SLAVEMODE_TRIGGER
+    - TIM_SLAVEMODE_EXTERNAL1
+    - TIM_SLAVEMODE_COMBINED_RESETTRIGGER
+    - TIM_SLAVEMODE_DISABLE
   TIM_CommutationSource:
     comment: Commutation source
     type: list
     default: TIM_COMMUTATION_SOFTWARE
     group: Counter Settings
+    values:
+    - TIM_COMMUTATION_TRGI
+    - TIM_COMMUTATION_SOFTWARE
   ICPolarity_1:
     comment: Polarity Selection
     type: list
     default: TIM_INPUTCHANNELPOLARITY_RISING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_RISING
+    - TIM_INPUTCHANNELPOLARITY_FALLING
   ICPolarity_2:
     comment: Polarity Selection (opposite CH1)
     type: list
     default: TIM_INPUTCHANNELPOLARITY_FALLING
+    values:
+    - TIM_INPUTCHANNELPOLARITY_FALLING
+    - TIM_INPUTCHANNELPOLARITY_RISING
   ICSelection_1:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_DIRECTTI
+    values:
+    - TIM_ICSELECTION_DIRECTTI
+    - TIM_ICSELECTION_INDIRECTTI
   ICSelection_2:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_INDIRECTTI
+    values:
+    - TIM_ICSELECTION_INDIRECTTI
+    - TIM_ICSELECTION_DIRECTTI
   ICPrescaler_1:
     comment: Prescaler Division Ratio
     type: list
     default: TIM_ICPSC_DIV1
+    values:
+    - TIM_ICPSC_DIV1
   ICPrescaler_2:
     comment: Prescaler Division Ratio
     type: list
     default: TIM_ICPSC_DIV1
+    values:
+    - TIM_ICPSC_DIV1
   ICFilter_1:
     comment: Input Filter (4 bits value)
     type: integer
@@ -248,14 +401,20 @@ parameters:
     comment: Channel
     type: list
     default: TIM_CHANNEL_1
+    values:
+    - TIM_CHANNEL_1
   Channel_2:
     comment: Channel
     type: list
     default: TIM_CHANNEL_1
+    values:
+    - TIM_CHANNEL_2
   Channel_3:
     comment: Channel
     type: list
     default: TIM_CHANNEL_3
+    values:
+    - TIM_CHANNEL_3
   Pulse:
     comment: Pulse (16 bits value)
     type: integer
@@ -266,18 +425,29 @@ parameters:
     comment: Mode
     type: list
     default: TIM_OCMODE_PWM1
+    values:
+    - TIM_OCMODE_PWM1
+    - TIM_OCMODE_PWM2
   OCFastMode_PWM:
     comment: Fast Mode
     type: list
     default: TIM_OCFAST_DISABLE
+    values:
+    - TIM_OCFAST_DISABLE
+    - TIM_OCFAST_ENABLE
   DefaultOCFastMode:
     comment: Fast Mode
     type: list
     default: TIM_OCFAST_DISABLE
+    values:
+    - TIM_OCFAST_DISABLE
   OCMode_forced:
     comment: Mode
     type: list
     default: TIM_OCMODE_FORCED_ACTIVE
+    values:
+    - TIM_OCMODE_FORCED_ACTIVE
+    - TIM_OCMODE_FORCED_INACTIVE
   Separateur-channel1-nonParameter:
     comment: '          ____ Parameters for Channel 1 ____'
     type: subtitle
@@ -291,18 +461,46 @@ parameters:
     comment: Mode
     type: list
     default: TIM_OCMODE_TIMING
+    values:
+    - TIM_OCMODE_TIMING
+    - TIM_OCMODE_ACTIVE
+    - TIM_OCMODE_INACTIVE
+    - TIM_OCMODE_TOGGLE
+    - TIM_OCMODE_FORCED_ACTIVE
+    - TIM_OCMODE_FORCED_INACTIVE
   OCMode_2:
     comment: Mode
     type: list
     default: TIM_OCMODE_TIMING
+    values:
+    - TIM_OCMODE_TIMING
+    - TIM_OCMODE_ACTIVE
+    - TIM_OCMODE_INACTIVE
+    - TIM_OCMODE_TOGGLE
+    - TIM_OCMODE_FORCED_ACTIVE
+    - TIM_OCMODE_FORCED_INACTIVE
   OCMode_3:
     comment: Mode
     type: list
     default: TIM_OCMODE_TIMING
+    values:
+    - TIM_OCMODE_TIMING
+    - TIM_OCMODE_ACTIVE
+    - TIM_OCMODE_INACTIVE
+    - TIM_OCMODE_TOGGLE
+    - TIM_OCMODE_FORCED_ACTIVE
+    - TIM_OCMODE_FORCED_INACTIVE
   OCMode_4:
     comment: Mode
     type: list
     default: TIM_OCMODE_TIMING
+    values:
+    - TIM_OCMODE_TIMING
+    - TIM_OCMODE_ACTIVE
+    - TIM_OCMODE_INACTIVE
+    - TIM_OCMODE_TOGGLE
+    - TIM_OCMODE_FORCED_ACTIVE
+    - TIM_OCMODE_FORCED_INACTIVE
   Pulse_1:
     comment: Pulse (16 bits value)
     type: integer
@@ -325,126 +523,221 @@ parameters:
     comment: CH Polarity
     type: list
     default: TIM_OCPOLARITY_HIGH
+    values:
+    - TIM_OCPOLARITY_HIGH
+    - TIM_OCPOLARITY_LOW
   OCPolarity_2:
     comment: CH Polarity
     type: list
     default: TIM_OCPOLARITY_HIGH
+    values:
+    - TIM_OCPOLARITY_HIGH
+    - TIM_OCPOLARITY_LOW
   OCPolarity_3:
     comment: CH Polarity
     type: list
     default: TIM_OCPOLARITY_HIGH
+    values:
+    - TIM_OCPOLARITY_HIGH
+    - TIM_OCPOLARITY_LOW
   OCPolarity_4:
     comment: CH Polarity
     type: list
     default: TIM_OCPOLARITY_HIGH
+    values:
+    - TIM_OCPOLARITY_HIGH
+    - TIM_OCPOLARITY_LOW
   OCNPolarity_1:
     comment: CHN Polarity
     type: list
     default: TIM_OCNPOLARITY_HIGH
+    values:
+    - TIM_OCNPOLARITY_HIGH
+    - TIM_OCNPOLARITY_LOW
   OCNPolarity_2:
     comment: CHN Polarity
     type: list
     default: TIM_OCNPOLARITY_HIGH
+    values:
+    - TIM_OCNPOLARITY_HIGH
+    - TIM_OCNPOLARITY_LOW
   OCNPolarity_3:
     comment: CHN Polarity
     type: list
     default: TIM_OCNPOLARITY_HIGH
+    values:
+    - TIM_OCNPOLARITY_HIGH
+    - TIM_OCNPOLARITY_LOW
   OCIdleState_1:
     comment: CH Idle State
     type: list
     default: TIM_OCIDLESTATE_RESET
+    values:
+    - TIM_OCIDLESTATE_SET
+    - TIM_OCIDLESTATE_RESET
   OCIdleState_2:
     comment: CH Idle State
     type: list
     default: TIM_OCIDLESTATE_RESET
+    values:
+    - TIM_OCIDLESTATE_SET
+    - TIM_OCIDLESTATE_RESET
   OCIdleState_3:
     comment: CH Idle State
     type: list
     default: TIM_OCIDLESTATE_RESET
+    values:
+    - TIM_OCIDLESTATE_SET
+    - TIM_OCIDLESTATE_RESET
   OCIdleState_4:
     comment: CH Idle State
     type: list
     default: TIM_OCIDLESTATE_RESET
+    values:
+    - TIM_OCIDLESTATE_SET
+    - TIM_OCIDLESTATE_RESET
   OCNIdleState_1:
     comment: CHN Idle State
     type: list
     default: TIM_OCNIDLESTATE_RESET
+    values:
+    - TIM_OCNIDLESTATE_SET
+    - TIM_OCNIDLESTATE_RESET
   OCNIdleState_2:
     comment: CHN Idle State
     type: list
     default: TIM_OCNIDLESTATE_RESET
+    values:
+    - TIM_OCNIDLESTATE_SET
+    - TIM_OCNIDLESTATE_RESET
   OCNIdleState_3:
     comment: CHN Idle State
     type: list
     default: TIM_OCNIDLESTATE_RESET
+    values:
+    - TIM_OCNIDLESTATE_SET
+    - TIM_OCNIDLESTATE_RESET
   OCNIdleState_4:
     comment: CHN Idle State
     type: list
     default: TIM_OCNIDLESTATE_RESET
+    values:
+    - TIM_OCNIDLESTATE_SET
+    - TIM_OCNIDLESTATE_RESET
   OC1Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC2Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC3Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC4Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC5Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC6Preload:
     comment: Output compare preload
     type: list
     default: DISABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC1Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC2Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC3Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC4Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC5Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   OC6Preload_PWM:
     comment: Output compare preload
     type: list
     default: ENABLE
+    values:
+    - DISABLE
+    - ENABLE
   EncoderMode:
     comment: Encoder Mode
     type: list
     default: TIM_ENCODERMODE_TI1
+    values:
+    - TIM_ENCODERMODE_TI1
+    - TIM_ENCODERMODE_TI2
+    - TIM_ENCODERMODE_TI12
   IC1Polarity:
     comment: Polarity
     type: list
     default: TIM_ICPOLARITY_RISING
+    values:
+    - TIM_ICPOLARITY_RISING
+    - TIM_ICPOLARITY_FALLING
   IC1Selection:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_DIRECTTI
+    values:
+    - TIM_ICSELECTION_DIRECTTI
   IC1Prescaler:
     comment: Prescaler Division Ratio
     type: list
     default: TIM_ICPSC_DIV1
+    values:
+    - TIM_ICPSC_DIV1
+    - TIM_ICPSC_DIV2
+    - TIM_ICPSC_DIV4
+    - TIM_ICPSC_DIV8
   IC1Filter:
     comment: Input Filter
     type: integer
@@ -455,14 +748,24 @@ parameters:
     comment: Polarity
     type: list
     default: TIM_ICPOLARITY_RISING
+    values:
+    - TIM_ICPOLARITY_RISING
+    - TIM_ICPOLARITY_FALLING
   IC2Selection:
     comment: IC Selection
     type: list
     default: TIM_ICSELECTION_DIRECTTI
+    values:
+    - TIM_ICSELECTION_DIRECTTI
   IC2Prescaler:
     comment: Prescaler Division Ratio
     type: list
     default: TIM_ICPSC_DIV1
+    values:
+    - TIM_ICPSC_DIV1
+    - TIM_ICPSC_DIV2
+    - TIM_ICPSC_DIV4
+    - TIM_ICPSC_DIV8
   IC2Filter:
     comment: Input Filter
     type: integer
@@ -474,11 +777,23 @@ parameters:
     type: list
     default: TIM_TRGO_RESET
     group: Trigger Output (TRGO) Parameters
+    values:
+    - TIM_TRGO_RESET
+    - TIM_TRGO_ENABLE
+    - TIM_TRGO_UPDATE
+    - TIM_TRGO_OC1
+    - TIM_TRGO_OC1REF
+    - TIM_TRGO_OC2REF
+    - TIM_TRGO_OC3REF
+    - TIM_TRGO_OC4REF
   TIM_MasterSlaveMode:
     comment: Master/Slave Mode (MSM bit)
     type: list
     default: TIM_MASTERSLAVEMODE_DISABLE
     group: Trigger Output (TRGO) Parameters
+    values:
+    - TIM_MASTERSLAVEMODE_DISABLE
+    - TIM_MASTERSLAVEMODE_ENABLE
   DeadTime:
     comment: Dead Time
     type: integer
@@ -491,51 +806,84 @@ parameters:
     type: list
     default: TIM_OSSR_DISABLE
     group: Break And Dead Time management - Output Configuration
+    values:
+    - TIM_OSSR_DISABLE
+    - TIM_OSSR_ENABLE
   OffStateIDLEMode:
     comment: 'Off State Selection for Idle Mode (OSSI)  '
     type: list
     default: TIM_OSSI_DISABLE
     group: Break And Dead Time management - Output Configuration
+    values:
+    - TIM_OSSI_DISABLE
+    - TIM_OSSI_ENABLE
   LockLevel:
     comment: 'Lock Configuration  '
     type: list
     default: TIM_LOCKLEVEL_OFF
     group: Break And Dead Time management - Output Configuration
+    values:
+    - TIM_LOCKLEVEL_OFF
+    - TIM_LOCKLEVEL_1
+    - TIM_LOCKLEVEL_2
+    - TIM_LOCKLEVEL_3
   BreakState:
     comment: BRK State
     type: list
     default: TIM_BREAK_DISABLE
     group: Break And Dead Time management - BRK Configuration
+    values:
+    - TIM_BREAK_DISABLE
+    - TIM_BREAK_ENABLE
   BreakPolarity:
     comment: BRK Polarity
     type: list
     default: TIM_BREAKPOLARITY_HIGH
     group: Break And Dead Time management - BRK Configuration
+    values:
+    - TIM_BREAKPOLARITY_HIGH
+    - TIM_BREAKPOLARITY_LOW
   AutomaticOutput:
     comment: Automatic Output State
     type: list
     default: TIM_AUTOMATICOUTPUT_DISABLE
     group: Break And Dead Time management - Output Configuration
+    values:
+    - TIM_AUTOMATICOUTPUT_DISABLE
+    - TIM_AUTOMATICOUTPUT_ENABLE
   ClearInputState:
     comment: Clear Input State
     type: list
     default: ENABLE
     group: Clear Input
+    values:
+    - ENABLE
   ClearInputSource:
     comment: Clear Input Source
     type: list
     default: TIM_CLEARINPUTSOURCE_NONE
     group: Clear Input
+    values:
+    - TIM_CLEARINPUTSOURCE_NONE
+    - TIM_CLEARINPUTSOURCE_ETR
   ClearInputPolarity:
     comment: Clear Input Polarity
     type: list
     default: TIM_CLEARINPUTPOLARITY_NONINVERTED
     group: Clear Input
+    values:
+    - TIM_CLEARINPUTPOLARITY_NONINVERTED
+    - TIM_CLEARINPUTPOLARITY_INVERTED
   ClearInputPrescaler:
     comment: Clear Input Prescaler
     type: list
     default: TIM_CLEARINPUTPRESCALER_DIV1
     group: Clear Input
+    values:
+    - TIM_CLEARINPUTPRESCALER_DIV1
+    - TIM_CLEARINPUTPRESCALER_DIV2
+    - TIM_CLEARINPUTPRESCALER_DIV4
+    - TIM_CLEARINPUTPRESCALER_DIV8
   ClearInputFilter:
     comment: Clear Input Filter
     type: integer
@@ -548,37 +896,53 @@ parameters:
     type: list
     default: TIM_CHANNEL_1
     group: Clear Input
+    values:
+    - TIM_CHANNEL_1
   ClearChannel1:
     comment: Clear Channel 1
     type: list
     group: Clear Input
+    values:
+    - TIM_CHANNEL_1
   ClearChannel__2:
     comment: Clear Channel 2
     type: list
     default: TIM_CHANNEL_2
     group: Clear Input
+    values:
+    - TIM_CHANNEL_2
   ClearChannel2:
     comment: Clear Channel 2
     type: list
     group: Clear Input
+    values:
+    - TIM_CHANNEL_2
   ClearChannel__3:
     comment: Clear Channel 3
     type: list
     default: TIM_CHANNEL_3
     group: Clear Input
+    values:
+    - TIM_CHANNEL_3
   ClearChannel3:
     comment: Clear Channel 3
     type: list
     group: Clear Input
+    values:
+    - TIM_CHANNEL_3
   ClearChannel__4:
     comment: Clear Channel 4
     type: list
     default: TIM_CHANNEL_4
     group: Clear Input
+    values:
+    - TIM_CHANNEL_4
   ClearChannel4:
     comment: Clear Channel 4
     type: list
     group: Clear Input
+    values:
+    - TIM_CHANNEL_4
   Commutation_Delay:
     comment: Commutation Delay
     type: integer
@@ -589,11 +953,16 @@ parameters:
     comment: TI1_Selection
     type: list
     default: TIM_TI1SELECTION_XORCOMBINATION
+    values:
+    - TIM_TI1SELECTION_XORCOMBINATION
+    - TIM_TI1SELECTION_CH1
   TIM5_TI4_REMAP:
     comment: TI4 remap capabilities for TIM5
     type: list
     default: TIM_TIM5_LSI
     group: TI4 remap capabilities for TIM5
+    values:
+    - TIM_TIM5_LSI
 signals:
   BKIN:
     io_mode: AlternateFunctionPushPull

@@ -8,10 +8,18 @@ parameters:
     type: list
     default: VM_ASYNC
     group: Basic Parameters
+    values:
+    - VM_ASYNC
+    - VM_SYNC
+    - VM_IRDA
+    - VM_SMARTCARD
   VirtualClockMode:
     type: list
     default: VM_SYNC
     group: Basic Parameters
+    values:
+    - VM_SYNC
+    - VM_SMARTCARD
   BaudRate:
     comment: Baud Rate
     type: integer
@@ -25,51 +33,86 @@ parameters:
     type: list
     default: WORDLENGTH_8B
     group: Basic Parameters
+    values:
+    - WORDLENGTH_8B
+    - WORDLENGTH_9B
   UsartWordLength:
     comment: Word Length
     type: list
     default: USART_WORDLENGTH_8B
     group: Basic Parameters
+    values:
+    - USART_WORDLENGTH_8B
+    - USART_WORDLENGTH_9B
   IrdaWordLength:
     comment: Word Length
     type: list
     default: IRDA_WORDLENGTH_8B
     group: Basic Parameters
+    values:
+    - IRDA_WORDLENGTH_8B
+    - IRDA_WORDLENGTH_9B
   SmartCardWordLength:
     comment: Word Length
     type: list
     default: SMARTCARD_WORDLENGTH_9B
     group: Basic Parameters
+    values:
+    - SMARTCARD_WORDLENGTH_9B
   UartWordLength:
     comment: Word Length
     type: list
     default: UART_WORDLENGTH_8B
     group: Basic Parameters
+    values:
+    - UART_WORDLENGTH_8B
+    - UART_WORDLENGTH_9B
   StopBits:
     comment: Stop Bits
     type: list
     default: STOPBITS_1
     group: Basic Parameters
+    values:
+    - STOPBITS_1
+    - STOPBITS_2
+    - STOPBITS_0_5
+    - STOPBITS_1_5
   UsartStopBits:
     comment: Stop Bits
     type: list
     default: USART_STOPBITS_2
     group: Basic Parameters
+    values:
+    - USART_STOPBITS_2
+    - USART_STOPBITS_1
+    - USART_STOPBITS_1_5
+    - USART_STOPBITS_0_5
   UartStopBits:
     comment: Stop Bits
     type: list
     default: UART_STOPBITS_1
     group: Basic Parameters
+    values:
+    - UART_STOPBITS_1
+    - UART_STOPBITS_2
+    - UART_STOPBITS_1_5
   SmartCardStopBits:
     comment: Stop Bits
     type: list
     default: SMARTCARD_STOPBITS_1_5
     group: Basic Parameters
+    values:
+    - SMARTCARD_STOPBITS_1_5
+    - SMARTCARD_STOPBITS_0_5
   Parity:
     comment: Parity
     type: list
     default: PARITY_EVEN
     group: Basic Parameters
+    values:
+    - PARITY_EVEN
+    - PARITY_ODD
+    - PARITY_NONE
   UsartParity:
     comment: Parity
     type: list
@@ -95,6 +138,10 @@ parameters:
     type: list
     default: MODE_TX_RX
     group: Advanced Parameters
+    values:
+    - MODE_TX_RX
+    - MODE_RX
+    - MODE_TX
   UsartMode:
     comment: Data Direction
     type: list
@@ -115,36 +162,66 @@ parameters:
     type: list
     default: UART_MODE_TX_RX
     group: Advanced Parameters
+    values:
+    - UART_MODE_TX_RX
+    - UART_MODE_TX
+    - UART_MODE_RX
   HwFlowCtl:
     comment: Hardware Flow Control
     type: list
     default: UART_HWCONTROL_RTS
     group: Basic Parameters
+    values:
+    - UART_HWCONTROL_RTS
+    - UART_HWCONTROL_CTS
+    - UART_HWCONTROL_RTS_CTS
+    - UART_HWCONTROL_NONE
   OverSampling:
     comment: Over Sampling
     type: list
     default: 'null'
     group: Advanced Parameters
+    values:
+    - 'null'
+    - UART_OVERSAMPLING_16
   CLKPolarity:
     comment: Clock Polarity
     type: list
     default: SMARTCARD_POLARITY_LOW
     group: Clock Parameters
+    values:
+    - SMARTCARD_POLARITY_LOW
+    - SMARTCARD_POLARITY_HIGH
+    - USART_POLARITY_LOW
+    - USART_POLARITY_HIGH
   CLKPhase:
     comment: Clock Phase
     type: list
     default: SMARTCARD_PHASE_1EDGE
     group: Clock Parameters
+    values:
+    - SMARTCARD_PHASE_1EDGE
+    - SMARTCARD_PHASE_2EDGE
+    - USART_PHASE_1EDGE
+    - USART_PHASE_2EDGE
   CLKLastBit:
     comment: Clock Last Bit
     type: list
     default: SMARTCARD_LASTBIT_DISABLE
     group: Clock Parameters
+    values:
+    - SMARTCARD_LASTBIT_DISABLE
+    - SMARTCARD_LASTBIT_ENABLE
+    - USART_LASTBIT_DISABLE
+    - USART_LASTBIT_ENABLE
   IrDAMode:
     comment: IrDa Mode
     type: list
     default: IRDA_POWERMODE_NORMAL
     group: Advanced Parameters
+    values:
+    - IRDA_POWERMODE_LOWPOWER
+    - IRDA_POWERMODE_NORMAL
   Prescaler:
     comment: Prescaler
     type: integer
@@ -162,6 +239,9 @@ parameters:
     type: list
     default: SMARTCARD_NACK_DISABLE
     group: Advanced Parameters
+    values:
+    - SMARTCARD_NACK_DISABLE
+    - SMARTCARD_NACK_ENABLE
   GuardTime:
     comment: Guard Time
     type: integer
@@ -174,6 +254,9 @@ parameters:
     type: list
     default: UART_WAKEUPMETHOD_IDLELINE
     group: Advanced Parameters
+    values:
+    - UART_WAKEUPMETHOD_IDLELINE
+    - UART_WAKEUPMETHOD_ADDRESSMARK
   Address:
     comment: Wake-Up Address
     type: integer
@@ -186,6 +269,9 @@ parameters:
     type: list
     default: UART_LINBREAKDETECTLENGTH_10B
     group: Advanced Parameters
+    values:
+    - UART_LINBREAKDETECTLENGTH_10B
+    - UART_LINBREAKDETECTLENGTH_11B
 signals:
   CK:
     io_mode: AlternateFunctionPushPull

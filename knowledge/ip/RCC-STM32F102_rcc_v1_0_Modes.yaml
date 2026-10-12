@@ -23,6 +23,22 @@ parameters:
     comment: PLL Mul
     type: list
     default: RCC_PLL_MUL2
+    values:
+    - RCC_PLL_MUL2
+    - RCC_PLL_MUL3
+    - RCC_PLL_MUL4
+    - RCC_PLL_MUL5
+    - RCC_PLL_MUL6
+    - RCC_PLL_MUL7
+    - RCC_PLL_MUL8
+    - RCC_PLL_MUL9
+    - RCC_PLL_MUL10
+    - RCC_PLL_MUL11
+    - RCC_PLL_MUL12
+    - RCC_PLL_MUL13
+    - RCC_PLL_MUL14
+    - RCC_PLL_MUL15
+    - RCC_PLL_MUL16
   APB1TimCLKDivider:
     comment: APB1 Timer Clock Divider
     type: integer
@@ -39,6 +55,9 @@ parameters:
     comment: USB clock Divider
     type: list
     default: RCC_USBCLKSOURCE_PLL
+    values:
+    - RCC_USBCLKSOURCE_PLL
+    - RCC_USBCLKSOURCE_PLL_DIV1_5
   HSIDivPLL:
     comment: HSIRC Divider for PLL
     type: integer
@@ -49,6 +68,9 @@ parameters:
     comment: HSE Prediv Value
     type: list
     default: RCC_HSE_PREDIV_DIV1
+    values:
+    - RCC_HSE_PREDIV_DIV1
+    - RCC_HSE_PREDIV_DIV2
   RCC_RTC_Clock_Source_FROM_HSE:
     comment: HSE RTC Divider
     type: integer
@@ -71,14 +93,32 @@ parameters:
     comment: AHBCLK Divider
     type: list
     default: RCC_SYSCLK_DIV1
+    values:
+    - RCC_SYSCLK_DIV1
+    - RCC_SYSCLK_DIV2
+    - RCC_SYSCLK_DIV4
+    - RCC_SYSCLK_DIV8
+    - RCC_SYSCLK_DIV16
+    - RCC_SYSCLK_DIV64
+    - RCC_SYSCLK_DIV128
+    - RCC_SYSCLK_DIV256
+    - RCC_SYSCLK_DIV512
   ADCPresc:
     comment: ADC1 Clock Divider
     type: list
     default: RCC_ADCPCLK2_DIV2
+    values:
+    - RCC_ADCPCLK2_DIV2
+    - RCC_ADCPCLK2_DIV4
+    - RCC_ADCPCLK2_DIV6
+    - RCC_ADCPCLK2_DIV8
   TimSys_Div:
     comment: Cortex timer system Div
     type: list
     default: SYSTICK_CLKSOURCE_HCLK
+    values:
+    - SYSTICK_CLKSOURCE_HCLK
+    - SYSTICK_CLKSOURCE_HCLK_DIV8
   Cortex_DivARG:
     comment: Cortex_DivARG
     type: String
@@ -87,14 +127,29 @@ parameters:
     comment: APB1 Clock Divider
     type: list
     default: RCC_HCLK_DIV1
+    values:
+    - RCC_HCLK_DIV1
+    - RCC_HCLK_DIV2
+    - RCC_HCLK_DIV4
+    - RCC_HCLK_DIV8
+    - RCC_HCLK_DIV16
   APB2CLKDivider:
     comment: APB2 Clock Divider
     type: list
     default: RCC_HCLK_DIV1
+    values:
+    - RCC_HCLK_DIV1
+    - RCC_HCLK_DIV2
+    - RCC_HCLK_DIV4
+    - RCC_HCLK_DIV8
+    - RCC_HCLK_DIV16
   PLLSourceVirtual:
     comment: PLL Source
     type: list
     default: RCC_PLLSOURCE_HSE
+    values:
+    - RCC_PLLSOURCE_HSE
+    - RCC_PLLSOURCE_HSI_DIV2
   PLLSourceVirtualString:
     comment: PLL Source
     type: string
@@ -103,6 +158,9 @@ parameters:
     comment: PLL Source
     type: list
     default: +PLLSourceVirtualString
+    values:
+    - RCC_PLLSOURCE_HSI_DIV2
+    - RCC_PLLSOURCE_HSE
   PLLSourceLL:
     comment: PLLSourceLL
     type: list
@@ -111,22 +169,42 @@ parameters:
     comment: SYSCLK Source
     type: list
     default: RCC_SYSCLKSOURCE_HSI
+    values:
+    - RCC_SYSCLKSOURCE_HSI
+    - RCC_SYSCLKSOURCE_HSE
+    - RCC_SYSCLKSOURCE_PLLCLK
   RTCClockSelection:
     comment: RTC Clock Selection
     type: list
     default: RCC_RTCCLKSOURCE_LSI
+    values:
+    - RCC_RTCCLKSOURCE_LSE
+    - RCC_RTCCLKSOURCE_LSI
+    - RCC_RTCCLKSOURCE_HSE_DIV128
   RCC_RTC_Clock_SourceLL:
     comment: RTC Clock Source
     type: list
     default: RCC_RTCCLKSOURCE_LSE
+    values:
+    - RCC_RTCCLKSOURCE_LSE
+    - RCC_RTCCLKSOURCE_LSI
+    - RCC_RTCCLKSOURCE_HSE
   RCC_MCOSource:
     comment: MCO Clock Source
     type: list
     default: RCC_MCO1SOURCE_SYSCLK
+    values:
+    - RCC_MCO1SOURCE_SYSCLK
+    - RCC_MCO1SOURCE_HSI
+    - RCC_MCO1SOURCE_HSE
+    - RCC_MCO1SOURCE_PLLCLK
   EnbaleCSS:
     comment: 'Clock Security System: available only when HSE is used directly or undirectly as System Clock'
     type: list
     default: 'false'
+    values:
+    - 'true'
+    - 'false'
   HSI_VALUE:
     comment: HSI Source
     type: double
@@ -306,58 +384,100 @@ parameters:
     comment: HSE OSC
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   EnableHSERTCDevisor:
     comment: RTC and HSE Oscillator
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   EnableMCOMultDivisor:
     comment: PLL and MCO
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   RTCEnable:
     comment: RTC
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   EnableLSERTC:
     comment: EnableLSERTC
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   EnableLSE:
     comment: LSE OSC
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   IWDGEnable:
     comment: IWDG
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   FSMCEnable:
     comment: FSMC
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   SDIOEnable:
     comment: SDIO
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   USBEnable:
     comment: USB
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   MCOEnable:
     comment: Master Clock Output
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   ADCEnable:
     comment: ADC Clock Output
     type: list
     default: 'true'
+    values:
+    - 'true'
+    - 'false'
   I2S2Enable:
     comment: I2S2 instance
     type: list
     default: 'false'
+    values:
+    - 'false'
+    - 'true'
   I2S3Enable:
     comment: I2S3 instance
     type: list
     default: 'false'
+    values:
+    - 'false'
+    - 'true'
   HSEUsed:
     comment: HSE used flag
     type: integer
@@ -367,10 +487,17 @@ parameters:
   OscillatorTypeHSE:
     comment: Clock Type HSE
     type: list
+    default: RCC_OSCILLATORTYPE_HSE
+    values:
+    - RCC_OSCILLATORTYPE_HSE
   HSEState:
     comment: Hse State
     type: list
     default: RCC_HSE_BYPASS
+    values:
+    - RCC_HSE_BYPASS
+    - RCC_HSE_ON
+    - RCC_HSE_OFF
   LSEUsed:
     comment: LSE Is Used
     type: integer
@@ -379,13 +506,23 @@ parameters:
   OscillatorTypeLSE:
     comment: Clock Type LSE
     type: list
+    default: RCC_OSCILLATORTYPE_LSE
+    values:
+    - RCC_OSCILLATORTYPE_LSE
   LSEState:
     comment: Lse State
     type: list
     default: RCC_LSE_BYPASS
+    values:
+    - RCC_LSE_BYPASS
+    - RCC_LSE_ON
+    - RCC_LSE_OFF
   OscillatorTypeLSI:
     comment: Clock Type LSI
     type: list
+    default: RCC_OSCILLATORTYPE_LSI
+    values:
+    - RCC_OSCILLATORTYPE_LSI
   LSIUsed:
     comment: LSI used flag
     type: integer
@@ -396,9 +533,15 @@ parameters:
     comment: Lsi State
     type: list
     default: RCC_LSI_OFF
+    values:
+    - RCC_LSI_OFF
+    - RCC_LSI_ON
   OscillatorTypeHSI:
     comment: Clock Type HSI
     type: list
+    default: RCC_OSCILLATORTYPE_HSI
+    values:
+    - RCC_OSCILLATORTYPE_HSI
   HSIUsed:
     comment: HSI Is Used
     type: integer
@@ -408,6 +551,8 @@ parameters:
     comment: Hsi State
     type: list
     default: RCC_HSI_OFF
+    values:
+    - RCC_HSI_ON
   PLLUsed:
     comment: MainPLL Is Used
     type: integer
@@ -417,6 +562,9 @@ parameters:
     comment: Pll State
     type: list
     default: RCC_PLL_OFF
+    values:
+    - RCC_PLL_OFF
+    - RCC_PLL_ON
   PeriphClockSelectionARG:
     comment: Periph Clock Selection
     type: list
@@ -429,22 +577,32 @@ parameters:
     comment: RCC_PERIPHCLK_I2S2Var
     type: list
     default: RCC_PERIPHCLK_I2S2
+    values:
+    - RCC_PERIPHCLK_I2S2
   RCC_PERIPHCLK_I2S3Var:
     comment: RCC_PERIPHCLK_I2S3Var
     type: list
     default: RCC_PERIPHCLK_I2S3
+    values:
+    - RCC_PERIPHCLK_I2S3
   RCC_PERIPHCLK_RTCVar:
     comment: RCC_PERIPHCLK_RTCVar
     type: list
     default: RCC_PERIPHCLK_RTC
+    values:
+    - RCC_PERIPHCLK_RTC
   RCC_PERIPHCLK_ADCVar:
     comment: RCC_PERIPHCLK_ADCVar
     type: list
     default: RCC_PERIPHCLK_ADC
+    values:
+    - RCC_PERIPHCLK_ADC
   RCC_PERIPHCLK_USBVar:
     comment: RCC_PERIPHCLK_USBVar
     type: list
     default: RCC_PERIPHCLK_USB
+    values:
+    - RCC_PERIPHCLK_USB
   I2S2ClockSelectionARG:
     comment: I2S2ClockSelectionARG
     type: list
@@ -536,18 +694,26 @@ parameters:
     comment: Clock Type SysClk
     type: list
     default: RCC_CLOCKTYPE_SYSCLK
+    values:
+    - RCC_CLOCKTYPE_SYSCLK
   ClockTypeHCLK:
     comment: Clock Type AHB
     type: list
     default: RCC_CLOCKTYPE_HCLK
+    values:
+    - RCC_CLOCKTYPE_HCLK
   ClockTypePCLK1:
     comment: Clock Type HCLK1
     type: list
     default: RCC_CLOCKTYPE_PCLK1
+    values:
+    - RCC_CLOCKTYPE_PCLK1
   ClockTypePCLK2:
     comment: Clock Type HCLK2
     type: list
     default: RCC_CLOCKTYPE_PCLK2
+    values:
+    - RCC_CLOCKTYPE_PCLK2
   VDD_VALUE:
     comment: VDD voltage (V)
     type: double
@@ -561,19 +727,30 @@ parameters:
     type: uniqueElementList
     default: FLASH_LATENCY_0
     group: System Parameters
+    values:
+    - FLASH_LATENCY_0
+    - FLASH_LATENCY_1
+    - FLASH_LATENCY_2
   PREFETCH_ENABLE:
     comment: Prefetch Buffer
     type: list
     default: '1'
     group: System Parameters
+    values:
+    - '1'
+    - '0'
   RCC_MCO:
     comment: Clock Output
     type: list
     default: RCC_MCO
+    values:
+    - RCC_MCO
   RCC_MCODiv:
     comment: MCO Prescaler
     type: list
     default: RCC_MCODIV_1
+    values:
+    - RCC_MCODIV_1
   PLLUsedForSys:
     comment: MainPLL Is Used
     type: integer

@@ -9,21 +9,32 @@ parameters:
     type: list
     default: I2C_Standard
     group: Timing configuration
+    values:
+    - I2C_Standard
   I2C_Mode:
     comment: 'I2C Speed Mode '
     type: list
     default: I2C_Standard
     group: Master Features
+    values:
+    - I2C_Standard
+    - I2C_Fast
   SMBusAnalogFilter:
     comment: Analog Filter
     type: list
     default: SMBUS_ANALOGFILTER_ENABLE
     group: Timing configuration
+    values:
+    - SMBUS_ANALOGFILTER_ENABLE
+    - SMBUS_ANALOGFILTER_DISABLE
   Analog_Filter:
     comment: Analog Filter
     type: list
     default: I2C_ANALOGFILTER_ENABLE
     group: Timing configuration
+    values:
+    - I2C_ANALOGFILTER_DISABLE
+    - I2C_ANALOGFILTER_ENABLE
   I2C_Coeff_DF:
     comment: Coefficient of Digital Filter
     type: integer
@@ -50,6 +61,9 @@ parameters:
     type: list
     default: I2C_DUTYCYCLE_2
     group: Master Features
+    values:
+    - I2C_DUTYCYCLE_2
+    - I2C_DUTYCYCLE_16_9
   OwnAddress:
     comment: Primary slave address
     type: integer
@@ -69,6 +83,9 @@ parameters:
     type: list
     default: I2C_ADDRESSINGMODE_7BIT
     group: Slave Features
+    values:
+    - I2C_ADDRESSINGMODE_7BIT
+    - I2C_ADDRESSINGMODE_10BIT
   OwnAddress2:
     comment: Secondary slave address
     type: integer
@@ -83,31 +100,54 @@ parameters:
     min: '0'
     max: '127'
     group: Slave Features
+    values:
+    - '0'
   DualAddressMode:
     comment: Dual Address Acknowledged
     type: list
     default: I2C_DUALADDRESS_DISABLE
     group: Slave Features
+    values:
+    - I2C_DUALADDRESS_DISABLE
+    - I2C_DUALADDRESS_ENABLE
   GeneralCallMode:
     comment: General Call address detection
     type: list
     default: I2C_GENERALCALL_DISABLE
     group: Slave Features
+    values:
+    - I2C_GENERALCALL_DISABLE
+    - I2C_GENERALCALL_ENABLE
   NoStretchMode:
     comment: Clock No Stretch Mode
     type: list
     default: I2C_NOSTRETCH_DISABLE
     group: Slave Features
+    values:
+    - I2C_NOSTRETCH_DISABLE
+    - I2C_NOSTRETCH_ENABLE
   OwnAddress2Masks:
     comment: Secondary Address Mask
     type: list
     default: I2C_OA2_NOMASK
     group: Slave Features
+    values:
+    - I2C_OA2_NOMASK
+    - I2C_OA2_MASK01
+    - I2C_OA2_MASK02
+    - I2C_OA2_MASK03
+    - I2C_OA2_MASK04
+    - I2C_OA2_MASK05
+    - I2C_OA2_MASK06
+    - I2C_OA2_MASK07
   TIDLE:
     comment: Idle Clock Timeout Detection
     type: list
     default: SMBUS_TIDLE_DISABLED
     group: Timeout configuration
+    values:
+    - SMBUS_TIDLE_ENABLED
+    - SMBUS_TIDLE_DISABLED
   Timeout:
     comment: Timeout
     type: string
@@ -118,16 +158,25 @@ parameters:
     type: list
     default: 'null'
     group: SMBus Features
+    values:
+    - SMBUS_PEC_DISABLE
+    - SMBUS_PEC_ENABLE
   SMBusPeripheralMode:
     comment: Peripheral Mode
     type: list
     default: 'null'
     group: SMBus Features
+    values:
+    - SMBUS_PERIPHERAL_MODE_SMBUS_HOST
+    - SMBUS_PERIPHERAL_MODE_SMBUS_SLAVE
+    - SMBUS_PERIPHERAL_MODE_SMBUS_SLAVE_ARP
   SMBusAddressingMode:
     comment: Primary Address Length selection
     type: list
     default: 'null'
     group: SMBus Slave Features
+    values:
+    - SMBUS_ADDRESSINGMODE_7BIT
   SMBusOwnAddress:
     comment: Primary slave address
     type: integer
@@ -149,6 +198,8 @@ parameters:
     min: '0'
     max: '127'
     group: SMBus Slave Features
+    values:
+    - '0'
   SMBusOwnAddress22:
     comment: Secondary slave address
     type: integer
@@ -156,26 +207,46 @@ parameters:
     min: '0'
     max: '127'
     group: SMBus Slave Features
+    values:
+    - '0'
   SMBusDualAddressMode:
     comment: Dual Address Acknowledged
     type: list
     default: 'null'
     group: SMBus Slave Features
+    values:
+    - SMBUS_DUALADDRESS_DISABLE
+    - SMBUS_DUALADDRESS_ENABLE
   SMBusGeneralCallMode:
     comment: General Call Address Detection
     type: list
     default: 'null'
     group: SMBus Slave Features
+    values:
+    - SMBUS_GENERALCALL_DISABLE
+    - SMBUS_GENERALCALL_ENABLE
   SMBusNoStretchMode:
     comment: Clock No Stretch Mode
     type: list
     default: 'null'
     group: SMBus Slave Features
+    values:
+    - SMBUS_NOSTRETCH_DISABLE
+    - SMBUS_NOSTRETCH_ENABLE
   SMBusOwnAddress2Masks:
     comment: Secondary Address Mask
     type: list
     default: SMBUS_OA2_NOMASK
     group: SMBus Slave Features
+    values:
+    - SMBUS_OA2_NOMASK
+    - SMBUS_OA2_MASK01
+    - SMBUS_OA2_MASK02
+    - SMBUS_OA2_MASK03
+    - SMBUS_OA2_MASK04
+    - SMBUS_OA2_MASK05
+    - SMBUS_OA2_MASK06
+    - SMBUS_OA2_MASK07
 signals:
   SCL:
     io_mode: AlternateFunctionOpenDrainNoPullOrPullUp

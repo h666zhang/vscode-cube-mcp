@@ -10,6 +10,14 @@ parameters:
     type: list
     default: IWDG_PRESCALER_4
     group: Watchdog Clocking
+    values:
+    - IWDG_PRESCALER_4
+    - IWDG_PRESCALER_8
+    - IWDG_PRESCALER_16
+    - IWDG_PRESCALER_32
+    - IWDG_PRESCALER_64
+    - IWDG_PRESCALER_128
+    - IWDG_PRESCALER_256
   Reload:
     comment: IWDG down-counter reload value
     type: integer

@@ -6,26 +6,46 @@ parameters:
     type: list
     default: '0'
     group: Newlib settings (see parameter description first)
+    values:
+    - '0'
+    - '1'
   copyHeapFile:
     comment: Use FW pack heap file
     type: list
     default: '1'
     group: Project settings (see parameter description first)
+    values:
+    - '0'
+    - '1'
   FreeRTOS_API:
     comment: FreeRTOS API
     type: uniqueElementList
     default: '2'
     group: API
+    values:
+    - '2'
+    - '1'
+    - '0'
   CMSIS_version:
     comment: CMSIS-RTOS version
     type: String
     default: '1.02'
     group: Versions
+    values:
+    - '1.02'
+    - 2.1.3
+    - '2.00'
+    - undefined
   FREERTOS_version:
     comment: FreeRTOS version
     type: String
     default: 10.0.1
     group: Versions
+    values:
+    - 10.0.1
+    - 10.3.1
+    - 10.2.1
+    - 10.6.2
   RAM_SIZE:
     comment: RAM_SIZE
     type: integer
@@ -47,11 +67,17 @@ parameters:
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configCPU_CLOCK_HZ:
     comment: CPU_CLOCK_HZ
     type: uniqueElementList
     default: SystemD2Clock
     group: Kernel settings
+    values:
+    - SystemD2Clock
+    - SystemCoreClock
   configTICK_RATE_HZ:
     comment: TICK_RATE_HZ
     type: integer
@@ -64,6 +90,8 @@ parameters:
     type: uniqueElementList
     default: '56'
     group: Kernel settings
+    min: '4'
+    max: '32'
   configUSE_SB_COMPLETED_CALLBACK:
     comment: USE_SB_COMPLETED_CALLBACK
     type: integer
@@ -98,26 +126,40 @@ parameters:
     type: uniqueElementList
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
   configIDLE_SHOULD_YIELD:
     comment: IDLE_SHOULD_YIELD
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configUSE_MUTEXES:
     comment: USE_MUTEXES
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configUSE_RECURSIVE_MUTEXES:
     comment: USE_RECURSIVE_MUTEXES
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configUSE_COUNTING_SEMAPHORES:
     comment: USE_COUNTING_SEMAPHORES
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '1'
+    - '0'
   configQUEUE_REGISTRY_SIZE:
     comment: QUEUE_REGISTRY_SIZE
     type: integer
@@ -130,6 +172,9 @@ parameters:
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configTOTAL_HEAP_SIZE:
     comment: TOTAL_HEAP_SIZE
     type: integer
@@ -150,46 +195,78 @@ parameters:
     type: list
     default: '0'
     group: Memory management settings
+    values:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '10'
   configGENERATE_RUN_TIME_STATS:
     comment: GENERATE_RUN_TIME_STATS
     type: list
     default: '0'
     group: Run time and task stats gathering related definitions
+    values:
+    - '0'
+    - '1'
   configUSE_TRACE_FACILITY:
     comment: USE_TRACE_FACILITY
     type: list
     default: '1'
     group: Run time and task stats gathering related definitions
+    values:
+    - '1'
+    - '0'
   configUSE_STATS_FORMATTING_FUNCTIONS:
     comment: USE_STATS_FORMATTING_FUNCTIONS
     type: list
     default: '0'
     group: Run time and task stats gathering related definitions
+    values:
+    - '0'
+    - '1'
   configUSE_IDLE_HOOK:
     comment: USE_IDLE_HOOK
     type: list
     default: '0'
     group: Hook function related definitions
+    values:
+    - '0'
+    - '1'
   configUSE_TICK_HOOK:
     comment: USE_TICK_HOOK
     type: list
     default: '0'
     group: Hook function related definitions
+    values:
+    - '0'
+    - '1'
   configUSE_MALLOC_FAILED_HOOK:
     comment: USE_MALLOC_FAILED_HOOK
     type: list
     default: '0'
     group: Hook function related definitions
+    values:
+    - '0'
+    - '1'
   configCHECK_FOR_STACK_OVERFLOW:
     comment: CHECK_FOR_STACK_OVERFLOW
     type: list
     default: '0'
     group: Hook function related definitions
+    values:
+    - '0'
+    - '1'
+    - '2'
   configUSE_CO_ROUTINES:
     comment: USE_CO_ROUTINES
     type: list
     default: '0'
     group: Co-routine related definitions
+    values:
+    - '0'
+    - '1'
   configMAX_CO_ROUTINE_PRIORITIES:
     comment: MAX_CO_ROUTINE_PRIORITIES
     type: integer
@@ -202,6 +279,9 @@ parameters:
     type: list
     default: '0'
     group: Software timer definitions
+    values:
+    - '0'
+    - '1'
   configTIMER_TASK_PRIORITY:
     comment: TIMER_TASK_PRIORITY
     type: integer
@@ -253,201 +333,323 @@ parameters:
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_uxTaskPriorityGet:
     comment: uxTaskPriorityGet
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_vTaskDelete:
     comment: vTaskDelete
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_vTaskCleanUpResources:
     comment: vTaskCleanUpResources
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_vTaskSuspend:
     comment: vTaskSuspend
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '1'
+    - '0'
   INCLUDE_xTaskDelayUntil:
     comment: xTaskDelayUntil
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_vTaskDelayUntil:
     comment: vTaskDelayUntil
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_vTaskDelay:
     comment: vTaskDelay
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTaskGetSchedulerState:
     comment: xTaskGetSchedulerState
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   configUSE_ALTERNATIVE_API:
     comment: USE_ALTERNATIVE_API
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTaskResumeFromISR:
     comment: xTaskResumeFromISR
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xQueueGetMutexHolder:
     comment: xQueueGetMutexHolder
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xSemaphoreGetMutexHolder:
     comment: xSemaphoreGetMutexHolder
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_pcTaskGetTaskName:
     comment: pcTaskGetTaskName
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_uxTaskGetStackHighWaterMark:
     comment: uxTaskGetStackHighWaterMark
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTaskGetCurrentTaskHandle:
     comment: xTaskGetCurrentTaskHandle
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '1'
+    - '0'
   INCLUDE_eTaskGetState:
     comment: eTaskGetState
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '1'
+    - '0'
   INCLUDE_xEventGroupSetBitFromISR:
     comment: xEventGroupSetBitFromISR
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTimerPendFunctionCall:
     comment: xTimerPendFunctionCall
     type: list
     default: '1'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   configENABLE_BACKWARD_COMPATIBILITY:
     comment: ENABLE_BACKWARD_COMPATIBILITY
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configUSE_PORT_OPTIMISED_TASK_SELECTION:
     comment: USE_PORT_OPTIMISED_TASK_SELECTION
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configUSE_TICKLESS_IDLE:
     comment: USE_TICKLESS_IDLE
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
+    - '2'
   configUSE_TASK_NOTIFICATIONS:
     comment: USE_TASK_NOTIFICATIONS
     type: list
     default: '1'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configOVERRIDE_DEFAULT_TICK_CONFIGURATION:
     comment: OVERRIDE_DEFAULT_TICK_CONFIGURATION
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   MEMORY_ALLOCATION:
     comment: Memory Allocation
     type: uniqueElementList
     default: '2'
     group: Memory management settings
+    values:
+    - '2'
+    - '0'
+    - '1'
   configUSE_DAEMON_TASK_STARTUP_HOOK:
     comment: USE_DAEMON_TASK_STARTUP_HOOK
     type: list
     default: '0'
     group: Hook function related definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTaskAbortDelay:
     comment: xTaskAbortDelay
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   INCLUDE_xTaskGetHandle:
     comment: xTaskGetHandle
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   configRECORD_STACK_HIGH_ADDRESS:
     comment: RECORD_STACK_HIGH_ADDRESS
     type: list
     default: '0'
     group: Kernel settings
+    values:
+    - '0'
+    - '1'
   configENABLE_MPU:
     comment: ENABLE_MPU
     type: list
     default: '0'
     group: MPU/FPU
+    values:
+    - '0'
+    - '1'
   configENABLE_FPU:
     comment: ENABLE_FPU
     type: list
     default: '0'
     group: MPU/FPU
+    values:
+    - '0'
+    - '1'
   configMESSAGE_BUFFER_LENGTH_TYPE:
     comment: MESSAGE_BUFFER_LENGTH_TYPE
     type: uniqueElementList
     default: size_t
     group: Added with 10.2.1 support
+    values:
+    - size_t
+    - none
   configUSE_POSIX_ERRNO:
     comment: USE_POSIX_ERRNO
     type: list
     default: '0'
     group: Added with 10.2.1 support
+    values:
+    - '0'
+    - '1'
   INCLUDE_uxTaskGetStackHighWaterMark2:
     comment: uxTaskGetStackHighWaterMark2
     type: list
     default: '0'
     group: Include definitions
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_THREAD_SUSPEND_RESUME:
     comment: USE_OS2_THREAD_SUSPEND_RESUME
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_THREAD_ENUMERATE:
     comment: USE_OS2_THREAD_ENUMERATE
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_EVENTFLAGS_FROM_ISR:
     comment: USE_OS2_EVENTFLAGS_FROM_ISR
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_THREAD_FLAGS:
     comment: USE_OS2_THREAD_FLAGS
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_TIMER:
     comment: USE_OS2_TIMER
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   configUSE_OS2_MUTEX:
     comment: USE_OS2_MUTEX
     type: list
     default: '1'
     group: CMSIS-RTOS V2 flags
+    values:
+    - '0'
+    - '1'
   FirstAddedTab:
     comment: First additional tab
     type: string

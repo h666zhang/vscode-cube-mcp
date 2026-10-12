@@ -9,21 +9,36 @@ parameters:
     type: list
     default: RTC_AUTO_1_SECOND
     group: General
+    values:
+    - RTC_AUTO_1_SECOND
+    - '0'
   AsynchPrediv:
     comment: Asynchronous Predivider value
     type: list
     default: RTC_AUTO_1_SECOND
     group: General
+    values:
+    - RTC_AUTO_1_SECOND
+    min: '0'
+    max: '1048575'
   OutPut:
     comment: Output
     type: list
     default: RTC_OUTPUTSOURCE_NONE
     group: General
+    values:
+    - RTC_OUTPUTSOURCE_NONE
+    - RTC_OUTPUTSOURCE_ALARM
+    - RTC_OUTPUTSOURCE_CALIBCLOCK
+    - RTC_OUTPUTSOURCE_SECOND
   Format:
     comment: Data Format
     type: list
     default: RTC_FORMAT_BCD
     group: Calendar Time
+    values:
+    - RTC_FORMAT_BIN
+    - RTC_FORMAT_BCD
   Hours:
     comment: Hours
     type: decimal
@@ -65,11 +80,32 @@ parameters:
     type: list
     default: RTC_WEEKDAY_MONDAY
     group: Calendar Date
+    values:
+    - RTC_WEEKDAY_MONDAY
+    - RTC_WEEKDAY_TUESDAY
+    - RTC_WEEKDAY_WEDNESDAY
+    - RTC_WEEKDAY_THURSDAY
+    - RTC_WEEKDAY_FRIDAY
+    - RTC_WEEKDAY_SATURDAY
+    - RTC_WEEKDAY_SUNDAY
   Month:
     comment: Month
     type: list
     default: RTC_MONTH_JANUARY
     group: Calendar Date
+    values:
+    - RTC_MONTH_JANUARY
+    - RTC_MONTH_FEBRUARY
+    - RTC_MONTH_MARCH
+    - RTC_MONTH_APRIL
+    - RTC_MONTH_MAY
+    - RTC_MONTH_JUNE
+    - RTC_MONTH_JULY
+    - RTC_MONTH_AUGUST
+    - RTC_MONTH_SEPTEMBER
+    - RTC_MONTH_OCTOBER
+    - RTC_MONTH_NOVEMBER
+    - RTC_MONTH_DECEMBER
   Date:
     comment: Date
     type: decimal
@@ -135,16 +171,23 @@ parameters:
     type: list
     default: RTC_ALARM_A
     group: Alarm A
+    values:
+    - RTC_ALARM_A
   Tamper:
     comment: Tamper
     type: list
     default: RTC_TAMPER_1
     group: Tamper
+    values:
+    - RTC_TAMPER_1
   Trigger:
     comment: Tamper Trigger
     type: list
     default: RTC_TAMPERTRIGGER_LOWLEVEL
     group: Tamper
+    values:
+    - RTC_TAMPERTRIGGER_LOWLEVEL
+    - RTC_TAMPERTRIGGER_HIGHLEVEL
 signals:
   TAMPER:
     io_mode: System

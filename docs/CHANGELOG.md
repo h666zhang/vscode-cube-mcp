@@ -2,6 +2,26 @@
 
 本项目的版本变更记录。开发笔记(原理、实测、SOP)见 [README.dev-notes.md](README.dev-notes.md)。
 
+## 0.4.4.2(2026-10-12)
+
+补三处"新会话实测"暴露的缺口 + 一处性能优化(完整实测记录见 dev-notes)。
+
+- **`cubemx_load` 默认不再启动 CubeMX**(新增 `via_cubemx` 参数):只解析 `.ioc` 文本、
+  返回结构化摘要,秒回;要确认"CubeMX 认不认这份 .ioc"才传 `via_cubemx=True`。
+  agent 回读配置是高频动作,以前每次都要等 CubeMX 启动 10~30s
+- **`cubemx_help` 补了「执行顺序与注入时机」一节**:intents 先于 CubeMX 脚本执行、
+  TIM 内部时钟是就地注入、commands 里针对某 TIM 的 set 命令必须在该 TIM 已存在时才生效
+  (否则被静默忽略)、注入类键(NVIC/DMA)排在 `saveas` 之后 generate 之前。
+  这些以前只存在于源码里 —— 实测时 agent 是读完 `intent_resolver.py` 才知道顺序
+- **TIM 意图支持 `irq: false`**:内部时钟注入片段默认带 `NVIC.TIMx_IRQn`(会生成 handler),
+  只拿它当触发源时可以关掉(`interrupt: false` 同义)
+- **知识库导出参数的取值域**:`RefParameter` 现在带 `values`(如 ADC 的 14 个
+  `ExternalTrigConv` 合法值);同名参数在 XML 里有多份定义(其中一份是 `Visible=false` 的
+  精简副本),取**并集**而不是只取第一份。以前要确认 `ADC_EXTERNALTRIGCONV_T3_TRGO`
+  这种枚举名只能去翻 CubeMX 的 db XML
+- 另:0.4.4.1 段里标记的"发布后修复"(`ToolError` 继承 SDK、`authors` 恢复)也随本版带出
+- 测试 189 → **209**(201 单元/协议 + 8 集成)
+
 ## 0.4.4.1(2026-10-10 定号,2026-10-12 发布)
 
 重构:把 STM32 的事实从代码里搬进知识库,并加了"配置意图"这一层。(已于 2026-10-12 发布到 PyPI)
@@ -147,7 +167,7 @@
 - 测试 189 → **206**(198 单元/协议 + 8 集成);覆盖率 92.4% → **93.0%**
 - 仍未验证:真机烧录、F1 之外的芯片
 
-### 发布后修复(2026-10-12,随下一版发布)
+### 发布后修复(随 0.4.4.2 发布)
 
 - **工具错误信息在 mcp≥2.3 下被吞(CI 抓出来的)**:mcp 2.3 起,工具里**只有**抛 SDK 自己的
   `ToolError` 才算"预期失败"(返回 `is_error=True`、消息给模型读);抛其它异常一律按崩溃处理,

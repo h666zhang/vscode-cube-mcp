@@ -291,6 +291,29 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 > **里面没有 DMA,也没有中断相关项**,这两者都走"注入 `.ioc` 键"这条路(见 `rules/dma.yaml`、`rules/nvic.yaml`)。
 > 另外 `help` 里的 `possible_value ip` 可以查某个 IP 的合法取值。
 
+## 一次"盲测"暴露的三处缺口(2026-10-12,0.4.4.2 修)
+
+用一份**故意不给答案**的提示词,让一个全新会话用 `cubemx_help` + `cubemx_intent` 配
+「ADC 5 通道 + DMA 循环 + TIM3 TRGO 触发」,要求只走 MCP 工具、不许手写 `.ioc`。
+结果:一次成功、零返工,配置与生成代码全部正确 —— 但复盘它的动作后发现它**读了源码**:
+
+- 它 `read_file` 了 `intent_resolver.py` 全文、`ioc_editor.py`(TIM 注入段)、
+  `cubemx_mcp.py`(new_project 段)—— 因为 `cubemx_help` 当时**没说清执行顺序**:
+  intents 先于 CubeMX 脚本、TIM 是就地注入、commands 里的 TIM set 命令要求该 TIM 已存在。
+  顺序反了 TRGO 会**静默丢失**(generate 不报错,但硬件不触发)。→ 已写进 `help.yaml`。
+- 为确认 `ADC_EXTERNALTRIGCONV_T3_TRGO`,它去 `db/mcu/IP/ADC-aditf_v2_5F1_Cube_Modes.xml`
+  grep 了一遍 —— 因为导出的知识库里 `ExternalTrigConv` **只有 default、没有取值域**。
+  → `gen_knowledge_from_db.py` 现在导 `RefParameter` 的 `PossibleValue`;同名参数在 XML 里
+  有多份定义(`Visible=false` 的精简副本),所以取**并集**,否则只能拿到 1 个值。
+- 它想"TIM 只当触发源、不要更新中断"时发现做不到(`_apply_tim` 没暴露 `irq`)。
+  → 意图现在支持 `irq: false`(`interrupt: false` 同义)。
+
+顺带:`cubemx_load` 改成**默认纯文本解析**(`via_cubemx=False`)—— 回读配置是高频动作,
+以前每次都要等 CubeMX 启动 10~30s。
+
+> 结论也记在这里:**"零返工"不能单独作为知识库够用的证据** —— 载体是"能读整个仓库的 AI"。
+> 要真正验证,得再做一次同样的实验,但**禁止读仓库源码**,只留 MCP 工具。
+
 ## 加一个外设的 SOP
 
 1. **先探针**:把猜的写法写出来,`cubemx_probe` 在模板副本上跑一遍 —— `commands` 跑脚本命令、

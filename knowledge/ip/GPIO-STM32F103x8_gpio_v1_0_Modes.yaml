@@ -8,6 +8,18 @@ parameters:
   GPIOx:
     comment: GPIO address
     type: list
+    values:
+    - GPIOA
+    - GPIOB
+    - GPIOC
+    - GPIOD
+    - GPIOE
+    - GPIOF
+    - GPIOG
+    - GPIOH
+    - GPIOI
+    - GPIOJ
+    - GPIOK
   GPIO_Pin:
     comment: GPIO pin mask
     type: list
@@ -15,49 +27,137 @@ parameters:
     comment: GPIO output level
     type: list
     default: GPIO_PIN_RESET
+    values:
+    - GPIO_PIN_RESET
+    - GPIO_PIN_SET
   GPIO_ModeDefaultPP:
     comment: GPIO mode
     type: list
     default: GPIO_MODE_AF_PP
+    values:
+    - GPIO_MODE_INPUT
+    - GPIO_MODE_OUTPUT_PP
+    - GPIO_MODE_OUTPUT_OD
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+    - GPIO_MODE_ANALOG
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
   GPIO_ModeDefaultOD:
     comment: GPIO mode
     type: list
     default: GPIO_MODE_AF_OD
+    values:
+    - GPIO_MODE_INPUT
+    - GPIO_MODE_OUTPUT_PP
+    - GPIO_MODE_OUTPUT_OD
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+    - GPIO_MODE_ANALOG
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
   GPIO_ModeDefaultOutputPP:
     comment: GPIO mode
     type: list
     default: GPIO_MODE_OUTPUT_PP
+    values:
+    - GPIO_MODE_INPUT
+    - GPIO_MODE_OUTPUT_PP
+    - GPIO_MODE_OUTPUT_OD
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+    - GPIO_MODE_ANALOG
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
   GPIO_ModeDefaultEXTI:
     comment: GPIO mode
     type: list
     default: GPIO_MODE_IT_RISING
+    values:
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
   GPIO_Mode:
     comment: GPIO mode
     type: list
+    values:
+    - GPIO_MODE_INPUT
+    - GPIO_MODE_OUTPUT_PP
+    - GPIO_MODE_OUTPUT_OD
+    - GPIO_MODE_AF_PP
+    - GPIO_MODE_AF_OD
+    - GPIO_MODE_ANALOG
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
   GPIO_PuPdOD:
     comment: GPIO Pull-up/Pull-down
     type: list
     default: GPIO_PULLUP
+    values:
+    - GPIO_NOPULL
+    - GPIO_PULLUP
   GPIO_PuPd:
     comment: GPIO Pull-up/Pull-down
     type: list
     default: GPIO_NOPULL
+    values:
+    - GPIO_NOPULL
+    - GPIO_PULLUP
+    - GPIO_PULLDOWN
   GPIO_Pu:
     comment: GPIO Pull-up/Pull-down
     type: list
     default: GPIO_NOPULL
+    values:
+    - GPIO_NOPULL
+    - GPIO_PULLUP
   GPIO_Speed:
     comment: Maximum output speed
     type: list
     default: GPIO_SPEED_FREQ_LOW
+    values:
+    - GPIO_SPEED_FREQ_LOW
+    - GPIO_SPEED_FREQ_MEDIUM
+    - GPIO_SPEED_FREQ_HIGH
   GPIO_Speed_High_Default:
     comment: Maximum output speed
     type: list
     default: GPIO_SPEED_FREQ_HIGH
+    values:
+    - GPIO_SPEED_FREQ_LOW
+    - GPIO_SPEED_FREQ_MEDIUM
+    - GPIO_SPEED_FREQ_HIGH
   GPIO_Mode_For_EXTI_LL:
     comment: GPIO mode
     type: list
     default: GPIO_MODE_INPUT
+    values:
+    - GPIO_MODE_INPUT
+    - GPIO_MODE_IT_RISING
+    - GPIO_MODE_IT_FALLING
+    - GPIO_MODE_IT_RISING_FALLING
+    - GPIO_MODE_EVT_RISING
+    - GPIO_MODE_EVT_FALLING
+    - GPIO_MODE_EVT_RISING_FALLING
 signals: {}
 modes:
 - name: GPIO

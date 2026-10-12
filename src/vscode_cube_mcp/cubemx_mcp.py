@@ -308,27 +308,35 @@ def cubemx_script(script: str) -> str:
 
 
 @mcp.tool()
-def cubemx_load(ioc: str, summary: bool = True) -> str:
-    """加载 .ioc 工程并回读关键配置(只读,不修改任何文件)。
+def cubemx_load(ioc: str, summary: bool = True, via_cubemx: bool = False) -> str:
+    """加载 .ioc 工程并回读关键配置(默认只读文本,不修改任何文件)。
 
-    summary=True(默认)时额外返回一份**结构化摘要** —— 直接解析 .ioc 文本得到的
+    summary=True(默认)时返回一份**结构化摘要** —— 直接解析 .ioc 文本得到的
     IP 列表 / 引脚→信号 / DMA 请求与参数 / 中断 / 时钟 / 各外设参数 / 初始化顺序,
     省得为了"现在配了什么"去读整个 .ioc 原文(摘要里都是 .ioc 原始字符串,
     "这样写合不合法"由知识库判定)。
 
+    via_cubemx=False(默认)时**只解析文本,秒回**;传 True 才会额外跑一次
+    `config load` 让 CubeMX 自己读一遍(用于确认"这份 .ioc CubeMX 认不认",
+    代价是要等它启动,通常 10~30s)。
+
     参数:
-      ioc:     工程 .ioc 文件绝对路径(须在允许目录内)
-      summary: 是否附带结构化摘要(默认 True;显式传 False 只要 CubeMX 的回读输出)
+      ioc:        工程 .ioc 文件绝对路径(须在允许目录内)
+      summary:    是否返回结构化摘要(默认 True;传 False 则只返回 via_cubemx 的输出)
+      via_cubemx: 是否额外让 CubeMX 真加载一次(默认 False,快)
     """
     ap = _ioc_path(ioc)
-    r = _run_script(f'config load "{ap}"')
-    out = render_run("cubemx_load", r)
+    if not summary and not via_cubemx:
+        raise ToolError("BAD_ARGUMENT", "summary 和 via_cubemx 至少要一个为 True,否则没有任何输出")
+    out = ""
+    if via_cubemx:
+        out = render_run("cubemx_load", _run_script(f'config load "{ap}"'))
     if summary:
         try:
             data = ioc_editor.summarize(ap)
         except OSError as exc:
-            return out + f"\n(结构化摘要解析失败: {exc})"
-        out += "\n--- 结构化摘要 ---\n" + json.dumps(data, ensure_ascii=False, indent=2)
+            return (out + f"\n(结构化摘要解析失败: {exc})").lstrip()
+        out += ("\n" if out else "") + "--- 结构化摘要 ---\n" + json.dumps(data, ensure_ascii=False, indent=2)
     return out
 
 

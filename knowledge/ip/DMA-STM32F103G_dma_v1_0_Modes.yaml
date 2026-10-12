@@ -4,37 +4,79 @@ parameters:
   Instance:
     comment: Channel
     type: list
+    values:
+    - DMA1_Channel1
+    - DMA1_Channel2
+    - DMA1_Channel3
+    - DMA1_Channel4
+    - DMA1_Channel5
+    - DMA1_Channel6
+    - DMA1_Channel7
+    - DMA2_Channel1
+    - DMA2_Channel2
+    - DMA2_Channel3
+    - DMA2_Channel4
+    - DMA2_Channel5
   Direction:
     comment: Direction
     type: list
     default: DMA_PERIPH_TO_MEMORY
+    values:
+    - DMA_PERIPH_TO_MEMORY
+    - DMA_MEMORY_TO_PERIPH
+    - DMA_MEMORY_TO_MEMORY
   PeriphInc:
     comment: Peripheral Increment
     type: list
     default: DMA_PINC_ENABLE
+    values:
+    - DMA_PINC_ENABLE
+    - DMA_PINC_DISABLE
   MemInc:
     comment: Memory Increment
     type: list
     default: DMA_MINC_ENABLE
+    values:
+    - DMA_MINC_ENABLE
+    - DMA_MINC_DISABLE
   PeriphDataAlignment:
     comment: Peripheral Data Alignment
     type: list
     default: DMA_PDATAALIGN_BYTE
+    values:
+    - DMA_PDATAALIGN_BYTE
+    - DMA_PDATAALIGN_HALFWORD
+    - DMA_PDATAALIGN_WORD
   MemDataAlignment:
     comment: Memomry Data Alignment
     type: list
     default: DMA_MDATAALIGN_WORD
+    values:
+    - DMA_MDATAALIGN_BYTE
+    - DMA_MDATAALIGN_HALFWORD
+    - DMA_MDATAALIGN_WORD
   Mode:
     comment: Mode
     type: list
     default: DMA_NORMAL
+    values:
+    - DMA_NORMAL
+    - DMA_CIRCULAR
   Priority:
     comment: Priority
     type: list
     default: DMA_PRIORITY_LOW
+    values:
+    - DMA_PRIORITY_LOW
+    - DMA_PRIORITY_MEDIUM
+    - DMA_PRIORITY_HIGH
+    - DMA_PRIORITY_VERY_HIGH
   ClockEnableMode:
     comment: Clock Enable Mode
     type: list
+    values:
+    - __HAL_RCC_DMA1_CLK_ENABLE
+    - __HAL_RCC_DMA2_CLK_ENABLE
   DMA_Handle:
     comment: DMA Handle
     type: list

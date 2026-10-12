@@ -468,8 +468,11 @@ def _apply_tim(ioc_path: str, instance: str, intent: dict) -> dict:
     knowledge_loader.rule_mode("tim", mode)  # 防幻觉闸门:没实测过的模式在这里被拦住
     if mode == "internal_clock":
         params = tim_params(mode, intent)
+        # 注入片段自带 NVIC 行;要"只当触发源、不要更新中断"就写 irq: false
+        # (写 interrupt: false 同义 —— 那个字段本来就是给 interrupt_line 用的)
+        irq = intent.get("irq", intent.get("interrupt", True))
         note = ioc_editor.inject_tim_internal_clock(
-            ioc_path, instance, prescaler=params["prescaler"], period=params["period"]
+            ioc_path, instance, prescaler=params["prescaler"], period=params["period"], irq=bool(irq)
         )
         return {"note": note, "commands": []}
     if mode not in ("pwm", "input_capture"):

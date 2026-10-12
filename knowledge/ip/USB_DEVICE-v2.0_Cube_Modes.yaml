@@ -28,38 +28,82 @@ parameters:
     type: list
     default: '1'
     group: Basic Parameters
+    values:
+    - '1'
+    - '0'
   USBD_SUPPORT_USER_STRING:
     comment: USBD_SUPPORT_USER_STRING (Enable user string descriptor)
     type: list
     default: '1'
     group: Basic Parameters
+    values:
+    - '1'
+    - '0'
   USBD_SELF_POWERED:
     comment: USBD_SELF_POWERED (Enabled self power)
     type: list
     default: '1'
     group: Basic Parameters
+    values:
+    - '1'
+    - '0'
   USBD_DEBUG_LEVEL:
     comment: USBD_DEBUG_LEVEL (USBD Debug Level)
     type: list
     default: '0'
     group: Basic Parameters
+    values:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
   USBD_LPM_ENABLED:
     comment: USBD_LPM_ENABLED (Link Power Management)
     type: list
     default: '1'
     group: Basic Parameters
+    values:
+    - '0'
+    - '1'
   VirtualMode:
     type: list
     default: Ccid
     group: Basic Parameters
+    values:
+    - Audio
+    - Ccid
+    - Cdc
+    - Dfu
+    - Hid
+    - CustomHid
+    - Msc
+    - Mtp
   VirtualModeHS:
     type: list
     default: Audio
     group: Basic Parameters
+    values:
+    - Audio_HS
+    - Ccid_HS
+    - Cdc_HS
+    - Dfu_HS
+    - Hid_HS
+    - Custom_Hid_HS
+    - Msc_HS
+    - Mtp_HS
   VirtualModeFS:
     type: list
     default: Audio
     group: Basic Parameters
+    values:
+    - Audio_FS
+    - Ccid_FS
+    - Cdc_FS
+    - Dfu_FS
+    - Hid_FS
+    - Custom_Hid_FS
+    - Msc_FS
+    - Mtp_FS
   VID:
     comment: VID (Vendor IDentifier)
     type: integer
@@ -72,6 +116,13 @@ parameters:
     type: List
     default: '1033'
     group: Device Descriptor
+    values:
+    - '1033'
+    - '1036'
+    - '1031'
+    - '1040'
+    - '1041'
+    - '1042'
   MANUFACTURER_STRING:
     comment: MANUFACTURER_STRING (Manufacturer Identifier)
     type: stringRW
@@ -686,192 +737,271 @@ parameters:
   USBD_HandleTypeDef_FS:
     type: list
     default: hUsbDevice_OTG_FS
+    values:
+    - hUsbDevice_OTG_FS
+    - hUsbDevice_USB_FS
   USBD_HandleTypeDef_HS:
     type: list
     default: hUsbDevice_OTG_HS
+    values:
+    - hUsbDevice_OTG_HS
   id:
     type: list
     default: id
+    values:
+    - id
   DEVICE_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - DEVICE_FS
   DEVICE_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - DEVICE_HS
   USBD_DESC:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USB_ALL_DESCRIPTOR
   HS_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - HS_Desc
   FS_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - FS_Desc
   DFU_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - DFU_Desc
   HID_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - HID_Desc
   MSC_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - MSC_Desc
   CDC_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - CDC_Desc
   AUDIO_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - AUDIO_Desc
   CCID_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - CCID_Desc
   MTP_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - MTP_Desc
   CUSTOM_HID_Desc:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - CUSTOM_HID_Desc
   USBD_CLASS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USB_ALL_CLASSES
   USBD_CDC:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CDC
   USBD_HID:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_HID
   USBD_CUSTOM_HID:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CUSTOM_HID
   USBD_MSC:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_MSC
   USBD_AUDIO:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_AUDIO
   USBD_CCID:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CCID
   USBD_DFU:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_DFU
   USBD_MTP:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_MTP
   USBD_USER_CALLBACK:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USB_ALL_CALLBACK
   USBD_Interface_fops:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_Interface_fops
   USBD_Interface_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_Interface_fops_HS
   USBD_Interface_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_Interface_fops_FS
   USBD_Storage_Interface_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_Storage_Interface_fops_FS
   USBD_Storage_Interface_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_Storage_Interface_fops_HS
   USBD_CustomHID_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CustomHID_fops_FS
   USBD_CustomHID_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CustomHID_fops_HS
   USBD_AUDIO_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_AUDIO_fops_FS
   USBD_AUDIO_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_AUDIO_fops_HS
   USBD_CCID_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CCID_fops_FS
   USBD_CCID_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_CCID_fops_HS
   USBD_DFU_fops_FS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_DFU_fops_FS
   USBD_DFU_fops_HS:
     type: integer
     default: '0'
     min: '0'
     max: '10'
+    values:
+    - USBD_DFU_fops_HS
 signals:
   VS_USB_DEVICE_CCID_FS: {}
   VS_USB_DEVICE_CDC_FS: {}

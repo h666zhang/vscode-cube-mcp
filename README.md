@@ -22,7 +22,7 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 | `cubemx_intent` | **按意图配置外设**:只写"要什么"(外设/模式/引脚/频率),`.ioc` 内部名由知识库查出来 —— 优先用它 |
 | `cubemx_new_project` | **从零生成新工程**(内置模板库,无需预先 .ioc;可直接吃 `intents` 意图) |
 | `cubemx_generate` | 加载 .ioc 并生成 HAL 工程 |
-| `cubemx_load` | 加载 .ioc 回读配置 + **结构化摘要**(IP / 引脚 / DMA / 中断 / 时钟,只读) |
+| `cubemx_load` | 回读配置 + **结构化摘要**(IP / 引脚 / DMA / 中断 / 时钟;默认纯文本解析、秒回,`via_cubemx=True` 才让 CubeMX 真加载一遍) |
 | `cubemx_configure` | 加载 .ioc,执行 `set` 命令序列并写回 |
 | `cubemx_probe` | **探针**:在 .ioc 副本上试跑脚本命令或**键注入**(DMA / TIM / NVIC),输出差异 + CubeMX 是否保留 |
 | `cubemx_export_pinout` | 导出引脚配置 CSV(只读) |
