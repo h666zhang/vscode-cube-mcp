@@ -69,6 +69,13 @@
   `NbrOfConversion` + `Rank-n`/`Channel-n`/`SamplingTime-n`,工具已自动补);**外部触发必须配套
   触发源外设**(如 TIM2 的 TRGO 输出),只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死。
   详见 `knowledge/rules/adc.yaml`。
+- **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
+  返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
+  240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
+  会把 .ioc 复制过去就地生成);`cubemx_script` 里手写 `project path` 会被直接拒绝。
+- **生成后要校验产出**:CubeMX 报 OK 也可能一个文件都没生成(实测 new_project 首次生成
+  零产出)—— 工具现在会校验 `Core/Src/*.c`,零产出时报 `CUBEMX_NO_OUTPUT`,成功时返回
+  生成文件清单。排查"报 OK 没产物"先看有没有残留 `javaw` 占着 CubeMX 单实例。
 - **自定义源文件写哪里**:`cmake/stm32cubemx/CMakeLists.txt` 每次 generate 都被全量重写(别往里加);
   **工程根 `CMakeLists.txt` 只生成一次、不重写** —— 用户的 `.c` 写进 `# Add sources to executable`
   的 `target_sources(... PRIVATE)`、`.h` 目录写进 `# Add include paths` 的
@@ -78,8 +85,9 @@
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**206 个:198 单元/协议 + 8 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**224 个:215 单元/协议 + 9 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
+  —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
 - 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 ~93%)
 - 风格:`ruff check .` / `ruff format --check .`
 - 语法检查:`python -m compileall -q src tests`(PowerShell 不展开 `*.py`,别直接把通配符传给 py_compile)

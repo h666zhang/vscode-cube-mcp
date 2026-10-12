@@ -314,6 +314,35 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 > 结论也记在这里:**"零返工"不能单独作为知识库够用的证据** —— 载体是"能读整个仓库的 AI"。
 > 要真正验证,得再做一次同样的实验,但**禁止读仓库源码**,只留 MCP 工具。
 
+## 第二次盲测(2026-10-12,禁读仓库、禁翻 db;0.4.4.3 修)
+
+按上面那条结论做的对照实验:同一份提示词,但**禁止读 `Vscode_cube_mcp` 下任何文件**,
+只走 MCP 工具。这次**配置层一次成功、零返工**(上一条补的执行顺序与取值域生效了:
+5 通道 Rank/采样时间、`RCC.ADCPresc` 自动补、`Prescaler=71/Period=99` = 10kHz、
+TRGO 顺序、`irq: false` 成功抑制 `TIM3_IRQHandler`,全对)。
+
+但**执行层连挂三次,同一个根因** —— `project path`:
+
+- `cubemx_new_project` 内部那次 generate **报 OK 却一个文件都没生成**(当时没被发现,
+  直到第三步才炸)。
+- `cubemx_generate(ioc, project_dir=…)` 报 `CUBEMX_KO`。复现确认:旧代码会发
+  `project path "dir"`,而 **CubeMX 6.18 对这条命令回 KO** —— 工具把任意一行 KO 当整体失败
+  (那条"`.ioc` 可能不是 6.18 原生生成的"建议就是从这里来的,属误报)。
+- 手工用 `cubemx_script` 复现同一序列 → **240s 卡死被强杀 + 残留 `javaw`**(要 taskkill)。
+
+修复(0.4.4.3):不再发 `project path`(`project_dir` 指向别的目录时把 `.ioc` 复制过去
+就地生成)、`cubemx_script` 直接拒绝手写 `project path`、**生成后校验 `Core/Src/*.c`**
+(零产出报 `CUBEMX_NO_OUTPUT`,成功时附生成文件清单)、失败时说清**哪条命令**返回了 KO。
+
+顺带发现:**8 个集成测试里 5 个早就失修了** —— `cubemx_load` 改成默认 `via_cubemx=False`
+之后它们仍断言返回里有 `[OK`,而集成测试默认跳过、CI 也没有 CubeMX,所以一直没人发现。
+这也是 `project path` 这个坑能活到盲测的原因:集成测试的 generate 路径根本没覆盖
+`project_dir`(`test_generate_with_project_dir` 只断言 `[OK` 和目录存在,不检查产出)。
+已改用真加载断言 + 新增一条覆盖 `project_dir` 的用例。
+
+> 教训两条:①工具自己说的"成功"必须有**产出证据**兜底(报 OK 而零产出是最难查的失败);
+> ②默认跳过的测试等于没有测试 —— 改默认值/返回格式后要手动跑一次集成测试。
+
 ## 加一个外设的 SOP
 
 1. **先探针**:把猜的写法写出来,`cubemx_probe` 在模板副本上跑一遍 —— `commands` 跑脚本命令、

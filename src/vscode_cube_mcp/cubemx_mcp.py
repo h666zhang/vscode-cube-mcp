@@ -117,6 +117,39 @@ def _cleanup(raw: str) -> str:
     return "\n".join(lines)
 
 
+def _ko_command(output: str) -> str:
+    """算出是哪条命令返回了 KO(CubeMX 脚本输出是"命令 / OK|KO"交替出现)。
+
+    失败时用它说清"哪条命令挂了",而不是笼统的"命令返回 KO"。找不到则返回空串。
+    """
+    pending = ""
+    for line in output.splitlines():
+        s = line.strip()
+        if s == "OK":
+            pending = ""
+        elif s == "KO":
+            return pending
+        elif s:
+            pending = s
+    return ""
+
+
+def _generated_artifacts(gen_dir: str) -> list:
+    """列出生成目录里的 HAL 骨架产物(Core/Src/*.c)。
+
+    返回空列表 = CubeMX 虽然报了成功,但一个文件都没生成(实测会遇到:
+    残留的 CubeMX 实例占着单实例锁时,-q 进程会把命令"接受"掉却不产出)。
+    """
+    src = os.path.join(gen_dir, "Core", "Src")
+    if not os.path.isdir(src):
+        return []
+    try:
+        names = sorted(n for n in os.listdir(src) if n.endswith(".c"))
+    except OSError:
+        return []
+    return [f"Core/Src/{n}" for n in names]
+
+
 def _kill_process_tree(proc) -> None:
     """强杀进程树:Windows 用 taskkill /T /F(CubeMX 是 Java 启动器,直接 kill 会留子进程),其它平台 SIGKILL。"""
     try:
@@ -177,10 +210,12 @@ def _run_script(script: str, stage: str = "run_cubemx") -> dict:
 
     raw = (stdout or "") + "\n" + (stderr or "")
     output = _cleanup(raw)
+    ko_command = ""
     if proc.returncode != 0:
         error_code = "CUBEMX_EXIT_NONZERO"
     elif any(line.strip() == "KO" for line in output.splitlines()):
         error_code = "CUBEMX_KO"
+        ko_command = _ko_command(output)
     else:
         error_code = ""
     return {
@@ -189,6 +224,7 @@ def _run_script(script: str, stage: str = "run_cubemx") -> dict:
         "exit_code": proc.returncode,
         "stage": stage,
         "error_code": error_code,
+        "ko_command": ko_command,
     }
 
 
@@ -302,7 +338,18 @@ def cubemx_script(script: str) -> str:
       set gpio parameters PB13 GPIO_Label=LED
       config saveas "C:/path/proj.ioc"
       project generate
+
+    不要用 `project path`(实测:CubeMX 6.18 对该命令返回 KO,且带它的批处理里随后的
+    project generate 会静默零产出、甚至卡死到超时)。要把工程生成到别的目录,用
+    cubemx_generate(ioc, project_dir=...)。
     """
+    if re.search(r"(?mi)^\s*project\s+path\b", script):
+        raise ToolError(
+            "BAD_ARGUMENT",
+            "脚本里有 `project path`:CubeMX 6.18 已不支持该命令(返回 KO,并会让随后的 "
+            "project generate 静默零产出或卡死)。要生成到别的目录请用 "
+            "cubemx_generate(ioc, project_dir=...),它会把 .ioc 复制过去就地生成。",
+        )
     r = _run_script(script)
     return render_run("cubemx_script", r)
 
@@ -363,17 +410,37 @@ def cubemx_generate(ioc: str, project_dir: str = "") -> str:
     参数:
       ioc: 工程 .ioc 文件绝对路径
       project_dir: 生成目标目录;留空则在 .ioc 所在目录生成。
+                   传了别的目录时,先把 .ioc 复制到那里再就地生成(原 .ioc 不动)。
                    强烈建议指向副本/测试目录,避免覆盖现有工程。
+
+    实现说明:CubeMX 6.18 的 `project path` 命令已失效(实测返回 KO,且带它的批处理里
+    随后的 project generate 不产出任何文件、甚至卡死到 240s 超时),所以本工具不再发它,
+    改用"把 .ioc 复制到目标目录"达到同样效果;生成后还会校验文件是否真的落盘。
     """
     ap = _ioc_path(ioc)
-    lines = [f'config load "{ap}"']
     if project_dir:
         pd = _check_path(project_dir)
         os.makedirs(pd, exist_ok=True)
-        lines.append(f'project path "{pd}"')
-    lines.append("project generate")
-    r = _run_script("\n".join(lines))
-    return render_run("cubemx_generate", r)
+        if os.path.abspath(pd) != os.path.dirname(ap):
+            dst = os.path.join(pd, os.path.basename(ap))
+            if os.path.abspath(dst) != os.path.abspath(ap):
+                shutil.copy2(ap, dst)
+            ap = dst
+    gen_dir = os.path.dirname(ap)
+    r = _run_script(f'config load "{ap}"\nproject generate')
+    if not r["ok"]:
+        return render_run("cubemx_generate", r)
+    arts = _generated_artifacts(gen_dir)
+    if not arts:
+        return render(
+            "cubemx_generate",
+            False,
+            r.get("exit_code"),
+            "CUBEMX_NO_OUTPUT",
+            output=r.get("output", ""),
+            extra=f"生成目录: {gen_dir}",
+        )
+    return render_run("cubemx_generate", r, extra=f"生成目录: {gen_dir}\n生成文件({len(arts)}): " + ", ".join(arts))
 
 
 @mcp.tool()
@@ -554,8 +621,14 @@ def cubemx_new_project(
     lines = [f'config load "{ioc_dst}"']
     lines.append("project generate")
     r2 = _run_script("\n".join(lines))
-    if r2["ok"]:
-        r = r2
+    if not r2["ok"]:
+        return render_run(
+            "cubemx_new_project",
+            r2,
+            steps=[("locate_template", "ok"), ("compose_ioc", "ok"), ("run_cubemx", "FAIL")],
+            extra=f"配置已写进 .ioc,但 project generate 失败;.ioc 在: {ioc_dst}",
+        )
+    r = r2
     note_internal = "\n".join(tim_notes) if tim_notes else ""
     note_intent = "\n".join(plan["notes"]) if plan["notes"] else ""
     # 生成后:若工程被生成到 project_dir 的同级目录(以工程名命名),把 .ioc 移到工程目录,
@@ -591,6 +664,20 @@ def cubemx_new_project(
         extra += f"\n{note_intent}"
     if note_internal:
         extra += f"\n{note_internal}"
+    # 产出校验:CubeMX 报 OK 也可能一个文件都没生成(残留实例占着单实例锁时会这样),
+    # 这种情况必须显式失败 —— 否则调用方会拿着一个空目录继续往下走。
+    arts = _generated_artifacts(pd) or _generated_artifacts(gen_dir)
+    if not arts:
+        return render(
+            "cubemx_new_project",
+            False,
+            r.get("exit_code"),
+            "CUBEMX_NO_OUTPUT",
+            steps=[*steps, ("post_check", "FAIL")],
+            output=r.get("output", ""),
+            extra=f"工程目录: {pd}\n.ioc 已生成: {ioc_dst}(但没有 HAL 骨架产出)",
+        )
+    extra += f"\n生成文件({len(arts)}): " + ", ".join(arts)
     problems = ioc_editor.check_semantics(ioc_dst)
     if problems:
         extra += f"\n⚠ 离线预检(纯文本,不需要 CubeMX)发现 {len(problems)} 处问题:\n" + "\n".join(
@@ -756,6 +843,17 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
         result = _run_script(f'config load "{ap}"\nproject generate')
         if not result["ok"]:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
+        arts = _generated_artifacts(os.path.dirname(ap))
+        if not arts:
+            return render(
+                "cubemx_intent",
+                False,
+                result.get("exit_code"),
+                "CUBEMX_NO_OUTPUT",
+                steps=[*steps, ("run_cubemx", "ok"), ("post_check", "FAIL")],
+                output=result.get("output", ""),
+                extra=f"生成目录: {os.path.dirname(ap)}",
+            )
         steps.append(("run_cubemx", "ok"))
     extra = "\n".join(plan["notes"])
     problems = ioc_editor.check_semantics(ap)

@@ -62,7 +62,17 @@ ERRORS = {
     # CubeMX 子进程相关
     "CUBEMX_TIMEOUT": ("run_cubemx", "CubeMX 超时被终止", "机器慢可以把 ST_CUBEMX_TIMEOUT 调大"),
     "CUBEMX_EXIT_NONZERO": ("run_cubemx", "CubeMX 退出码不是 0", "看下面的原始输出定位"),
-    "CUBEMX_KO": ("run_cubemx", "CubeMX 命令返回 KO", ".ioc 可能不是 6.18 原生生成的;先在 GUI 里打开并保存一次"),
+    "CUBEMX_KO": (
+        "run_cubemx",
+        "CubeMX 对脚本命令返回 KO",
+        "看上面“返回 KO 的命令”是哪一条;常见原因:该命令在当前 CubeMX 版本已失效"
+        "(如 `project path` 在 6.18 返回 KO,且会让随后的 generate 静默零产出甚至卡死)",
+    ),
+    "CUBEMX_NO_OUTPUT": (
+        "post_check",
+        "CubeMX 报成功,但没有生成任何文件",
+        "确认没有残留的 CubeMX/javaw 进程占着单实例(结束它再重试);必要时在 GUI 里打开该 .ioc 保存一次再重试",
+    ),
 }
 
 
@@ -149,7 +159,14 @@ def render(
 
 
 def render_run(tool: str, result: dict, steps=None, extra: str = "", warnings=None) -> str:
-    """渲染一次 CubeMX 调用的结果(参数就是 _run_script 的返回值)。"""
+    """渲染一次 CubeMX 调用的结果(参数就是 _run_script 的返回值)。
+
+    失败且能定位到是哪条命令返回 KO 时,把那条命令放最前面 —— 比笼统的
+    "命令返回 KO"好查得多(例如 project path 在 6.18 就是那条 KO 的命令)。
+    """
+    ko = result.get("ko_command")
+    if not result.get("ok") and ko:
+        extra = f"返回 KO 的命令: {ko}\n{extra}" if extra else f"返回 KO 的命令: {ko}"
     return render(
         tool,
         bool(result.get("ok")),

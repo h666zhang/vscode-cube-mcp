@@ -977,14 +977,40 @@ class TestNewProjectDispatch(unittest.TestCase):
             cubemx_mcp, "_run_script", return_value={"ok": ok, "output": output, "exit_code": exit_code}
         )
 
+    def _mock_run_generating(self, ok=True, output="OK", exit_code=0):
+        """mock _run_script:跑到含 project generate 的那次调用时,在工程目录造出骨架文件。
+
+        真实 CubeMX 会落 Core/Src/*.c,而 cubemx_new_project 现在会校验产出 ——
+        mock 里不造文件的话,会被产出校验拦下(这正是本次要测的行为)。
+        """
+
+        def fake(script, stage="run_cubemx"):
+            if "project generate" in script:
+                src = os.path.join(self.project_dir, "Core", "Src")
+                os.makedirs(src, exist_ok=True)
+                with open(os.path.join(src, "main.c"), "w", encoding="utf-8") as f:
+                    f.write("int main(void){return 0;}\n")
+            return {
+                "ok": ok,
+                "output": output,
+                "exit_code": exit_code,
+                "error_code": "" if ok else "CUBEMX_KO",
+                "ko_command": "",
+                "stage": stage,
+            }
+
+        return mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake)
+
     def test_invalid_name_raises(self):
         with self.assertRaises(ValueError):
             cubemx_mcp.cubemx_new_project("Bad-Name!", self.project_dir)
 
     def test_no_commands_ok(self):
-        with self._mock_run():
+        with self._mock_run_generating():
             r = cubemx_mcp.cubemx_new_project("Proj1", self.project_dir)
+        self.assertIn("[OK", r)
         self.assertIn("工程目录", r)
+        self.assertIn("生成文件(1): Core/Src/main.c", r)
         self.assertTrue(os.path.isfile(os.path.join(self.project_dir, "Proj1.ioc")))
 
     def test_intents_resolved_like_cubemx_intent(self):
@@ -993,6 +1019,11 @@ class TestNewProjectDispatch(unittest.TestCase):
 
         def fake_run(script, stage="run_cubemx"):
             scripts.append(script)
+            if "project generate" in script:
+                src = os.path.join(self.project_dir, "Core", "Src")
+                os.makedirs(src, exist_ok=True)
+                with open(os.path.join(src, "main.c"), "w", encoding="utf-8") as f:
+                    f.write("int main(void){return 0;}\n")
             return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
 
         with mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake_run):
@@ -1020,6 +1051,11 @@ class TestNewProjectDispatch(unittest.TestCase):
 
         def fake_run(script, stage="run_cubemx"):
             seen.setdefault("first", script)
+            if "project generate" in script:
+                src = os.path.join(self.project_dir, "Core", "Src")
+                os.makedirs(src, exist_ok=True)
+                with open(os.path.join(src, "main.c"), "w", encoding="utf-8") as f:
+                    f.write("int main(void){return 0;}\n")
             return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
 
         with mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake_run):
@@ -1033,7 +1069,7 @@ class TestNewProjectDispatch(unittest.TestCase):
         self.assertIn("set mode I2C1 I2C", seen["first"])
 
     def test_tim_internal_clock_command(self):
-        with self._mock_run():
+        with self._mock_run_generating():
             r = cubemx_mcp.cubemx_new_project(
                 "Proj2",
                 self.project_dir,
@@ -1044,7 +1080,7 @@ class TestNewProjectDispatch(unittest.TestCase):
             self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", f.read())
 
     def test_pwm_and_ic_commands(self):
-        with self._mock_run():
+        with self._mock_run_generating():
             r = cubemx_mcp.cubemx_new_project(
                 "Proj3",
                 self.project_dir,
@@ -1105,11 +1141,83 @@ class TestToolWrappers(unittest.TestCase):
         self.assertIn("set pin PB13 GPIO_Output", script)
         self.assertIn("config saveas", script)
 
+    def _mock_generating_run(self, gen_dir, seen=None, ok=True):
+        """mock _run_script:执行含 project generate 的调用时,在 gen_dir 造出骨架文件。"""
+
+        def fake(script, stage="run_cubemx"):
+            if seen is not None:
+                seen.append(script)
+            if "project generate" in script:
+                src = os.path.join(gen_dir, "Core", "Src")
+                os.makedirs(src, exist_ok=True)
+                with open(os.path.join(src, "main.c"), "w", encoding="utf-8") as f:
+                    f.write("int main(void){return 0;}\n")
+            return {
+                "ok": ok,
+                "output": "OK",
+                "exit_code": 0,
+                "error_code": "" if ok else "CUBEMX_KO",
+                "ko_command": "",
+                "stage": stage,
+            }
+
+        return mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake)
+
     def test_generate_with_project_dir(self):
+        # project_dir 指向别的目录:不再发 `project path`(6.18 返回 KO、会让 generate
+        # 静默零产出),改为把 .ioc 复制过去再就地生成。
         gen_dir = os.path.join(self._td.name, "gen")
-        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
-            self.assertIn("[OK", cubemx_mcp.cubemx_generate(self.ioc, project_dir=gen_dir))
+        seen = []
+        with self._mock_generating_run(gen_dir, seen):
+            r = cubemx_mcp.cubemx_generate(self.ioc, project_dir=gen_dir)
+        self.assertIn("[OK", r)
         self.assertTrue(os.path.isdir(gen_dir))
+        self.assertTrue(os.path.isfile(os.path.join(gen_dir, "demo.ioc")))
+        self.assertNotIn("project path", "".join(seen))
+        self.assertIn("生成文件(1): Core/Src/main.c", r)
+
+    def test_generate_no_project_path_command(self):
+        # 就地生成同样不发 project path
+        seen = []
+        with self._mock_generating_run(self._td.name, seen):
+            r = cubemx_mcp.cubemx_generate(self.ioc)
+        self.assertIn("[OK", r)
+        self.assertNotIn("project path", "".join(seen))
+
+    def test_generate_flags_missing_output(self):
+        # CubeMX 报成功但一个文件都没生成:必须显式失败,不能假装成功
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            r = cubemx_mcp.cubemx_generate(self.ioc)
+        self.assertIn("[FAIL", r)
+        self.assertIn("CUBEMX_NO_OUTPUT", r)
+
+    def test_script_rejects_project_path(self):
+        # 手工脚本里带 project path 直接拒绝(6.18 会 KO + 静默零产出 + 可能卡死)
+        with self.assertRaises(ValueError) as cm:
+            cubemx_mcp.cubemx_script('project path "C:/tmp/x"')
+        self.assertIn("project path", str(cm.exception))
+
+    def test_ko_command_is_reported(self):
+        # 失败时要说清是哪条命令 KO,而不是笼统的"命令返回 KO"
+        output = 'config load "x"\nOK\nproject path "y"\nKO\nproject generate\nOK'
+        with mock.patch.object(
+            cubemx_mcp,
+            "_run_script",
+            return_value={
+                "ok": False,
+                "output": output,
+                "exit_code": 0,
+                "error_code": "CUBEMX_KO",
+                "ko_command": cubemx_mcp._ko_command(output),
+            },
+        ):
+            r = cubemx_mcp.cubemx_script("config load x")
+        self.assertIn("返回 KO 的命令", r)
+        self.assertIn("project path", r)
+
+    def test_ko_command_parser(self):
+        self.assertEqual(cubemx_mcp._ko_command("a\nOK\nb\nKO\nc\nOK"), "b")
+        self.assertEqual(cubemx_mcp._ko_command("a\nOK"), "")
 
     def test_export_pinout_ok(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
@@ -2366,21 +2474,23 @@ class TestCubeMXIntegration(unittest.TestCase):
         self.addCleanup(setattr, cubemx_mcp, "ALLOWED_ROOTS", [os.getcwd()])
 
     def test_template_loads(self):
-        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+        # summary=True(默认)只解析文本、不起 CubeMX;要证明"CubeMX 真的认这份 .ioc"
+        # 必须看 via_cubemx 的 run 输出。
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True))
 
     def test_pwm_ioc_accepted(self):
         intent_resolver.apply_intents(
             self.ioc, [{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "prescaler": 72, "period": 100, "pulse": 50}]
         )
-        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True))
 
     def test_internal_clock_ioc_accepted(self):
         intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM2", "mode": "internal_clock"}])
-        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True))
 
     def test_input_capture_ioc_accepted(self):
         intent_resolver.apply_intents(self.ioc, [{"peripheral": "TIM2", "mode": "input_capture", "pin": "PA0-WKUP"}])
-        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True))
 
     def test_gpio_i2c_usart_commands_accepted(self):
         out = cubemx_mcp.cubemx_configure(
@@ -2426,6 +2536,17 @@ class TestCubeMXIntegration(unittest.TestCase):
             text = f.read()
         self.assertIn("NVIC.USART2_IRQn=", text)
 
+    def test_generate_into_other_dir_works(self):
+        # 核心回归:project_dir 指向别的目录必须真能生成。以前这里发 `project path`
+        # (6.18 返回 KO)→ 零产出,还被误报成失败。
+        gen = os.path.join(self._td.name, "gen_out")
+        out = cubemx_mcp.cubemx_generate(self.ioc, project_dir=gen)
+        self.assertIn("[OK", out)
+        self.assertNotIn("返回 KO 的命令", out)
+        self.assertTrue(os.path.isfile(os.path.join(gen, "Core", "Src", "main.c")))
+        self.assertTrue(os.path.isfile(os.path.join(gen, "it.ioc")))  # .ioc 被复制过去了
+        self.assertIn("生成文件(", out)
+
     def test_remove_peripheral_leaves_loadable_ioc(self):
         # 配外设 + 它的 DMA 请求,再移除:连带清理后 CubeMX 仍要能 load
         cubemx_mcp.cubemx_configure(self.ioc, ["set pin PB8 I2C1_SCL", "set pin PB9 I2C1_SDA", "set mode I2C1 I2C"])
@@ -2436,7 +2557,7 @@ class TestCubeMXIntegration(unittest.TestCase):
         self.assertNotIn("Dma.", text)
         self.assertNotIn("PB8", text)
         self.assertNotIn("NVIC.DMA1_Channel7_IRQn", text)  # I2C1_RX 占的通道中断也一并清掉
-        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True))
 
 
 if __name__ == "__main__":

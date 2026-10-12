@@ -15,7 +15,23 @@
   `tim.precheck.master_output_for_trigger` / `dma.ioc_keys`),不硬编码。
   接入:`cubemx_load` 摘要里多 `precheck` 字段;`cubemx_intent` / `cubemx_new_project`
   改完直接把问题附在返回里
-- 测试 209 → **218**(210 单元/协议 + 8 集成)
+- **修复 `cubemx_generate(project_dir=…)`(第二轮盲测暴露)**:CubeMX 6.18 已不支持
+  `project path` 脚本命令 —— 它返回 `KO`,而带它的批处理里随后的 `project generate`
+  既不产出任何文件、还会被判定成失败(实测另有一次 240s 卡死 + 残留 `javaw`)。现在不再
+  发这条命令:`project_dir` 指向别的目录时,把 `.ioc` 复制过去就地生成(原 `.ioc` 不动);
+  `cubemx_script` 里手写 `project path` 直接拒绝并给出替代做法
+- **生成产出校验**(同一次盲测暴露):`cubemx_generate` / `cubemx_new_project` /
+  `cubemx_intent(generate=True)` 生成后校验 `Core/Src/*.c` 是否真的落盘 —— 以前"CubeMX
+  报 OK 却一个文件都没生成"会被当成功回报,调用方要到第三步才发现;现在报
+  `CUBEMX_NO_OUTPUT`,成功时返回里附生成文件清单
+- **KO 定位到命令**:失败时返回"返回 KO 的命令: `<cmd>`",不再只有笼统的"命令返回 KO";
+  那条误导性建议("`.ioc` 可能不是 6.18 原生生成的;先在 GUI 里打开并保存一次")已替换
+- `cubemx_new_project` 里第二次 `project generate` 失败以前被忽略(仍报成功),现在显式失败
+- `cubemx_help(topic="adc")` 补上 `continuous` / `interrupt` 的默认值(false),以及
+  "外部触发下 continuous 的含义变化"(盲测里 agent 取默认值只能靠猜)
+- 测试 209 → **224**(215 单元/协议 + 9 集成);顺手修集成测试失修:8 个用例里 5 个的
+  断言在 `cubemx_load` 改成默认 `via_cubemx=False` 后就过时了(默认跳过所以一直没暴露),
+  已改用真加载断言;新增 1 条覆盖 `project_dir` 生成路径
 
 ## 0.4.4.2(2026-10-12)
 

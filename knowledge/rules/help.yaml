@@ -212,9 +212,11 @@ peripheral:
     - 采样时间:sampling_time="ADC_SAMPLETIME_55CYCLES_5"(默认 1.5 周期)。
     - **必配 ADC 时钟**:不配 generate 会弹 [Clock] 对话框把 -q 批处理卡死;72MHz PCLK2 下
       用 RCC_ADCPCLK2_DIV6(12MHz ≤ F103 的 14MHz 上限)。工具按 .ioc 的 APB2 频率自动补。
-    - 连续/扫描:continuous=True、scan=True(多通道默认开);ScanConvMode 由 CubeMX 按
-      NbrOfConversion 自己推导,.ioc 里不保留该行。
-    - 中断:写 interrupt=true → 注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),
+    - 连续/扫描:**continuous 默认 false(不写就是不连续)**;写 continuous=True 才开。
+      有外部触发(trigger)时:false = 每次触发转换一整轮;true = 第一次触发后 ADC 自由
+      连续转换、触发退化成启动信号(此时让 TIM 定频触发就失去意义)。多通道 scan 默认开;
+      ScanConvMode 由 CubeMX 按 NbrOfConversion 自己推导,.ioc 里不保留该行。
+    - 中断:interrupt 默认 false;写 interrupt=true → 注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),
       generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler。
     - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
       generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
