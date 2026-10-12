@@ -30,7 +30,7 @@ python -m pip show vscode-cube-mcp
 
 能显示版本信息即为安装成功。
 
-> **常见错误**:若提示 `pip 不是内部或外部命令`,说明 Python 未加入 PATH(重装时勾选 Add to PATH);若装包成功但启动时报 `No module named 'cubemx_mcp'`,说明 `python` 指向了其他解释器,将下文命令中的 `python` 统一替换为 `py` 重试。
+> **常见错误**:若提示 `pip 不是内部或外部命令`,说明 Python 未加入 PATH(重装时勾选 Add to PATH);若装包成功但启动时报 `No module named 'vscode_cube_mcp'`,说明 `python` 指向了其他解释器,将下文命令中的 `python` 统一替换为 `py` 重试。
 
 ## 第 2 步:注册到 Claude Code
 
@@ -40,7 +40,7 @@ python -m pip show vscode-cube-mcp
 claude mcp add vscode-cube-mcp `
   --env ST_CUBEMX_EXE="C:\你的\STM32CubeMX.exe完整路径" `
   --env ST_CUBEMX_ALLOWED_ROOTS="C:\你的\工程根目录" `
-  -- python -m cubemx_mcp
+  -- python -m vscode_cube_mcp
 ```
 
 参数说明:
@@ -60,7 +60,7 @@ claude mcp add vscode-cube-mcp `
   "mcpServers": {
     "vscode-cube-mcp": {
       "command": "python",
-      "args": ["-m", "cubemx_mcp"],
+      "args": ["-m", "vscode_cube_mcp"],
       "env": {
         "ST_CUBEMX_EXE": "C:/你的/STM32CubeMX.exe完整路径",
         "ST_CUBEMX_ALLOWED_ROOTS": "C:/你的/工程根目录"
@@ -92,7 +92,7 @@ claude mcp list
 | AI 报"找不到 STM32CubeMX" | `ST_CUBEMX_EXE` 路径不正确,或修改后未重启会话 | 用 `Test-Path "路径"` 确认文件存在;重开 claude 会话 |
 | 报"路径不在允许范围内" | 工程目录不在 `ST_CUBEMX_ALLOWED_ROOTS` 白名单内 | 将工程目录加入白名单(多个用 `;`)后重启 |
 | 调用慢或超时 | CubeMX 冷启动慢属正常;或超时阈值过低 | 增加 `ST_CUBEMX_TIMEOUT`(如 600);确认无残留 CubeMX/Java 进程 |
-| CubeMX 弹出 "Resolve Clock Issues" | 工程 .ioc 时钟树不自洽(工程配置问题,非本 MCP 缺陷) | 见仓库 `README.dev-notes.md`「从零配置时钟实战」 |
+| CubeMX 弹出 "Resolve Clock Issues" | 工程 .ioc 时钟树不自洽(工程配置问题,非本 MCP 缺陷) | 见仓库 `docs/README.dev-notes.md`「从零配置时钟实战」 |
 
 ## 卸载
 
@@ -104,5 +104,5 @@ pip uninstall vscode-cube-mcp
 ## 相关文档
 
 - [`README.md`](../README.md):项目总览、快速开始、完整环境变量表、通用 FAQ
-- [`README.dev-notes.md`](../README.dev-notes.md):开发笔记、踩坑记录、能力边界
-- [`templates/README.md`](../templates/README.md):各外设(GPIO/I2C/TIM/时钟)配置命令与实测状态
+- [`README.dev-notes.md`](README.dev-notes.md):开发笔记、踩坑记录、能力边界
+- [`../templates/`](../templates/):内置 .ioc 模板库(按芯片型号命名,如 `STM32F103C8T6.ioc`)

@@ -20,9 +20,8 @@ from __future__ import annotations
 
 import re
 
-import ioc_editor
-import knowledge_loader
-from cubemx_result import ToolError
+from . import ioc_editor, knowledge_loader
+from .cubemx_result import ToolError
 
 MAX_PRESCALER = 65536
 MAX_PERIOD = 65535

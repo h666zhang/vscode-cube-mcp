@@ -75,7 +75,7 @@ def diff_files(old_path: str, new_path: str, ignore=DEFAULT_IGNORE) -> dict:
 
 def render_diff(diff: dict, limit: int = 40) -> str:
     """把差异渲染成给人看的文本(每类最多列 limit 行)。"""
-    from cubemx_result import render
+    from .cubemx_result import render
 
     lines = [f"  差异: {diff['summary']}"]
     for title, key in (("新增", "added"), ("修改", "changed"), ("删除", "removed")):

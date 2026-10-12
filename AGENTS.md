@@ -17,24 +17,26 @@
 
 ## 项目结构
 
-- `cubemx_mcp.py` — MCP server 源码(11 个工具;只做参数校验、编排与结果渲染)
-- `cubemx_result.py` — 步骤名、错误码与统一渲染(失败时能看出卡在哪一步)
-- `knowledge_loader.py` — 读 `knowledge/` 里的 YAML;查不到就报错,不猜
-- `ioc_editor.py` — `.ioc` 文本编辑(注入/移除/模板改写;写前备份、写后回读校验)
-- `intent_resolver.py` — 把配置意图翻译成动作(信号名与参数都查表得到)
-- `ioc_diff.py` — 比较两份 `.ioc` 的结构化差异(探针用)
+- `src/vscode_cube_mcp/` — 包源码(src 布局,入口 `python -m vscode_cube_mcp`)
+  - `cubemx_mcp.py` — MCP server 源码(10 个工具;只做参数校验、编排与结果渲染)
+  - `cubemx_result.py` — 步骤名、错误码与统一渲染(失败时能看出卡在哪一步)
+  - `knowledge_loader.py` — 读 `knowledge/` 里的 YAML;查不到就报错,不猜
+  - `ioc_editor.py` — `.ioc` 文本编辑(注入/移除/模板改写;写前备份、写后回读校验)
+  - `intent_resolver.py` — 把配置意图翻译成动作(信号名与参数都查表得到)
+  - `ioc_diff.py` — 比较两份 `.ioc` 的结构化差异(探针用)
+  - `__main__.py` — `python -m vscode_cube_mcp` 入口
 - `knowledge/` — 知识库:`ip/`、`mcu/` 从 CubeMX 的 db 导出,`rules/` 是实测规则(每条带 `verified`)
 - `tools/gen_knowledge_from_db.py` — 从 CubeMX 安装目录的 `db/` 导出知识库(只读)
 - `templates/` — **最小模板**基底模板(6.18 原生 .ioc,按芯片命名;仅芯片标识+基础时钟 72MHz/SWD/SysTick,**无外设**,外设全部由 `cubemx_new_project` 的 `commands` set 现配;新增芯片用 CubeMX GUI 新建后存为 `templates/{mcu}.ioc`)
-- `test_cubemx_mcp.py` — 单元测试(不依赖 CubeMX)
+- `tests/test_cubemx_mcp.py` — 单元测试(不依赖 CubeMX)
 - `README.md` — 面向用户的手册(安装/配置/FAQ)
-- `README.dev-notes.md` — 开发笔记(配置补丁原理、外设实测、发布流程)
+- `docs/README.dev-notes.md` — 开发笔记(配置补丁原理、外设实测、发布流程)
 
-## 工具一览(11 个)
+## 工具一览(10 个)
 
 `cubemx_help` / `cubemx_script` / `cubemx_load` / `cubemx_configure` / `cubemx_generate`
 / `cubemx_export_pinout` / `cubemx_new_project` / `cubemx_intent` / `cubemx_probe`
-/ `cubemx_remove_peripheral` / `cubemx_add_source`
+/ `cubemx_remove_peripheral`
 
 - **`cubemx_intent`**:只写"要什么"(外设 / 模式 / 引脚 / 频率 / 占空比),`.ioc` 内部名由知识库查出来 —— 优先用它。
   目前支持:`TIMx`(pwm / input_capture / internal_clock)、`GPIO`、`I2Cx`、`USARTx`、`SPIx`、`ADCx`、
@@ -61,18 +63,20 @@
   `NbrOfConversion` + `Rank-n`/`Channel-n`/`SamplingTime-n`,工具已自动补);**外部触发必须配套
   触发源外设**(如 TIM2 的 TRGO 输出),只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死。
   详见 `knowledge/rules/adc.yaml`。
-- **generate 覆盖 CMakeLists**:`cmake/stm32cubemx/CMakeLists.txt` 会被重新 generate 覆盖,自定义
-  源文件需重新调 `cubemx_add_source` 加入(幂等)。
+- **自定义源文件写哪里**:`cmake/stm32cubemx/CMakeLists.txt` 每次 generate 都被全量重写(别往里加);
+  **工程根 `CMakeLists.txt` 只生成一次、不重写** —— 用户的 `.c` 写进 `# Add sources to executable`
+  的 `target_sources(... PRIVATE)`、`.h` 目录写进 `# Add include paths` 的
+  `target_include_directories(... PRIVATE)`,写完永久有效(旧版 `cubemx_add_source` 写在会被覆盖的位置,已退役)。
 - **模板必须 6.18 原生生成**:手写/非原生 .ioc 会被 6.18 拒绝。请求的芯片无模板时,报错会给出
   可用模板清单与生成方法。
 
 ## 开发 / 验证
 
-- 单元测试:`python -m unittest test_cubemx_mcp`(165 个,其中 5 个集成测试默认跳过;都不依赖 CubeMX)
+- 单元测试:`python -m pytest`(159 个,其中 5 个集成测试默认跳过;都不依赖 CubeMX)
 - 集成测试(真启动 CubeMX,每个用例约 10s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
 - 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 90%+)
 - 风格:`ruff check .` / `ruff format --check .`
-- 语法检查:`python -m py_compile cubemx_mcp.py test_cubemx_mcp.py`
+- 语法检查:`python -m compileall -q src tests`(PowerShell 不展开 `*.py`,别直接把通配符传给 py_compile)
 - MCP 协议级冒烟:**用官方 `mcp.client.stdio.ClientSession` 连接**;手写 JSON-RPC 直连本 2.0 server 会挂起无响应。
 
 ## 原则

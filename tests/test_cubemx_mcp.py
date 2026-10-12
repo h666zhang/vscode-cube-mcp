@@ -1,6 +1,9 @@
 """Vscode_cube_mcp 单元测试(标准库 unittest,不依赖 CubeMX 实体)。
 
-运行: python -m unittest test_cubemx_mcp -v
+运行: python -m pytest -v
+
+测试通过根目录 pyproject.toml 的 `pythonpath = ["src"]` 找到 vscode_cube_mcp 包,不必先安装;
+若要用 unittest 跑: pip install -e . 后 python -m unittest discover -s tests -v
 """
 
 import os
@@ -10,12 +13,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-import cubemx_mcp
-import cubemx_result
-import intent_resolver
-import ioc_diff
-import ioc_editor
-import knowledge_loader
+from vscode_cube_mcp import cubemx_mcp, cubemx_result, intent_resolver, ioc_diff, ioc_editor, knowledge_loader
 
 
 class TestCleanup(unittest.TestCase):
@@ -118,24 +116,25 @@ class _FakeProc:
 
 class TestRunScript(unittest.TestCase):
     def test_ok_output(self):
-        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\noutput\n")):
+        with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\noutput\n")):
             r = cubemx_mcp._run_script("config load x")
         self.assertTrue(r["ok"])
         self.assertIn("output", r["output"])
 
     def test_ko_marker_detected(self):
-        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\nKO\n")):
+        with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\nKO\n")):
             r = cubemx_mcp._run_script("set bad")
         self.assertFalse(r["ok"])
 
     def test_nonzero_exit_detected(self):
-        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(1, "boom")):
+        with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=_FakeProc(1, "boom")):
             r = cubemx_mcp._run_script("x")
         self.assertFalse(r["ok"])
 
     def test_timeout_path(self):
         with mock.patch(
-            "cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))
+            "vscode_cube_mcp.cubemx_mcp.subprocess.Popen",
+            return_value=_FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1)),
         ):
             r = cubemx_mcp._run_script("x")
         self.assertFalse(r["ok"])
@@ -143,14 +142,14 @@ class TestRunScript(unittest.TestCase):
 
     def test_timeout_kills_process_tree(self):
         fake = _FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))
-        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=fake):
-            with mock.patch("cubemx_mcp._kill_process_tree") as kill:
+        with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=fake):
+            with mock.patch("vscode_cube_mcp.cubemx_mcp._kill_process_tree") as kill:
                 cubemx_mcp._run_script("x")
         kill.assert_called_once_with(fake)
 
     def test_temp_script_cleaned(self):
         before = set(os.listdir(tempfile.gettempdir()))
-        with mock.patch("cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\n")):
+        with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\n")):
             cubemx_mcp._run_script("config load x")
         after = set(os.listdir(tempfile.gettempdir()))
         self.assertEqual(before, after)
@@ -255,101 +254,6 @@ class TestRemovePeripheral(unittest.TestCase):
             self.assertIn("Mcu.IPNb=5", text)
         finally:
             os.remove(path)
-
-
-class TestAddSource(unittest.TestCase):
-    def _make_project(self):
-        root = tempfile.mkdtemp()
-        cmake_dir = os.path.join(root, "cmake", "stm32cubemx")
-        os.makedirs(cmake_dir)
-        with open(os.path.join(root, "proj.ioc"), "w", encoding="utf-8") as f:
-            f.write("#MicroXplorer Configuration settings - do not modify\n")
-        lists = """set(MX_Application_Src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c
-)
-"""
-        with open(os.path.join(cmake_dir, "CMakeLists.txt"), "w", encoding="utf-8") as f:
-            f.write(lists)
-        return root
-
-    def setUp(self):
-        self._orig = cubemx_mcp.ALLOWED_ROOTS
-        cubemx_mcp.ALLOWED_ROOTS = [tempfile.gettempdir()]
-
-    def tearDown(self):
-        cubemx_mcp.ALLOWED_ROOTS = self._orig
-
-    def test_add_source_inserts_once_and_idempotent(self):
-        root = self._make_project()
-        try:
-            ioc = os.path.join(root, "proj.ioc")
-            out = cubemx_mcp.cubemx_add_source(ioc, "Core/Src/OLED.c")
-            self.assertIn("OLED.c", out)
-            lists_path = os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt")
-            with open(lists_path, encoding="utf-8") as f:
-                text = f.read()
-            self.assertIn("../../Core/Src/OLED.c", text)
-            self.assertEqual(text.count("OLED.c"), 1)
-            # 幂等:再次调用不重复
-            out2 = cubemx_mcp.cubemx_add_source(ioc, "Core/Src/OLED.c")
-            self.assertIn("已在源列表", out2)
-            with open(lists_path, encoding="utf-8") as f:
-                text2 = f.read()
-            self.assertEqual(text2.count("OLED.c"), 1)
-        finally:
-            import shutil
-
-            shutil.rmtree(root, ignore_errors=True)
-
-    def test_add_source_missing_cmake_raises(self):
-        root = self._make_project()
-        try:
-            os.remove(os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt"))
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
-        finally:
-            import shutil
-
-            shutil.rmtree(root, ignore_errors=True)
-
-    def test_add_source_rejects_traversal(self):
-        root = self._make_project()
-        try:
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "../outside.c")
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/../evil.c")
-        finally:
-            import shutil
-
-            shutil.rmtree(root, ignore_errors=True)
-
-    def test_add_source_rejects_absolute_and_newline(self):
-        root = self._make_project()
-        try:
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), r"C:\evil\OLED.c")
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c\nset(OTHER evil)")
-        finally:
-            import shutil
-
-            shutil.rmtree(root, ignore_errors=True)
-
-    def test_add_source_no_anchor_raises(self):
-        # 两个锚点(main.c/stm32f1xx_it.c)都不存在时必须报错,不能静默假成功
-        root = self._make_project()
-        try:
-            lists_path = os.path.join(root, "cmake", "stm32cubemx", "CMakeLists.txt")
-            with open(lists_path, "w", encoding="utf-8") as f:
-                f.write("set(MX_Application_Src\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/other.c\n)\n")
-            with self.assertRaises(ValueError):
-                cubemx_mcp.cubemx_add_source(os.path.join(root, "proj.ioc"), "Core/Src/OLED.c")
-        finally:
-            import shutil
-
-            shutil.rmtree(root, ignore_errors=True)
 
 
 class TestHelp(unittest.TestCase):
@@ -1062,9 +966,6 @@ class TestHelpTopics(unittest.TestCase):
     def test_topic_remove(self):
         self.assertIn("cubemx_remove_peripheral", cubemx_mcp.cubemx_help("remove"))
 
-    def test_topic_add_source(self):
-        self.assertIn("cubemx_add_source", cubemx_mcp.cubemx_help("add_source"))
-
     def test_templates_empty_dir(self):
         with mock.patch.object(cubemx_mcp, "_available_templates", return_value=[]):
             self.assertIn("为空或不存在", cubemx_mcp.cubemx_help("templates"))
@@ -1625,7 +1526,7 @@ class TestProbeTool(unittest.TestCase):
 
 # ---------------------------------------------------------------- 集成测试(默认跳过)
 INTEGRATION = os.environ.get("ST_CUBEMX_RUN_INTEGRATION") == "1"
-TEMPLATE_IOC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "STM32F103C8T6.ioc")
+TEMPLATE_IOC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "STM32F103C8T6.ioc")
 
 
 @unittest.skipUnless(
@@ -1637,7 +1538,7 @@ class TestCubeMXIntegration(unittest.TestCase):
 
     单元测试只能证明"代码逻辑对",这个类才证明"写出来的东西 CubeMX 认"。
     默认跳过(慢,而且会启动外部程序)。
-    运行: $env:ST_CUBEMX_RUN_INTEGRATION=1; python -m unittest test_cubemx_mcp.TestCubeMXIntegration
+    运行: $env:ST_CUBEMX_RUN_INTEGRATION=1; python -m pytest tests/test_cubemx_mcp.py::TestCubeMXIntegration -v
     """
 
     def setUp(self):

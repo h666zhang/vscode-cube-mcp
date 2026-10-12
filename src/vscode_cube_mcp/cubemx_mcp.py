@@ -15,7 +15,6 @@ Tools:
   cubemx_intent(ioc, intents)      按配置意图改 .ioc(内部名由知识库查出来)
   cubemx_probe(ioc, cmds)          探针:在副本上试跑,输出改前改后的差异
   cubemx_remove_peripheral(ioc, peripheral) 文本方式移除外设
-  cubemx_add_source(ioc, source_file) 自定义源文件加入 CMake 源列表
 
 配置(环境变量,不硬编码本机路径):
   ST_CUBEMX_EXE            STM32CubeMX 可执行文件路径;未设置时尝试 PATH 中的
@@ -39,11 +38,8 @@ import threading
 
 from mcp.server import MCPServer
 
-import intent_resolver
-import ioc_diff
-import ioc_editor
-import knowledge_loader
-from cubemx_result import ToolError, render, render_run
+from . import intent_resolver, ioc_diff, ioc_editor, knowledge_loader
+from .cubemx_result import ToolError, render, render_run
 
 # .ioc 的文本编辑在 ioc_editor.py(纯文本操作,不起 CubeMX 进程)。
 # 这里用原来的函数名做别名转发,内部调用与既有测试都不用改。
@@ -205,11 +201,13 @@ def _ioc_path(ioc: str) -> str:
 
 
 def _template_search_dirs() -> list:
-    """模板查找路径:①源码目录 __file__/templates ②安装版 data-files(site-packages 上级)
-    ③data-files 实际安装位置 sys.prefix/templates(pip 装 wheel 时相对 sys.prefix)。"""
+    """模板查找路径:①模块同级 templates ②包目录上一级(src 布局下是仓库根)
+    ③再上一级 ④安装版 data-files / pip 装 wheel 时相对 sys.prefix。"""
+    here = os.path.dirname(os.path.abspath(__file__))
     return [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"),
+        os.path.join(here, "templates"),
+        os.path.join(os.path.dirname(here), "templates"),
+        os.path.join(os.path.dirname(os.path.dirname(here)), "templates"),
         os.path.join(sys.prefix, "templates"),
     ]
 
@@ -263,7 +261,6 @@ def cubemx_help(topic: str = "") -> str:
       gpio / i2c / tim / rcc(或 clock)  常用外设配置命令与已知坑
       usart / spi / adc / can / rtc / iwdg / wwdg / dma / nvic  其余已收录外设与功能
       remove       移除外设
-      add_source   自定义源文件加入 CMake 源列表
     """
     t = topic.strip().lower()
     if t == "templates":
@@ -647,73 +644,6 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
             f"已从 {ap} 移除外设 {peripheral}\n"
             f"删除 {len(info['removed'])} 行相关配置,外设列表已重排(Mcu.IPNb={len(info['keep_ips'])})"
         ),
-    )
-
-
-@mcp.tool()
-def cubemx_add_source(ioc: str, source_file: str) -> str:
-    """把自定义源文件加入工程的 CMake 源列表(stm32cubemx/CMakeLists.txt)。
-
-    CubeMX 重新 generate 会覆盖 cmake/stm32cubemx/CMakeLists.txt,手动加进
-    MX_Application_Src 的自定义源文件会丢失;本工具用于重新添加(幂等,重复调用不重复加)。
-
-    参数:
-      ioc:          工程 .ioc 文件绝对路径(用于定位工程根目录)
-      source_file:  源文件相对工程根的路径,如 Core/Src/OLED.c
-    """
-    ap = _ioc_path(ioc)
-    proj_root = os.path.dirname(ap)
-    cmake_lists = os.path.join(proj_root, "cmake", "stm32cubemx", "CMakeLists.txt")
-    if not os.path.isfile(cmake_lists):
-        raise ToolError("PROJECT_NOT_GENERATED", f"找不到 {cmake_lists};请先 project generate 生成工程")
-    sf = source_file.replace("\\", "/").strip()
-    # 输入校验:必须是相对工程根的普通路径——拒绝绝对路径、盘符、路径穿越(../)、换行注入
-    if (
-        not sf
-        or sf.startswith("/")
-        or re.match(r"^[A-Za-z]:", sf)
-        or sf.startswith("../")
-        or "/../" in sf
-        or sf.endswith("/..")
-        or "\n" in sf
-        or "\r" in sf
-    ):
-        raise ToolError(
-            "BAD_ARGUMENT",
-            f"非法 source_file(须为相对工程根的路径,如 Core/Src/OLED.c): {source_file!r}",
-        )
-    with open(cmake_lists, encoding="utf-8") as f:
-        text = f.read()
-    marker = "${CMAKE_CURRENT_SOURCE_DIR}/../../"
-    entry = f"    {marker}{sf}\n"
-    # 幂等:已含该条目标记(大小写不敏感,Windows 文件系统)则直接返回
-    if (marker + sf).lower() in text.lower():
-        return render(
-            "cubemx_add_source",
-            True,
-            steps=[("check_path", "ok"), ("compose_ioc", "ok")],
-            extra=f"{sf} 已在源列表中,无需重复添加",
-        )
-    # 选插入锚点:优先 stm32f1xx_it.c(接近列表尾部),退而求其次 main.c(列表首项)
-    anchors = [
-        f"    {marker}Core/Src/stm32f1xx_it.c",
-        f"    {marker}Core/Src/main.c",
-    ]
-    hit = next((a for a in anchors if a in text), None)
-    if hit is None:
-        raise ToolError(
-            "PROJECT_STRUCTURE_UNEXPECTED",
-            f"无法在 {cmake_lists} 中找到插入锚点(MX_Application_Src 中 main.c/stm32f1xx_it.c "
-            f"条目均不存在);请检查工程 CMakeLists.txt 结构",
-        )
-    text = text.replace(hit, entry + hit, 1)
-    with open(cmake_lists, "w", encoding="utf-8") as f:
-        f.write(text)
-    return render(
-        "cubemx_add_source",
-        True,
-        steps=[("check_path", "ok"), ("compose_ioc", "ok")],
-        extra=f"已将 {sf} 加入 {cmake_lists}",
     )
 
 

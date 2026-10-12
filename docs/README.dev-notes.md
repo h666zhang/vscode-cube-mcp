@@ -2,7 +2,7 @@
 
 > 全部由 deepseek-v4-flash 生成
 
-[![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 - **GitHub**: https://github.com/h666zhang/vscode-cube-mcp
 - **PyPI**: https://pypi.org/project/vscode-cube-mcp/
 
@@ -95,8 +95,10 @@ cubemx_new_project(
 HSE 8MHz + PLL ×9 = 72MHz、SWD、SysTick,**无外设**)。新增芯片:把 6.18 原生生成的 .ioc
 复制成 `templates/{芯片型号}.ioc` 即可(必须是 6.18 原生文件,否则加载会报错)。
 
-**配套工具**:`cubemx_remove_peripheral`(文本方式移除外设,解决 `set noparam` 无效)、
-`cubemx_add_source`(把自定义源文件加回 CMake 列表,generate 覆盖后可重补)。
+**配套工具**:`cubemx_remove_peripheral`(文本方式移除外设,解决 `set noparam` 无效)。
+
+> 自定义源文件(自己的库)不需要工具:直接写进工程根 `CMakeLists.txt` 的用户区
+> (`# Add sources to executable` / `# Add include paths`)——该文件 CubeMX 只生成一次,generate 不会覆盖。
 
 > **TIM 内部时钟**:命令含 `set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL` 时
 > server 自动注入标准表达(配置补丁),详见下文「TIM 标准写法与实测坑」。
@@ -193,7 +195,7 @@ HAL_TIM_Base_Start_IT(&htim2);                  /* 再开中断 */
 | `set mode TIMx` 无效 | 一律 KO,TIM 靠配置补丁/原生模板激活 |
 | `set ip parameters TIMx` 未激活时静默忽略 | 不报错也不生效,先激活再设参 |
 | `set noparam TIMx` 删除无效 | 返回 OK 但外设仍在,需用 cubemx_remove_peripheral 文本移除 |
-| 重新 generate 覆盖 CMakeLists | `cmake/stm32cubemx/CMakeLists.txt` 被重写,手动加的源文件需重新 cubemx_add_source |
+| 自定义源文件写错文件 | `cmake/stm32cubemx/CMakeLists.txt` 每次 generate 都被重写;写工程根 `CMakeLists.txt` 的用户区(`# Add sources to executable` / `# Add include paths`)才不会丢 |
 
 ## TIM PWM / 输入捕获的实测细节(2026-08-27,PWM_IC_OLED)
 
@@ -236,7 +238,7 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 - **CubeMX 只生成 IC1 的 sConfigIC**(`HAL_TIM_IC_ConfigChannel` 仅 1 次);测占空比的 IC2 需 main.c 手动补 `HAL_TIM_IC_ConfigChannel(&htim2, ic2, TIM_CHANNEL_2)`(示例见 cubemx_help tim topic);
 - 注入后的 .ioc 经 6.18 load+generate 后与基准样本逐行一致,生成 tim.c 参数正确(PWM 10kHz/50% + IC RISING)。
 
-**MCP 开发模式配置坑(2026-08-27)**:config.toml 的 `[[plugins]]` 用 `command = python.exe` + `args = ["-m", "cubemx_mcp"]` 时,server 从 site-packages 导入,**cwd 字段不被 MCP 启动器支持(静默忽略)**;可靠写法是 `args = ['C:\MINE\STM32Project\Vscode_cube_mcp\cubemx_mcp.py']` 直接执行开发目录脚本。改配置需重启会话生效。
+**MCP 开发模式配置坑(2026-08-27,2026-10-12 随 src 布局修订)**:config.toml 的 `[[plugins]]` 用 `command = python.exe` + `args = ["-m", "vscode_cube_mcp"]`;**cwd 字段不被 MCP 启动器支持(静默忽略)**,所以开发目录必须先 `pip install -e .`,否则 `-m` 找不到包。改配置需重启会话生效,详见本文末「MCP 开发模式配置」。
 
 ## 知识库是怎么来的(2026-10-10,重构后)
 
@@ -271,7 +273,7 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 3. **加意图(可选)**:要让 `cubemx_intent` 支持它,就在 `intent_resolver.py` 加一个分支 ——
    命令类(如 GPIO/I2C/USART)复用 `_pin_commands`;片段注入类(如 TIM)照 `_apply_tim` 的写法;
 4. **补测试**:单元测试(mock 掉 `_run_script`)+ 集成测试用例(`TestCubeMXIntegration`);
-5. **验证**:`python -m unittest` + `python -m pytest`,最后真跑一次集成测试确认 CubeMX 认。
+5. **验证**:`python -m pytest`,最后真跑一次集成测试确认 CubeMX 认。
 
 > ⚠️ 探针里**看不到差异 ≠ 命令无效**。实测例子:USART2 的 `BaudRate 115200` 正好等于 db 默认值,
 > CubeMX 就不写出 `USART2.BaudRate` 行;换成 9600 才出现。所以探针要用**非默认值**再试一遍。
@@ -285,6 +287,22 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 
 > 注意:知识库里每颗芯片一份引脚表,`--mcu` 换芯片就是重新导出;当前导的是 `STM32F103C8T6`
 > (对应 `db/mcu/STM32F103C(8-B)Tx.xml`)。
+
+## 开发与测试
+
+```bash
+pip install -e .                                # 首次:src 布局,把 src/ 装成可导入的包(或靠 pyproject 的 pythonpath)
+python -m pytest                                # 单元测试 + 覆盖率门槛(低于 80% 失败)
+ruff check . && ruff format --check .            # 风格
+```
+
+真跑 CubeMX 的集成测试(每个用例约 10s,会启动 CubeMX,用于验证"写出来的 .ioc CubeMX 真的认"):
+
+```powershell
+$env:ST_CUBEMX_RUN_INTEGRATION=1; python -m pytest tests/test_cubemx_mcp.py::TestCubeMXIntegration -v
+```
+
+技术栈:Python >= 3.10 + mcp SDK 2.x(stdio);打包 setuptools + build + twine;目标平台 Windows(跨平台可用)。
 
 ## 报错模型(错误码表)
 
@@ -304,27 +322,26 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 | `PIN_CONFLICT` | resolve_intent | 引脚已被占用 | 换引脚,或先移除占用者 |
 | `RULE_NOT_VERIFIED` | resolve_intent | 规则没实测过 | 先 probe 验证 |
 | `PERIPHERAL_NOT_FOUND` | compose_ioc | .ioc 里没有这个外设 | 确认外设名 |
-| `PROJECT_NOT_GENERATED` / `PROJECT_STRUCTURE_UNEXPECTED` | compose_ioc | 工程没生成 / 结构不符 | 先 `cubemx_generate` |
 | `CUBEMX_TIMEOUT` / `CUBEMX_EXIT_NONZERO` / `CUBEMX_KO` | run_cubemx | CubeMX 超时 / 退出非 0 / 返回 KO | 看原始输出 |
 | `READBACK_MISMATCH` | readback_verify | 写入后回读不一致 | 看列出的缺失行 |
 | `CLOCK_DEGRADED` | post_check | HSE 被降级(**警告**,不是失败) | GUI 里把 PLL Source 选回 HSE |
 
 ## 本地开发:让宿主跑本地代码(补充上面那条旧记录)
 
-上面 2026-08-27 那条只对了一半:`cwd` 确实不被支持(**会被静默忽略**),但要点是
-`args` 必须指向**脚本文件本身**,而不是 `-m 模块名`:
+上面那条「`args` 必须指向脚本文件本身」的结论在**旧布局**(模块平铺在仓库根、无 `__main__.py`)下成立,
+src 布局后已作废:包内改用相对导入,**直连脚本文件会报**
+`ImportError: attempted relative import with no known parent package`,只能走 `-m`:
 
 ```toml
 [[plugins]]
 name    = "Vscode_cube_mcp"
 command = "C:\\...\\Python313\\python.exe"
-args    = ["C:\\MINE\\STM32Project\\Vscode_cube_mcp\\cubemx_mcp.py"]   # ← 不是 ["-m", "cubemx_mcp"]
+args    = ["-m", "vscode_cube_mcp"]   # 开发目录需先 `pip install -e .`
 env     = { ST_CUBEMX_ALLOWED_ROOTS = "C:\\MINE\\STM32Project" }
 ```
 
-直接执行脚本时,Python 会把**脚本所在目录**放进 `sys.path`,所以同目录的
-`cubemx_result` / `ioc_editor` / `intent_resolver` / `ioc_diff` / `knowledge_loader` 都能导入,
-`knowledge/` 也能被 `knowledge_loader` 找到。改完**重启宿主**才生效。
+`pip install -e .` 会把 `src/` 挂进 `sys.path`;包外的 `knowledge/` 与 `templates/` 由
+`knowledge_loader` / `_template_search_dirs` 向上回溯到仓库根找到。改完**重启宿主**才生效。
 
 > 另注意:`%APPDATA%\reasonix` 是宿主的运行时状态路径,agent 无权写入(会被直接拒绝),
 > 这类改动得自己动手。

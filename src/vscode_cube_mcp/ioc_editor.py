@@ -20,8 +20,8 @@ import os
 import re
 import shutil
 
-import knowledge_loader
-from cubemx_result import ToolError
+from . import knowledge_loader
+from .cubemx_result import ToolError
 
 
 # ---------------------------------------------------------------- 写盘:备份 + 回读校验

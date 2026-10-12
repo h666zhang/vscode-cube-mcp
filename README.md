@@ -1,21 +1,18 @@
 # Vscode_cube_mcp
 
-> ## ⚠️ 已废弃(Deprecated)
-> 本项目已停止维护、存在已知缺陷,不建议使用;待作者想好改进措施后再考虑继续。详见 [DEPRECATED.md](DEPRECATED.md)。
-
 [![GitHub](https://img.shields.io/badge/GitHub-h666zhang%2Fvscode--cube--mcp-181717%3Flogo%3Dgithub)](https://github.com/h666zhang/vscode-cube-mcp)  [![PyPI](https://img.shields.io/pypi/v/vscode-cube-mcp)](https://pypi.org/project/vscode-cube-mcp/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **项目定位**：
-· 自动化流水线：CI/CD中根据配置文件自动生成初始化代码。
-· 自然语言配置：用聊天描述硬件需求，直接产出可编译的工程。
-· 批量变体：为不同板子快速生成不同配置。
-· 版本控制友好：.ioc文本可diff，比GUI点来点去可追溯。
+> **项目定位**:
+> - 自动化流水线:CI/CD 中根据配置文件自动生成初始化代码
+> - 自然语言配置:用聊天描述硬件需求,直接产出可编译的工程
+> - 批量变体:为不同板子快速生成不同配置
+> - 版本控制友好:`.ioc` 是纯文本,可 diff、可追溯
 
 MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本模式(`-q`),
 让 AI 助手可以直接加载 .ioc 工程、改引脚/外设配置、生成 HAL 代码、导出引脚表,全程无需打开 CubeMX GUI。
 
-> **能力边界**：本工具只生成**工程配置与 HAL 骨架**（引脚、外设、时钟、工具链），
-> 不负责应用逻辑代码（LED 闪烁、OLED 显示内容、传感器驱动等）——业务代码请在生成后的工程里自己写。
+> **能力边界**:本工具只生成**工程配置与 HAL 骨架**(引脚、外设、时钟、工具链),
+> 不负责应用逻辑代码(LED 闪烁、OLED 显示内容、传感器驱动等)——业务代码请在生成后的工程里自己写。
 
 ## 功能一览
 
@@ -30,13 +27,13 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 | `cubemx_probe` | **探针**:在 .ioc 副本上试跑命令,输出改前改后的差异(用来收录还没实测过的外设写法) |
 | `cubemx_export_pinout` | 导出引脚配置 CSV(只读) |
 | `cubemx_remove_peripheral` | 从 .ioc 移除外设 |
-| `cubemx_add_source` | 把自定义源文件加入 CMake 源列表 |
 | `cubemx_script` | 任意 CubeMX 脚本命令序列(高级/原始脚本接口) |
 
 ## 要求
 
 - **Python >= 3.10**(Windows 建议用官方安装版,不要用 msys2/Git 自带的 python,见 FAQ)
 - **STM32CubeMX 6.x**(ST 专有软件,请从 [ST 官网](https://www.st.com/en/development-tools/stm32cubemx.html) 免费下载并自行遵守其许可;本工具仅运行时调用其命令行,不包含、不修改其代码)
+- 目标平台 Windows(跨平台可用);运行时只依赖 mcp SDK 2.x(stdio),无其它依赖
 
 ## 快速开始(Windows)
 
@@ -75,7 +72,7 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
   "mcpServers": {
     "Vscode_cube_mcp": {
       "command": "python",
-      "args": ["-m", "cubemx_mcp"],
+      "args": ["-m", "vscode_cube_mcp"],
       "env": {
         "ST_CUBEMX_EXE": "C:/MINE/STM/STM/STM32CubeMX.exe",
         "ST_CUBEMX_ALLOWED_ROOTS": "C:/MINE/STM32Project"
@@ -91,7 +88,7 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 ### 验证
 
 让 AI 调一次 `cubemx_help`(或给个 `.ioc` 路径调 `cubemx_load`),能返回内容就通了。
-终端手动冒烟:`python -m cubemx_mcp` 不报错、不立刻退出即为正常(stdio 服务会挂起等输入,`Ctrl+C` 退出)。
+终端手动冒烟:`python -m vscode_cube_mcp` 不报错、不立刻退出即为正常(stdio 服务会挂起等输入,`Ctrl+C` 退出)。
 
 ## 配置项(环境变量)
 
@@ -106,13 +103,13 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 
 ## 使用示例
 
-让 AI 助手做的事情都会通过上述 11 个工具完成,例如:
+让 AI 助手做的事情都会通过上述 10 个工具完成,例如:
 
 - 「第一次用你,先看看你能干什么、有哪些芯片模板」→ `cubemx_help`(陌生 agent 建议第一个调用)
 - 「用 STM32F103C8T6 从零建一个工程」→ `cubemx_new_project`
 - 「TIM3 的 PA6 出 10kHz、占空比 50% 的 PWM;USART2 接 PA2/PA3,波特率 9600」→ **`cubemx_intent`**
 - 「把 PB13 改成 GPIO_Output 并加标签 LED」→ `cubemx_intent`(也可以直接发 `cubemx_configure` 的 set 命令)
-- 「把 OLED.c 加进编译,重新 generate 后也保留」→ `cubemx_add_source`
+- 「把自己写的 OLED 库加进编译,重新 generate 后也保留」→ **不用调工具**,直接写进工程根 `CMakeLists.txt` 的用户区(见下节)
 
 ### 用意图配置外设(推荐)
 
@@ -140,19 +137,40 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 - ADC 多通道时自动补转换序列(`NbrOfConversion` + 每个通道的 `Rank-n` / `Channel-n` / `SamplingTime-n`);
 - `interrupt: true` 自动注入对应的 NVIC 键,并按外设选对向量名(如 ADC 用共用的 `ADC1_2_IRQn`)。
 
+### 把自己的库加进编译(如 OLED.c / OLED.h)
+
+CubeMX 工程里有**两个** `CMakeLists.txt`,作用完全不同:
+
+| 文件 | 谁生成 | 重新 generate 会怎样 |
+|------|--------|----------------------|
+| `cmake/stm32cubemx/CMakeLists.txt` | CubeMX 每次生成 | **全量重写** —— 别往里加东西 |
+| 工程根 `CMakeLists.txt` | CubeMX **只生成一次** | **不会重写**,里面的用户区就是留给你改的 |
+
+所以你自己的库直接写进**工程根 `CMakeLists.txt`**(CubeMX 在文件头就写明"generated only once"):
+
+```cmake
+# Add sources to executable
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user sources here
+    SPL_OLED/Src/OLED.c          # ← 你的 .c
+)
+
+# Add include paths
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined include paths
+    SPL_OLED/Inc                 # ← 你的 .h 所在目录
+)
+```
+
+一次写好,之后 generate 多少次都不会丢 —— 不需要任何工具代劳。
+
 ## 知识库(`knowledge/`)
 
-工具不靠"记忆"写 `.ioc`:事实只有两个来源,都在 `knowledge/` 里(纯文本,可 diff、可审):
+工具不靠"记忆"写 `.ioc`:引脚、模式、参数、命令写法全部来自 `knowledge/`(纯文本,可 diff、可审),
+每条实测规则都带 `verified` 与来源 —— 没验证过的规则会被**拒绝执行**,不是猜出来的。
 
-| 目录 | 内容 | 来源 |
-|------|------|------|
-| `knowledge/ip/` | 每个 IP 的合法模式名、参数与取值范围 | 从 CubeMX 安装目录的 `db/mcu/IP/*.xml` **导出** |
-| `knowledge/mcu/` | 芯片引脚表:每个引脚支持哪些信号 | 从 CubeMX 的 `db/mcu/<芯片>.xml` **导出** |
-| `knowledge/rules/` | 命令写法、`.ioc` 片段、已知坑 | **用探针实测**,每条带 `verified` 与来源 |
-
-- 只有 `verified: true` 的规则会被执行;`false` 的会被拒绝(提示先用 `cubemx_probe` 验证)。
-- 换芯片 / 升级 CubeMX 后重新导出:`python tools/gen_knowledge_from_db.py --mcu STM32F103C8T6`
-- 目录可用 `ST_CUBEMX_KNOWLEDGE` 指定,一般不用设(源码运行与 pip 安装都会自动找到)。
+换芯片、升级 CubeMX 后重新导出,或收录新外设的流程,见 [`docs/README.dev-notes.md`](docs/README.dev-notes.md)。
+目录可用 `ST_CUBEMX_KNOWLEDGE` 指定,一般不用设(源码运行与 pip 安装都会自动找到)。
 
 内置模板库(`templates/`,按芯片型号命名的**最小模板**:仅芯片标识 + 基础时钟 72MHz/SWD/SysTick,**无外设**,如 `STM32F103C8T6.ioc`);外设全部由 `cubemx_new_project` 的 `commands` set 命令现配,TIM 内部时钟由配置补丁自动处理。新增芯片只需把该芯片 6.18 原生 .ioc 放进 `templates/`。
 
@@ -186,12 +204,9 @@ python -m pip show vscode-cube-mcp   # 确认版本号
 升级后**必须重启客户端**(Reasonix / Claude 等),MCP server 进程才会加载新代码;
 若重启后工具参数仍是旧的,等几秒或新开一个会话(host 侧工具快照可能滞后)。
 
-> 维护者发布新版流程(改版本号 → `python -m build` → `twine upload` → `git tag` + push)
-> 见 [`README.dev-notes.md`](README.dev-notes.md)。
-
 ## 常见问题 FAQ
 
-**pip 装上了,但 `python -m cubemx_mcp` 报 `ModuleNotFoundError: No module named 'cubemx_mcp'`**
+**pip 装上了,但 `python -m vscode_cube_mcp` 报 `ModuleNotFoundError: No module named 'vscode_cube_mcp'`**
 装的解释器和 `python` 指向的不是同一个。`python -m pip show vscode-cube-mcp` 能显示才算装对;
 若 `python` 指向 msys2/Git/Store 版,改用官方 Python(`py -m pip install vscode-cube-mcp`),或在客户端配置里写解释器完整路径。
 
@@ -216,23 +231,11 @@ python -m pip show vscode-cube-mcp   # 确认版本号
 这条规则还没实测过(如早期的 USART)。为避免写出 CubeMX 不认的东西,工具会拒绝执行。先 `cubemx_probe` 验证,再把规则改成 `verified: true`。
 
 **CubeMX 弹「Resolve Clock Issues」**
-通常是 .ioc 时钟树不自洽(如 HSE 未启用但 PLL 选了 HSE),属于工程配置问题,详见 [`README.dev-notes.md`](README.dev-notes.md) 的「从零配置时钟实战」。
+通常是 .ioc 时钟树不自洽(如 HSE 未启用但 PLL 选了 HSE),属于工程配置问题,详见 [`docs/README.dev-notes.md`](docs/README.dev-notes.md) 的「从零配置时钟实战」。
 
-## 开发与测试
-
-```bash
-python -m unittest test_cubemx_mcp             # 133 个测试(其中 5 个集成测试默认跳过)
-python -m pytest                              # 带覆盖率门槛(低于 80% 失败)
-ruff check . && ruff format --check .          # 风格
-```
-
-真跑 CubeMX 的集成测试(每个用例约 10s,会启动 CubeMX,用于验证"写出来的 .ioc CubeMX 真的认"):
-
-```powershell
-$env:ST_CUBEMX_RUN_INTEGRATION=1; python -m unittest test_cubemx_mcp.TestCubeMXIntegration
-```
-
-技术栈:Python >= 3.10 + mcp SDK 2.x(stdio);打包 setuptools + build + twine;目标平台 Windows(跨平台可用)。
+**自己的库(OLED.c 之类)每次 generate 后就不编译了**
+它被加错文件了:`cmake/stm32cubemx/CMakeLists.txt` 每次 generate 都被重写。改放工程根 `CMakeLists.txt`
+的用户区(见上文「把自己的库加进编译」),就不会再丢。
 
 ## 许可与依赖声明
 
@@ -242,11 +245,7 @@ $env:ST_CUBEMX_RUN_INTEGRATION=1; python -m unittest test_cubemx_mcp.TestCubeMXI
 
 ## 更多资料
 
-- [`README.dev-notes.md`](README.dev-notes.md):开发笔记 —— 知识库怎么来的、加外设 / 加芯片的 SOP、报错码表、各外设实测结论
-- [`CHANGELOG.md`](CHANGELOG.md):版本变更记录
-- [`AGENTS.md`](AGENTS.md):给 agent 的项目约定(接入本目录前先读)
-- [`docs/install-claude-code.md`](docs/install-claude-code.md):Claude Code(终端版)安装配置指南
-
-## 更新日志
-
-见 [CHANGELOG.md](CHANGELOG.md)。
+- [`docs/CHANGELOG.md`](docs/CHANGELOG.md) —— 版本变更记录
+- [`docs/install-claude-code.md`](docs/install-claude-code.md) —— Claude Code(终端版)安装配置
+- [`AGENTS.md`](AGENTS.md) —— 给 AI agent 的项目约定(不是给人读的)
+- [`docs/README.dev-notes.md`](docs/README.dev-notes.md) —— 开发笔记 / 内部实现 / SOP(给维护者与贡献者)

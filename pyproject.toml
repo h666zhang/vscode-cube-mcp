@@ -30,10 +30,12 @@ Repository = "https://github.com/h666zhang/vscode-cube-mcp"
 Issues = "https://github.com/h666zhang/vscode-cube-mcp/issues"
 
 [project.scripts]
-vscode-cube-mcp = "cubemx_mcp:main"
+vscode-cube-mcp = "vscode_cube_mcp.cubemx_mcp:main"
 
 [tool.setuptools]
-py-modules = ["cubemx_mcp", "cubemx_result", "intent_resolver", "ioc_diff", "ioc_editor", "knowledge_loader"]
+# src 布局:包在 src/vscode_cube_mcp/;templates/ 与 knowledge/ 仍是根目录下的 data-files(见下)
+package-dir = { "" = "src" }
+packages = ["vscode_cube_mcp"]
 
 [tool.setuptools.data-files]
 # templates/ 模板库必须随包分发(cubemx_new_project 依赖它)
@@ -54,9 +56,11 @@ py-modules = ["cubemx_mcp", "cubemx_result", "intent_resolver", "ioc_diff", "ioc
 "knowledge/rules" = ["knowledge/rules/*.yaml"]
 
 [tool.pytest.ini_options]
+# src 布局:让测试无需先安装即可 import vscode_cube_mcp(本地与 CI 同一配置)
+pythonpath = ["src"]
 # 覆盖率门槛:核心逻辑 <80% 视为失败(本地与 CI 同一配置)
-addopts = "--cov=cubemx_mcp --cov=cubemx_result --cov=intent_resolver --cov=ioc_diff --cov=ioc_editor --cov=knowledge_loader --cov-report=term-missing --cov-fail-under=80"
-testpaths = ["test_cubemx_mcp.py"]
+addopts = "--cov=vscode_cube_mcp --cov-report=term-missing --cov-fail-under=80"
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120

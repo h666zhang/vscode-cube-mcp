@@ -39,12 +39,6 @@ ERRORS = {
         "把该芯片的 .ioc 放进 templates/<mcu>.ioc,或用 template 参数指定一个模板",
     ),
     "PERIPHERAL_NOT_FOUND": ("compose_ioc", ".ioc 里没有这个外设", "确认外设名,如 TIM3 / I2C1"),
-    "PROJECT_NOT_GENERATED": ("compose_ioc", "工程还没生成", "先调 cubemx_generate 生成工程"),
-    "PROJECT_STRUCTURE_UNEXPECTED": (
-        "compose_ioc",
-        "工程结构和预期不一样",
-        "确认这个工程是 CubeMX 生成的 CMake 工程",
-    ),
     # 下面几个是后面任务(知识库/意图)要用的,先定义好,避免以后改错误码
     "UNKNOWN_PERIPHERAL": ("load_knowledge", "知识库还没收录这个外设", "先在 GUI 里配一次,或跑 cubemx_probe 收录"),
     "UNKNOWN_PARAM": ("load_knowledge", "知识库还没收录这个参数", "用 cubemx_help 看这个外设支持哪些参数"),

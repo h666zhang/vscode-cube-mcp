@@ -45,6 +45,20 @@
   三个工程走完"只给意图 → generate → 回读 `adc.c`/`main.c`/`stm32f1xx_it.c`"
 - 测试 149 → **165**;覆盖率约 92.7%
 
+### 修订(2026-10-12)
+
+- **退役 `cubemx_add_source` 工具**(原第 11 个):它把自定义源文件写进
+  `cmake/stm32cubemx/CMakeLists.txt`,而该文件每次 `project generate` 都被全量重写 —— 写进去必然丢。
+  **正确做法**:工程根 `CMakeLists.txt` 是 CubeMX 明示"只生成一次、不重写"(generated only once)的文件,
+  把 `.c` 加进 `# Add sources to executable` 的 `target_sources(... PRIVATE)`、头文件目录加进
+  `# Add include paths` 的 `target_include_directories(... PRIVATE)`,一次写好、重新 generate 也不会丢
+  (实测见 `OLED_HAL` 工程),不需要工具代劳
+- 清掉因此失去引用的错误码 `PROJECT_NOT_GENERATED` / `PROJECT_STRUCTURE_UNEXPECTED`
+- **删除废弃说明**:删 `DEPRECATED.md` 与 README 顶部 ⚠️ 块,项目回到正常维护状态
+- **README 受众收敛**:「开发与测试」移到开发笔记;「知识库」压缩为指路;合并「更多资料 / 更新日志」;
+  删掉指向不存在章节的"维护者发版流程"指引;新增「把自己的库加进编译」一节写清正确位置
+- 工具数 11 → 10(README / AGENTS.md / 内置帮助 / `__init__` 注释)
+
 ## 0.4.2(2026-08-27)
 - **工程化补强**(非功能迭代,为「全外设完善」里程碑铺路):
   - CI:新增 GitHub Actions(windows-latest,Python 3.10-3.13 矩阵;`ruff check` + `ruff format --check` + `pytest` 覆盖率门槛 **80%**)
