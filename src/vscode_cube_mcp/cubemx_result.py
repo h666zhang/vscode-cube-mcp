@@ -10,6 +10,18 @@
 
 from __future__ import annotations
 
+try:
+    # mcp >= 2.3 的工具异常语义:工具里**只有**抛 SDK 自己的 ToolError 才算"预期失败"
+    # (返回 is_error=True,消息给模型读);抛其它异常一律按崩溃处理,模型只会看到
+    # "Error executing tool <name>",原始信息被吞掉。所以我们的错误类型同时继承它 ——
+    # 旧版 SDK(2.0)本来就把任意异常包成 is_error,靠这个继承关系两边行为一致。
+    from mcp.server.mcpserver.exceptions import ToolError as _McpToolError
+except ImportError:  # pragma: no cover - SDK 布局变化时的兜底:退回"纯 ValueError"的老行为
+
+    class _McpToolError(Exception):
+        """占位基类(SDK 里没有对应错误类型时用)。"""
+
+
 # 调用流程里可能卡住的位置,按实际执行顺序排列
 STAGES = (
     "validate_args",  # 参数校验
@@ -59,10 +71,13 @@ def explain(code: str) -> tuple:
     return ERRORS.get(code, ("", "", ""))
 
 
-class ToolError(ValueError):
+class ToolError(_McpToolError, ValueError):
     """带错误码的参数/流程错误。
 
-    继承 ValueError,所以原来 `raise ValueError(...)` 的调用方写法与测试断言不变;
+    同时是 ValueError 与 mcp SDK 的 ToolError:
+      - ValueError:原来 `raise ValueError(...)` 的调用方写法与测试断言不变;
+      - SDK ToolError:mcp>=2.3 才会把这条消息当"预期失败"回给模型(is_error=True)。
+
     文本里带上"卡在哪一步"和错误码,方便一眼看出问题在哪。
 
     形如:
