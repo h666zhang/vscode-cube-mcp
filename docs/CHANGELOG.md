@@ -147,6 +147,20 @@
 - 测试 189 → **206**(198 单元/协议 + 8 集成);覆盖率 92.4% → **93.0%**
 - 仍未验证:真机烧录、F1 之外的芯片
 
+### 发布后修复(2026-10-12,随下一版发布)
+
+- **工具错误信息在 mcp≥2.3 下被吞(CI 抓出来的)**:mcp 2.3 起,工具里**只有**抛 SDK 自己的
+  `ToolError` 才算"预期失败"(返回 `is_error=True`、消息给模型读);抛其它异常一律按崩溃处理,
+  模型只看到 `Error executing tool <name>`。我们的 `ToolError` 原先只继承 `ValueError`,
+  于是参数校验错误(UNKNOWN_PERIPHERAL / PIN_CONFLICT / PATH_NOT_ALLOWED …)的可读信息全丢。
+  现在它同时继承 SDK `ToolError` 与 `ValueError` —— 旧版 SDK 行为不变、新版消息能到模型手里、
+  测试里的 `assertRaises(ValueError)` 也不受影响
+  (验证:mcp 2.0.0 与 2.3.0 下均 198 passed / 8 skipped)
+- **CI 加最低依赖版本回归**(`test-min-deps` job,显式装 `mcp==2.0.0` 跑测试):上面那条正是
+  "本地装 2.0.0 全绿、CI 装 2.3.0 全红"漏出来的 —— matrix 装最新依赖、这个 job 装最低支持版,
+  两端行为都锁住
+- 这两项 + 上面的 `authors` 恢复,都随**下一版**发布(0.4.4.1 已上传,不覆盖)
+
 ## 0.4.2(2026-08-27)
 - **工程化补强**(非功能迭代,为「全外设完善」里程碑铺路):
   - CI:新增 GitHub Actions(windows-latest,Python 3.10-3.13 矩阵;`ruff check` + `ruff format --check` + `pytest` 覆盖率门槛 **80%**)

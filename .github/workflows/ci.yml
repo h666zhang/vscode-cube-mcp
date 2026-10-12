@@ -27,3 +27,24 @@ jobs:
       - name: Run tests with coverage gate (>=80%)
         # 测试为纯单元测试,不依赖 STM32CubeMX 实体
         run: python -m pytest
+
+  # 最低依赖版本回归:上面的 matrix 装的是**最新**依赖,这里装**最低支持版本**。
+  # 2026-10-12 加:当天 mcp 2.3 改了工具异常语义(只有抛 SDK 自己的 ToolError 才算"预期失败",
+  # 其它异常按崩溃处理、原始消息被吞),而本地装的是 2.0.0 —— 典型的"本地绿、CI 红"。
+  # 这个 job 把两端行为都锁住。
+  test-min-deps:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies (lowest supported mcp)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest pytest-cov ruff
+          # 显式降级到最低支持版(mcp>=2.0.0),验证老 SDK 下的行为
+          python -m pip install "mcp==2.0.0"
+          python -m pip show mcp
+      - name: Run tests (no coverage gate)
+        run: python -m pytest -q --no-cov
