@@ -69,6 +69,10 @@
   `NbrOfConversion` + `Rank-n`/`Channel-n`/`SamplingTime-n`,工具已自动补);**外部触发必须配套
   触发源外设**(如 TIM2 的 TRGO 输出),只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死。
   详见 `knowledge/rules/adc.yaml`。
+- **ADC 触发源分规则组/注入组**:F103 规则组(`ExternalTrigConv`)的合法值里**没有 T2_TRGO**
+  —— 那是注入组 `ExternalTrigInjecConv` 的值;规则组要用 TIM2 只能 `T2_CC2`/`T2_CC3`,要 TRGO
+  得用 `T3_TRGO`/`T8_TRGO`。写非法值时 CubeMX 静默忽略(不报错、硬件永不转换),所以
+  `cubemx_intent` 的 `trigger` 现在对照 db 的 values 直接拦下并列出合法取值。
 - **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
   返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
   240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
@@ -85,9 +89,12 @@
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**224 个:215 单元/协议 + 9 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**228 个:219 单元/协议 + 9 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
   —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
+- **改了 `src/` 之后必须重启宿主**:Reasonix 把本 server 当长驻进程**复用**,开新会话并不会
+  重启它(实测:改完代码后新会话仍在跑旧代码,查进程启动时间才确认)。`knowledge/*.yaml`
+  不受影响(缓存按文件 mtime 失效),但 `src/` 的改动必须重启宿主(或断开重连该 plugin)才生效
 - 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 ~93%)
 - 风格:`ruff check .` / `ruff format --check .`
 - 语法检查:`python -m compileall -q src tests`(PowerShell 不展开 `*.py`,别直接把通配符传给 py_compile)

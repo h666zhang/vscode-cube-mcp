@@ -392,9 +392,21 @@ class TestHelp(unittest.TestCase):
         out2 = cubemx_mcp.cubemx_help(topic="gpio")
         self.assertIn("set pin PB13 GPIO_Output", out2)
 
-    def test_help_unknown_topic_returns_full_guide(self):
-        out = cubemx_mcp.cubemx_help(topic="bogus")
+    def test_help_unknown_topic_lists_available(self):
+        # 未知 topic 必须明确报错并列出可用 topic(宿主的工具描述可能被截断,
+        # agent 只能靠这个错误发现有哪些 topic)
+        with self.assertRaises(ValueError) as ctx:
+            cubemx_mcp.cubemx_help(topic="bogus")
+        msg = str(ctx.exception)
+        self.assertIn("未知 topic", msg)
+        self.assertIn("adc", msg)
+        self.assertIn("templates", msg)
+
+    def test_help_guide_appends_topic_list(self):
+        out = cubemx_mcp.cubemx_help()
         self.assertIn("工具一览", out)
+        self.assertIn("【可用 topic】", out)
+        self.assertIn("adc", out)
 
     def test_help_guide_lists_every_registered_tool(self):
         # help 自述必须覆盖 server 实际注册的每个工具(数量也要对),防止加了工具忘同步文档
@@ -516,11 +528,11 @@ class TestAdcIntent(unittest.TestCase):
         self._seed()
         plan = intent_resolver.apply_intents(
             self.ioc,
-            [{"peripheral": "ADC1", "pin": "PA0", "continuous": True, "trigger": "T2_TRGO", "scan": False}],
+            [{"peripheral": "ADC1", "pin": "PA0", "continuous": True, "trigger": "T2_CC2", "scan": False}],
         )
         joined = "; ".join(plan["commands"])
         self.assertIn("set ip parameters ADC1 ContinuousConvMode ENABLE", joined)
-        self.assertIn("set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T2_TRGO", joined)
+        self.assertIn("set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T2_CC2", joined)
         self.assertNotIn("ScanConvMode", joined)  # 单通道 + 显式 scan=False -> 不写
 
     def test_full_trigger_enum_passthrough(self):
@@ -532,6 +544,16 @@ class TestAdcIntent(unittest.TestCase):
         self.assertIn(
             "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T1_CC1", "; ".join(plan["commands"])
         )
+
+    def test_trigger_rejects_unknown_value(self):
+        # 非法触发值必须在改 .ioc 之前拦下并列出合法取值(CubeMX 对不认识的枚举是静默忽略)
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "trigger": "T9_TRGO"}])
+        msg = str(ctx.exception)
+        self.assertIn("T9_TRGO", msg)
+        self.assertIn("T3_TRGO", msg)
+        self.assertIn("ADC_SOFTWARE_START", msg)
 
     def test_interrupt_uses_shared_adc_vector(self):
         # F103 上 ADC1/ADC2 共用一个向量:interrupt=true 要用 ADC1_2_IRQn,不是 ADC1_IRQn
@@ -546,7 +568,7 @@ class TestAdcIntent(unittest.TestCase):
     def test_trigger_warns_about_trigger_source(self):
         # 实测:只设 ADC 的 ExternalTrigConv、不配触发源外设 -> generate 卡死,所以要提示
         self._seed()
-        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "trigger": "T2_TRGO"}])
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "trigger": "T3_TRGO"}])
         self.assertTrue(any("触发源" in n for n in plan["notes"]), plan["notes"])
 
 
@@ -1403,6 +1425,40 @@ class TestKnowledgeLoader(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             knowledge_loader.dma_channel("ADC9")
         self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
+    def test_help_topics_from_yaml(self):
+        # 可用 topic 从 help.yaml 的键算出来(不硬编码);别名与流程 topic 都算
+        topics = knowledge_loader.help_topics()
+        for name in ("adc", "tim", "dma", "nvic", "gpio", "new_project", "probe", "remove", "clock"):
+            self.assertIn(name, topics)
+        for meta in ("guide", "source", "peripheral"):
+            self.assertNotIn(meta, topics)
+
+    def test_load_cache_follows_file_mtime(self):
+        # 改了 knowledge/*.yaml 之后不重启进程也要能读到新内容(实测踩过:help 一直是旧文本)
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        path = os.path.join(td.name, "probe.yaml")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("k: 1\n")
+        old = os.environ.get("ST_CUBEMX_KNOWLEDGE")
+        os.environ["ST_CUBEMX_KNOWLEDGE"] = td.name
+        self.addCleanup(knowledge_loader.reload)  # LIFO:先恢复环境变量,再清缓存
+
+        def restore_env():
+            if old is None:
+                os.environ.pop("ST_CUBEMX_KNOWLEDGE", None)
+            else:
+                os.environ["ST_CUBEMX_KNOWLEDGE"] = old
+
+        self.addCleanup(restore_env)
+        knowledge_loader.reload()
+        self.assertEqual(knowledge_loader._load("probe.yaml"), {"k": 1})
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("k: 2\n")
+        later = os.stat(path).st_mtime + 10
+        os.utime(path, (later, later))
+        self.assertEqual(knowledge_loader._load("probe.yaml"), {"k": 2})
 
     def test_help_text(self):
         self.assertIn("工具一览", knowledge_loader.help_text())

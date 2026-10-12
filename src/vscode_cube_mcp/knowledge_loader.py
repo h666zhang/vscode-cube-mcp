@@ -26,6 +26,7 @@ import yaml
 from .cubemx_result import ToolError
 
 _CACHE: dict = {}
+_CACHE_STAMP: dict = {}
 
 
 def knowledge_dir() -> Path:
@@ -52,18 +53,28 @@ def knowledge_dir() -> Path:
 def reload() -> None:
     """清掉缓存,下次读文件重新加载(改了知识库后调它)。"""
     _CACHE.clear()
+    _CACHE_STAMP.clear()
 
 
 def _load(name: str):
-    """读 knowledge/ 下的一个 YAML;不存在返回 None。"""
+    """读 knowledge/ 下的一个 YAML;不存在返回 None。
+
+    缓存以文件 mtime 为准:直接改 knowledge/*.yaml(不重启 server)也能立刻生效 ——
+    以前是纯内存缓存,改了 YAML 只有重启进程才看得到(实测踩过:help 一直显示旧文本)。
+    """
     path = knowledge_dir() / name
     key = str(path)
-    if key not in _CACHE:
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        stamp = None
+    if key not in _CACHE or _CACHE_STAMP.get(key) != stamp:
         if not path.is_file():
             _CACHE[key] = None
         else:
             with path.open(encoding="utf-8") as f:
                 _CACHE[key] = yaml.safe_load(f) or {}
+        _CACHE_STAMP[key] = stamp
     return _CACHE[key]
 
 
@@ -303,6 +314,9 @@ def ip_parameter(instance: str, name: str) -> dict:
 # topic 别名 -> help.yaml 里的位置
 _HELP_ALIAS = {"clock": "rcc"}
 
+# help.yaml 里的元数据键(不是 topic)
+_HELP_META_KEYS = {"source", "guide", "peripheral"}
+
 
 def help_text(topic: str = "") -> str | None:
     """取 cubemx_help 的文本;不是静态文本的 topic(如 templates)返回 None。"""
@@ -315,6 +329,19 @@ def help_text(topic: str = "") -> str | None:
     if key in (data.get("peripheral") or {}):
         return data["peripheral"][key]
     return data.get(key)
+
+
+def help_topics() -> list:
+    """cubemx_help 能回答的 topic(从 help.yaml 实际存在的键算出来,不硬编码)。
+
+    peripheral: 下的键是外设主题,顶层非元数据的键是流程主题(guide 本身不算),
+    别名(clock -> rcc)也算可用 topic。
+    """
+    data = _load("rules/help.yaml") or {}
+    names = set((data.get("peripheral") or {}).keys())
+    names |= {k for k in data if k not in _HELP_META_KEYS}
+    names |= {alias for alias, target in _HELP_ALIAS.items() if target in names}
+    return sorted(names)
 
 
 # ------------------------------------------------------------------ 片段渲染

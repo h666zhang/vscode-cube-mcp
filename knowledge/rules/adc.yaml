@@ -27,7 +27,7 @@ command_examples:
   # 连续转换 / 扫描模式 / 外部触发
   - "set ip parameters ADC1 ContinuousConvMode ENABLE"
   - "set ip parameters ADC1 ScanConvMode ADC_SCAN_ENABLE"
-  - "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T2_TRGO"
+  - "set ip parameters ADC1 ExternalTrigConv ADC_EXTERNALTRIGCONV_T3_TRGO"
 
 ioc_result:
   - "PA0-WKUP.Locked=true"
@@ -90,7 +90,8 @@ known_issues:
   - "连续转换 ContinuousConvMode ENABLE、扫描 ScanConvMode ADC_SCAN_ENABLE 均实测写入成功(取名:scan 用 ADC_SCAN_ENABLE,continuous 用 ENABLE)"
   - "generate 回读验证(ADCTest3,双通道+连续+中断):adc.c 里 NbrOfConversion=2、ScanConvMode=ADC_SCAN_ENABLE、ContinuousConvMode=ENABLE;两次 HAL_ADC_ConfigChannel 分别配 ADC_CHANNEL_0 / ADC_CHANNEL_1;注入 NVIC.ADC1_2_IRQn 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler 并调 HAL_ADC_IRQHandler"
   - "ScanConvMode 不必手写:.ioc 里不保留这一行(saveas 时被清理),但 CubeMX 在 NbrOfConversion>1 时会自动生成 ADC_SCAN_ENABLE —— 写了也没坏处,只是冗余"
-  - "**外部触发必须配套触发源**:只把 ExternalTrigConv 设成 ADC_EXTERNALTRIGCONV_T2_TRGO、而 TIM2 没配 TRGO 输出时,generate 会卡死到 240s 超时(实测)。要用外部触发,先用 TIM 把触发源配好(MasterConfig/TRGO),再设 ADC 的 ExternalTrigConv"
+  - "**外部触发必须配套触发源**:只把 ExternalTrigConv 设成 ADC_EXTERNALTRIGCONV_T3_TRGO、而 TIM3 没配 TRGO 输出时,generate 会卡死到 240s 超时(实测)。要用外部触发,先用 TIM 把触发源配好(MasterConfig/TRGO),再设 ADC 的 ExternalTrigConv"
+  - "触发源要分清规则组/注入组:F103 规则组(ExternalTrigConv)的合法取值里**没有 T2_TRGO** —— 那是注入组 ExternalTrigInjecConv 的值(ADC_EXTERNALTRIGINJECCONV_T2_TRGO);规则组要用 TIM2 只能写 T2_CC2 / T2_CC3,要 TRGO 得用 T3_TRGO / T8_TRGO。写非法值时 CubeMX 静默忽略(不报错,硬件永不转换);cubemx_intent 现在对照 db 导出的 values 直接拦下并列出合法取值"
   - "db 导出的 NbrOfConversion 写着 max: '1',那是 XML 里 Visible=false 的那份定义;真正可见的定义是 Max=16,实测能设 2 —— 别被 parameters_from_db 的 max 误导"
   - "中断:注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler"
   - "还没实测:注入通道(InjectedConv)、模拟看门狗"

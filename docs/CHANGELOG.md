@@ -29,7 +29,19 @@
 - `cubemx_new_project` 里第二次 `project generate` 失败以前被忽略(仍报成功),现在显式失败
 - `cubemx_help(topic="adc")` 补上 `continuous` / `interrupt` 的默认值(false),以及
   "外部触发下 continuous 的含义变化"(盲测里 agent 取默认值只能靠猜)
-- 测试 209 → **224**(215 单元/协议 + 9 集成);顺手修集成测试失修:8 个用例里 5 个的
+- **`cubemx_help` 的 topic 契约收紧**(第三轮盲测暴露):未知 topic 以前**静默返回总指南**,
+  而宿主的工具描述会被截断 ⇒ agent 看不到有哪些 topic,只能逐个瞎试。现在未知 topic 报
+  `BAD_ARGUMENT` 并列出全部可用 topic,总指南末尾也附一份清单;清单由 `help.yaml` 的实际
+  键算出(`knowledge_loader.help_topics()`),不硬编码
+- **ADC 外部触发取值不再靠猜**:`cubemx_intent` 的 `trigger` 现在对照 CubeMX db 导出的
+  `ExternalTrigConv.values` 校验,写错直接报错并列出合法值(以前只拼前缀就发给 CubeMX,
+  而 CubeMX 对不认识的枚举**静默忽略** —— 不报错、硬件永不转换)。顺带纠正 `rules/adc.yaml`
+  里用错的值:F103 规则组**没有 T2_TRGO**(那是注入组的 `ADC_EXTERNALTRIGINJECCONV_T2_TRGO`),
+  规则组要用 TIM2 只能 `T2_CC2`/`T2_CC3`
+- **知识库缓存改成按文件 mtime 失效**:以前 `knowledge/*.yaml` 是纯内存缓存,改了 YAML 只有
+  重启 server 才生效(实测:改完 `help.yaml` 后工具一直返回旧文本)
+- `cubemx_help(topic="adc")` 补 `trigger` 的写法与 F103 合法取值表
+- 测试 209 → **228**(219 单元/协议 + 9 集成);顺手修集成测试失修:8 个用例里 5 个的
   断言在 `cubemx_load` 改成默认 `via_cubemx=False` 后就过时了(默认跳过所以一直没暴露),
   已改用真加载断言;新增 1 条覆盖 `project_dir` 生成路径
 

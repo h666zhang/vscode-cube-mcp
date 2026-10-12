@@ -218,6 +218,12 @@ peripheral:
       ScanConvMode 由 CubeMX 按 NbrOfConversion 自己推导,.ioc 里不保留该行。
     - 中断:interrupt 默认 false;写 interrupt=true → 注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),
       generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler。
+    - trigger 取值:写 CubeMX 枚举名或它的简写(工具自动补 ADC_EXTERNALTRIGCONV_ 前缀,
+      如 T3_TRGO → ADC_EXTERNALTRIGCONV_T3_TRGO)。F103 可用:SOFTWARE_START(默认,软件启动)、
+      EXT_IT11、T1_CC1、T1_CC2、T1_CC3、T2_CC2、T2_CC3、T3_CC1、T3_TRGO、T4_CC4、
+      T5_CC1、T5_CC3、T8_TRGO、T8_CC1(完整列表即 knowledge/ip 里 ExternalTrigConv 的
+      values)。**写错的值会被工具直接拦下并列出合法取值** —— CubeMX 自己对不认识的枚举
+      是静默忽略,不会报错。
     - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
       generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
     - 还没实测:注入通道(InjectedConv)、模拟看门狗。

@@ -314,11 +314,31 @@ def adc_commands(intent: dict, ioc_path: str = "") -> list:
     if trigger:
         prefix = str(rules.get("trigger_prefix") or "ADC_EXTERNALTRIGCONV_")
         value = trigger if trigger.upper().startswith("ADC_") else f"{prefix}{trigger.upper()}"
+        _check_adc_trigger(value, prefix)
         commands.append(f"set ip parameters {instance} ExternalTrigConv {value}")
     clock = adc_clock_command(intent, ioc_path)
     if clock:
         commands.append(clock)
     return commands
+
+
+def _check_adc_trigger(value: str, prefix: str) -> None:
+    """校验 ADC 外部触发取值:必须是 CubeMX db 里 ExternalTrigConv 的合法值之一。
+
+    猜错时的表现最坑 —— CubeMX 对不认识的枚举**静默忽略**(不报错,但硬件永不转换),
+    所以这里直接对着 knowledge/ip/ 导出的取值表拦下来,并把合法值列给调用方。
+    """
+    try:
+        values = list((knowledge_loader.ip_parameter("ADC1", "ExternalTrigConv") or {}).get("values") or [])
+    except ToolError:
+        return  # 知识库里查不到就不拦(不能因为这个把工具卡死)
+    if not values or value in values:
+        return
+    shorts = "、".join(v.removeprefix(prefix) if v.startswith(prefix) else v for v in values)
+    raise ToolError(
+        "BAD_ARGUMENT",
+        f"ADC 外部触发取值 '{value}' 不在 CubeMX 允许的取值里;可用(可写简写,工具自动补 {prefix} 前缀):{shorts}",
+    )
 
 
 # 实例名 -> 规则文件名:映射在 knowledge_loader.rule_name_for(**唯一**一份定义)

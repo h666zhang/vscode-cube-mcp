@@ -293,12 +293,10 @@ def cubemx_help(topic: str = "") -> str:
     不传 topic 返回完整指南;传 topic 返回该主题详细说明。
 
     可用 topic(大小写不敏感):
-      new_project  从零生成工程的流程与参数
-      templates    可用芯片模板列表与各自内容
-      gpio / i2c / tim / rcc(或 clock)  常用外设配置命令与已知坑
-      usart / spi / adc / can / rtc / iwdg / wwdg / dma / nvic  其余已收录外设与功能
-      probe        探针(commands 脚本命令 / inject 键注入);
-      remove       移除外设
+      流程:new_project / probe / remove / templates
+      外设:gpio / i2c / spi / usart / tim / rcc(别名 clock)/ adc / dma / nvic /
+            can / rtc / iwdg / wwdg
+    传了不存在的 topic 会明确报错并列出全部可用 topic;不传 topic 返回总指南(末尾同样附清单)。
     """
     t = topic.strip().lower()
     if t == "templates":
@@ -316,11 +314,22 @@ def cubemx_help(topic: str = "") -> str:
         return "\n".join(lines)
     text = knowledge_loader.help_text(t)
     if text:
+        if not t:
+            # 总指南末尾附可用 topic 清单(从 help.yaml 算出来,不硬编码)
+            text += "\n\n【可用 topic】" + " / ".join(knowledge_loader.help_topics()) + " / templates"
         return text
-    # 未知 topic 与空 topic 都回到完整指南;知识库缺失时给出排查方向,而不是直接抛错
+    if t:
+        # 未知 topic 不再静默返回总指南:明确报错 + 列出可用 topic。
+        # (宿主的工具描述可能被截断,agent 往往看不到 docstring 里的 topic 清单,
+        #  只能靠这个错误发现有哪些 topic —— 实测踩过)
+        avail = knowledge_loader.help_topics()
+        raise ToolError(
+            "BAD_ARGUMENT",
+            f"未知 topic: '{topic}';可用 topic: " + " / ".join(avail) + " / templates(不传 topic 返回总指南)",
+        )
     guide = knowledge_loader.help_text("")
     if guide:
-        return guide
+        return guide + "\n\n【可用 topic】" + " / ".join(knowledge_loader.help_topics()) + " / templates"
     return (
         "知识库读取失败:找不到 knowledge/rules/help.yaml。"
         "请检查 ST_CUBEMX_KNOWLEDGE 环境变量,或重新跑 tools/gen_knowledge_from_db.py"
