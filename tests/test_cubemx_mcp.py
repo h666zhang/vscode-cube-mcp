@@ -1681,6 +1681,25 @@ board=custom
         self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6"))
         self.assertEqual(ioc_editor.check_semantics(self.ioc), [])
 
+    def test_missing_functionlist_segment_is_reported(self):
+        # "移除外设后又加回":外设在 Mcu.IPx 里、functionlistsort 里却缺它的段 ⇒ 要提示
+        # (否则只看 cubemx_load 摘要的 init_order 会以为这外设没配上)
+        self._write(
+            self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6")
+            + "ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,"
+            "2-MX_GPIO_Init-GPIO-false-HAL-true\n"
+        )
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("functionlistsort" in p and "ADC1" in p for p in problems))
+
+    def test_complete_functionlist_is_ok(self):
+        self._write(
+            self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6")
+            + "ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,"
+            "2-MX_GPIO_Init-GPIO-false-HAL-true,3-MX_ADC1_Init-ADC1-false-HAL-true\n"
+        )
+        self.assertEqual(ioc_editor.check_semantics(self.ioc), [])
+
     def test_external_trigger_without_source_tim(self):
         # ADC 用 T3_TRGO,但 TIM3 根本不在外设列表里
         self._write(self.BASE.format(trigger="ADC_EXTERNALTRIGCONV_T3_TRGO", adc_presc="RCC_ADCPCLK2_DIV6"))

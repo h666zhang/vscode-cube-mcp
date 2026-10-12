@@ -373,6 +373,11 @@ def cubemx_load(ioc: str, summary: bool = True, via_cubemx: bool = False) -> str
     省得为了"现在配了什么"去读整个 .ioc 原文(摘要里都是 .ioc 原始字符串,
     "这样写合不合法"由知识库判定)。
 
+    其中 `init_order` 是 `.ioc` 里 `ProjectManager.functionlistsort` 的**直读**结果 ——
+    它可能暂时落后于生成的代码(例如"移除外设再重新加回"之后:那段不会自动补回,
+    要等下一次 generate 由 CubeMX 重建)。离线预检会提示这种情况;想确认真实调用顺序,
+    用 `cubemx_inspect_output(project_dir, pattern="MX_.*_Init")` 读 main.c。
+
     via_cubemx=False(默认)时**只解析文本,秒回**;传 True 才会额外跑一次
     `config load` 让 CubeMX 自己读一遍(用于确认"这份 .ioc CubeMX 认不认",
     代价是要等它启动,通常 10~30s)。传了 True 时返回里会**明确写出结论**

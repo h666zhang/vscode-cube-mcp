@@ -73,7 +73,16 @@
 - **ADC `sampling_time` 也对着 db 校验**:写错的采样时间 CubeMX 会**静默忽略**,现在直接报错并列出
   8 个合法 `ADC_SAMPLETIME_*`。新接口 `knowledge_loader.ip_parameter_values(ip, 参数名前缀)`
   按前缀取并集(多份定义) —— DMA 的 mode/direction/priority 与 `adc_clock_div` 早就有同类校验
-- 测试 209 → **243**(233 单元/协议 + 10 集成);顺手修集成测试失修:8 个用例里 5 个的
+- **"移除外设又加回"的中间态被工具点名了**(第五轮压测暴露):`remove_peripheral` 会删掉 `.ioc`
+  里 `ProjectManager.functionlistsort` 的对应段,而"加回去"走 set 命令不会补回 ⇒ 期间
+  `cubemx_load` 摘要的 `init_order` 会少一项(实测:agent 差一点据此误判"USART2 没配上")。
+  generate 时 CubeMX 会自己重建、**生成代码不受影响**,所以离线预检只**提示**并写清这一点;
+  `cubemx_load` 的 docstring 也注明 `init_order` 是直读该段、可能暂时滞后
+- 补 4 处文档:`toolchain="STM32CubeIDE"` 的用户代码放哪(`STM32CubeIDE/Application/User/Core/`,
+  以前只写了 CMake 的根 `CMakeLists.txt` 用户区)、**DMA 通道中断 vs 外设中断**的区别 +
+  UART 接收默认是 `DMA_NORMAL`(想循环要显式 `mode: circular`)、GPIO 意图的 `label` 字段与
+  生成后的宏名、ADC 采样时间 8 个合法值列全;guide 里补了 `cubemx_intent(generate=…)` 的语义
+- 测试 209 → **245**(235 单元/协议 + 10 集成);顺手修集成测试失修:8 个用例里 5 个的
   断言在 `cubemx_load` 改成默认 `via_cubemx=False` 后就过时了(默认跳过所以一直没暴露),
   已改用真加载断言;新增 1 条覆盖 `project_dir` 生成路径
 

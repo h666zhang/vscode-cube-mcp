@@ -85,6 +85,9 @@
 - **有些参数不在 `.ioc` 里**:CubeMX 会把 `ContinuousConvMode` / `ScanConvMode` 这类"取默认值"的行
   省掉,所以 `cubemx_load` 摘要里看不到它们 —— **最终值要读生成的代码**:
   `cubemx_inspect_output(project_dir, pattern="ContinuousConvMode|ScanConvMode")`。
+- **"移除外设再加回"会留下中间态**:`remove_peripheral` 删掉了 `ProjectManager.functionlistsort`
+  里该外设的段,而"加回去"不补回 ⇒ 摘要的 `init_order` 会**暂时**少一项(下一次 generate 时
+  CubeMX 自己重建,生成代码不受影响)。离线预检会提示这件事,别据此以为外设没配上。
 - **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
   返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
   240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
@@ -96,12 +99,14 @@
   **工程根 `CMakeLists.txt` 只生成一次、不重写** —— 用户的 `.c` 写进 `# Add sources to executable`
   的 `target_sources(... PRIVATE)`、`.h` 目录写进 `# Add include paths` 的
   `target_include_directories(... PRIVATE)`,写完永久有效(旧版 `cubemx_add_source` 写在会被覆盖的位置,已退役)。
+  **换成 STM32CubeIDE 工具链时**:用户代码放 `STM32CubeIDE/Application/User/Core/`(同样只在首次生成时
+  创建、之后不被覆盖);EWARM/MDK-ARM 未实测,找各自的 user 目录。
 - **模板必须 6.18 原生生成**:手写/非原生 .ioc 会被 6.18 拒绝。请求的芯片无模板时,报错会给出
   可用模板清单与生成方法。
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**243 个:233 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**245 个:235 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
   —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
 - **改了 `src/` 之后必须重启宿主**:Reasonix 把本 server 当长驻进程**复用**,开新会话并不会

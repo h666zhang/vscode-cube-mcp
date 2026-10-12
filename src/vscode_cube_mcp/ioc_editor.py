@@ -149,6 +149,19 @@ def check_semantics(ioc_path: str) -> list:
             problems.append(f"Dma.{request}.{index}.* 的序号与 Dma.Request{index}={declared or '(缺)'} 对不上")
         if channel and f"NVIC.{channel}_IRQn" not in entries:
             problems.append(f"{request} 用了 {channel},但没使能 NVIC.{channel}_IRQn(DMA 完成回调不会进)")
+
+    # ④ 外设配上了,但 .ioc 的"初始化顺序表"里没有它的 MX_*_Init 段
+    #    典型成因:"移除该外设 + 重新加回" —— 移除会删掉那段,加回走 set 命令不会补回;
+    #    generate 时 CubeMX 会自己重建,所以**生成的代码不受影响**,但 cubemx_load 摘要的
+    #    init_order 会暂时少一项。提示一句,免得只看摘要的人以为"这外设没配上"。
+    functionlist = entries.get("ProjectManager.functionlistsort", "")
+    for name in sorted(ips - {"RCC", "SYS", "NVIC"}):
+        if functionlist and f"-{name}-" not in functionlist:
+            problems.append(
+                f"{name} 已在 Mcu.IPx 里,但 ProjectManager.functionlistsort 里没有它的 MX_*_Init 段"
+                "(常见于'移除外设后又加回';generate 时 CubeMX 会自己补回,生成的代码不受影响 —— "
+                "但 cubemx_load 摘要的 init_order 会暂时少这一项)"
+            )
     return problems
 
 

@@ -32,8 +32,12 @@ guide: |-
               {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}])
      **推荐用 intents**(与 cubemx_intent 同一套解析:配 ADC 自动补合法时钟、配 DMA 查通道表);
      commands(原始 set 命令)仍可用,两者可以混用(intent 的命令排在前面)
-  3) 自己的库(如 SPL_OLED/Src/OLED.c + SPL_OLED/Inc)写进工程根 CMakeLists.txt 的用户区
-     (# Add sources to executable / # Add include paths);该文件 CubeMX 只生成一次,不会被覆盖
+  3) 自己的库(.c / .h)写进"用户区",**位置看工具链**:
+     - CMake(默认):工程根 CMakeLists.txt —— .c 写进 `# Add sources to executable`,
+       .h 目录写进 `# Add include paths`(该文件只生成一次,不会被覆盖)
+     - STM32CubeIDE:`STM32CubeIDE/Application/User/Core/`(工具链自带的用户区,同样只在首次生成时创建)
+     - 其它工具链(EWARM / MDK-ARM)未实测,找各自的 user 目录即可
+     别往 `cmake/stm32cubemx/CMakeLists.txt` 里加(每次 generate 全量重写)
 
   【意图(intents / cubemx_intent)支持哪些外设】
   - **有专门解析的**(字段多,优先用意图):
@@ -48,6 +52,10 @@ guide: |-
     其余以 knowledge/rules/<外设>.yaml 为准;字段写错或查不到时工具会**报错**并给出可用值,
     不会静默忽略。拿不准能不能用意图表达时,先按意图写 —— 工具返回里会写明它最终走的是
     意图解析还是 set 命令。
+  - **`cubemx_intent` 的 `generate` 参数**:默认 False(只改 .ioc);写 `generate=True`
+    会在改完顺手跑一次 project generate(HAL 代码一起更新)。
+  - 每次成功调用后,返回里都会附一段**「本次采用的默认值/推导值」** —— 凡是你没显式给的、
+    由默认值或工具推导出来的字段都在那里,不必再回读 .ioc 或去翻文档。
 
   【执行顺序与注入时机(重要:写意图/命令前先读)】
   new_project 与 intent 的内部顺序固定,不要假设:
@@ -109,7 +117,10 @@ new_project: |-
               {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}])
      intents 走与 cubemx_intent 同一套解析(配 ADC 自动补时钟、配 DMA 查通道表);
      也可以用原始 commands=["set pin PB13 GPIO_Output"],两者可混用
-  3) 自己的库(.c + .h 目录)写进工程根 CMakeLists.txt 的用户区(该文件只生成一次,不会被覆盖)
+  3) 自己的库(.c / .h)写进"用户区",位置看工具链:
+     - CMake(默认):工程根 CMakeLists.txt 的 `# Add sources to executable` / `# Add include paths`
+     - STM32CubeIDE:`STM32CubeIDE/Application/User/Core/`
+     (两者都只在首次生成时创建,之后不会被覆盖)
 
   project_dir 行为:目录不存在会**自动创建**;**已存在则直接用**(不清理里面的旧文件,
   上一次的产物和 .ioc.bak 会留下 —— 要干净工程就换个新目录)。
@@ -149,6 +160,9 @@ peripheral:
       set pin PB13 GPIO_Output
       set gpio parameters PB13 GPIO_Label LED
     示例:LED 在 PB13 → 命令序列如上。
+    - 用意图写:{"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}
+      字段名就是 `label`(对应上面那条 `GPIO_Label`);`mode` 写 output / input 等。
+      生成后引脚会变成宏:main.h 里 `#define LED_Pin GPIO_PIN_13` / `#define LED_GPIO_Port GPIOB`。
   i2c: |-
     【I2C(已验证;实测 2026-08-06 + 2026-10-12 生成回读)】
       set pin PB8 I2C1_SCL
@@ -258,7 +272,9 @@ peripheral:
     - 模式名就是通道号:PA0-WKUP->IN0、PA1->IN1、PA5->IN5;引脚可写短名 PA0(自动归一化)。
     - 多通道(实测):pins 顺序即 Rank 顺序,工具自动补 NbrOfConversion + 每个通道一组
       Rank-n / Channel-n / SamplingTime-n(set mode INn 本身不写转换序列)。
-    - 采样时间:sampling_time="ADC_SAMPLETIME_55CYCLES_5"(默认 1.5 周期)。
+    - 采样时间:sampling_time="ADC_SAMPLETIME_55CYCLES_5"(默认 1.5 周期)。**F103 全部可选**:
+      ADC_SAMPLETIME_1CYCLE_5 / 7CYCLES_5 / 13CYCLES_5 / 28CYCLES_5 / 41CYCLES_5 /
+      55CYCLES_5 / 71CYCLES_5 / 239CYCLES_5(写错会被工具拦下并列出这张表)。
       **多通道时给一个值就统一用于所有通道**(SamplingTime-0..N 都写同一个);要逐通道不同
       得用 commands 单独 set SamplingTime-n#ChannelRegularConversion。
     - **必配 ADC 时钟**:不配 generate 会弹 [Clock] 对话框把 -q 批处理卡死;72MHz PCLK2 下
@@ -319,6 +335,13 @@ peripheral:
       **interrupt 默认 true**:不写就注入通道中断(`NVIC.<通道>_IRQn`,generate 后 it.c 里出现
       `<通道>_IRQHandler`)—— 与 CubeMX GUI 里加 DMA 请求的默认行为一致;只有写
       `"interrupt": false` 才不注入(只搬数据、不要中断回调时用)。
+    - **别把两种中断搞混**:这里的 `interrupt` 只管 **DMA 通道中断**;外设自己的中断
+      (如 `USART2_IRQn`)由外设意图的 `interrupt` 字段控制,两者互不影响。
+      例:"USART2 只要 DMA、不要收发中断" → 外设意图**不写** `interrupt`,DMA 字段按默认
+      (通道中断会开,生成 `DMA1_ChannelX_IRQHandler`)。
+    - **模式建议**:串口/SPI 收数据一般显式写 `"mode": "circular"`(缓冲循环用);不写时
+      CubeMX 按请求类型给默认 —— **UART 接收的默认是 `DMA_NORMAL`(只搬一次)**,
+      ADC 循环采样一般也显式写 circular。
     - 数据宽度不用管:CubeMX 按请求类型补默认(ADC→HALFWORD、USART→BYTE,实测)。
       generate 后 dma.c 的 MX_DMA_Init、各外设 x.c 的 hdma_xxx + __HAL_LINKDMA、
       stm32f1xx_it.c 的 <通道>_IRQHandler 都会生成(实测三例:ADC1 / USART2_RX / RX+TX)。
