@@ -109,7 +109,7 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 - 「用 STM32F103C8T6 从零建一个工程」→ `cubemx_new_project`
 - 「TIM3 的 PA6 出 10kHz、占空比 50% 的 PWM;USART2 接 PA2/PA3,波特率 9600」→ **`cubemx_intent`**
 - 「把 PB13 改成 GPIO_Output 并加标签 LED」→ `cubemx_intent`(也可以直接发 `cubemx_configure` 的 set 命令)
-- 「把自己写的 OLED 库加进编译,重新 generate 后也保留」→ **不用调工具**,直接写进工程根 `CMakeLists.txt` 的用户区(见下节)
+- 「把自己写的 OLED 库加进编译,重新 generate 后也保留」→ **不用调工具**,直接写进工程根 `CMakeLists.txt` 的用户区(`# Add sources to executable` / `# Add include paths`)
 
 ### 用意图配置外设(推荐)
 
@@ -136,33 +136,6 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
   `[Clock]` 对话框,`-q` 批处理没人点 → generate 卡死到超时;
 - ADC 多通道时自动补转换序列(`NbrOfConversion` + 每个通道的 `Rank-n` / `Channel-n` / `SamplingTime-n`);
 - `interrupt: true` 自动注入对应的 NVIC 键,并按外设选对向量名(如 ADC 用共用的 `ADC1_2_IRQn`)。
-
-### 把自己的库加进编译(如 OLED.c / OLED.h)
-
-CubeMX 工程里有**两个** `CMakeLists.txt`,作用完全不同:
-
-| 文件 | 谁生成 | 重新 generate 会怎样 |
-|------|--------|----------------------|
-| `cmake/stm32cubemx/CMakeLists.txt` | CubeMX 每次生成 | **全量重写** —— 别往里加东西 |
-| 工程根 `CMakeLists.txt` | CubeMX **只生成一次** | **不会重写**,里面的用户区就是留给你改的 |
-
-所以你自己的库直接写进**工程根 `CMakeLists.txt`**(CubeMX 在文件头就写明"generated only once"):
-
-```cmake
-# Add sources to executable
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    SPL_OLED/Src/OLED.c          # ← 你的 .c
-)
-
-# Add include paths
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
-    SPL_OLED/Inc                 # ← 你的 .h 所在目录
-)
-```
-
-一次写好,之后 generate 多少次都不会丢 —— 不需要任何工具代劳。
 
 ## 知识库(`knowledge/`)
 
@@ -232,10 +205,6 @@ python -m pip show vscode-cube-mcp   # 确认版本号
 
 **CubeMX 弹「Resolve Clock Issues」**
 通常是 .ioc 时钟树不自洽(如 HSE 未启用但 PLL 选了 HSE),属于工程配置问题,详见 [`docs/README.dev-notes.md`](docs/README.dev-notes.md) 的「从零配置时钟实战」。
-
-**自己的库(OLED.c 之类)每次 generate 后就不编译了**
-它被加错文件了:`cmake/stm32cubemx/CMakeLists.txt` 每次 generate 都被重写。改放工程根 `CMakeLists.txt`
-的用户区(见上文「把自己的库加进编译」),就不会再丢。
 
 ## 许可与依赖声明
 
