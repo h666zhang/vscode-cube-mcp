@@ -591,6 +591,11 @@ def cubemx_new_project(
         extra += f"\n{note_intent}"
     if note_internal:
         extra += f"\n{note_internal}"
+    problems = ioc_editor.check_semantics(ioc_dst)
+    if problems:
+        extra += f"\n⚠ 离线预检(纯文本,不需要 CubeMX)发现 {len(problems)} 处问题:\n" + "\n".join(
+            f"  - {p}" for p in problems
+        )
     return render_run("cubemx_new_project", r, steps=steps, extra=extra, warnings=warnings)
 
 
@@ -752,7 +757,13 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
         if not result["ok"]:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
         steps.append(("run_cubemx", "ok"))
-    return render("cubemx_intent", True, steps=steps, extra="\n".join(plan["notes"]))
+    extra = "\n".join(plan["notes"])
+    problems = ioc_editor.check_semantics(ap)
+    if problems:
+        extra += f"\n⚠ 离线预检(纯文本,不需要 CubeMX)发现 {len(problems)} 处问题:\n" + "\n".join(
+            f"  - {p}" for p in problems
+        )
+    return render("cubemx_intent", True, steps=steps, extra=extra)
 
 
 @mcp.tool()

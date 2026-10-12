@@ -1400,6 +1400,91 @@ class TestIocEditorWrite(unittest.TestCase):
             self.assertTrue(os.path.isfile(path + ".bak"))
 
 
+class TestSemanticPrecheck(unittest.TestCase):
+    """离线预检 ioc_editor.check_semantics:纯文本抓"CubeMX 不报错但配错了"的组合问题。"""
+
+    BASE = """#MicroXplorer Configuration settings - do not modify
+ADC1.ExternalTrigConv={trigger}
+ADC1.NbrOfConversion=1
+CAD.provider=
+Mcu.IP0=ADC1
+Mcu.IP1=NVIC
+Mcu.IP2=RCC
+Mcu.IP3=SYS
+Mcu.IPNb=4
+RCC.ADCPresc={adc_presc}
+RCC.APB2Freq_Value=72000000
+board=custom
+"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+
+    def _write(self, text):
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_clean_adc_is_ok(self):
+        self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6"))
+        self.assertEqual(ioc_editor.check_semantics(self.ioc), [])
+
+    def test_external_trigger_without_source_tim(self):
+        # ADC 用 T3_TRGO,但 TIM3 根本不在外设列表里
+        self._write(self.BASE.format(trigger="ADC_EXTERNALTRIGCONV_T3_TRGO", adc_presc="RCC_ADCPCLK2_DIV6"))
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("TIM3 不在 Mcu.IPx" in p for p in problems), problems)
+
+    def test_external_trigger_without_trgo(self):
+        # TIM3 在,但没配 TIM_MasterOutputTrigger —— generate 不报错,硬件不触发
+        text = self.BASE.format(trigger="ADC_EXTERNALTRIGCONV_T3_TRGO", adc_presc="RCC_ADCPCLK2_DIV6")
+        self._write(text.replace("Mcu.IP3=SYS", "Mcu.IP3=SYS\nMcu.IP4=TIM3\nMcu.IPNb=5"))
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("TIM_TRGO_UPDATE" in p for p in problems), problems)
+
+    def test_external_trigger_with_trgo_is_ok(self):
+        text = self.BASE.format(trigger="ADC_EXTERNALTRIGCONV_T3_TRGO", adc_presc="RCC_ADCPCLK2_DIV6")
+        self._write(
+            text.replace("Mcu.IP3=SYS", "Mcu.IP3=SYS\nMcu.IP4=TIM3\nMcu.IPNb=5")
+            + "TIM3.TIM_MasterOutputTrigger=TIM_TRGO_UPDATE\n"
+        )
+        self.assertEqual(ioc_editor.check_semantics(self.ioc), [])
+
+    def test_missing_adc_clock_is_reported(self):
+        self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc=""))
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("ADCPresc" in p for p in problems), problems)
+
+    def test_adc_clock_over_limit_is_reported(self):
+        # PCLK2 72MHz / DIV2 = 36MHz,超过 F103 的 14MHz 上限
+        self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV2"))
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("超过上限" in p for p in problems), problems)
+
+    def test_dma_without_ip_entry_or_nvic(self):
+        text = self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6")
+        self._write(text + "Dma.ADC1.0.Instance=DMA1_Channel1\nDma.Request0=ADC1\n")
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("没有 DMA" in p for p in problems), problems)
+        self.assertTrue(any("NVIC.DMA1_Channel1_IRQn" in p for p in problems), problems)
+
+    def test_dma_request_index_mismatch(self):
+        text = self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="RCC_ADCPCLK2_DIV6")
+        self._write(
+            text.replace("Mcu.IP3=SYS", "Mcu.IP3=SYS\nMcu.IP4=DMA\nMcu.IPNb=5")
+            + "Dma.ADC1.0.Instance=DMA1_Channel1\n"
+            + "Dma.Request1=ADC1\n"
+        )
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("对不上" in p for p in problems), problems)
+
+    def test_summary_carries_precheck(self):
+        self._write(self.BASE.format(trigger="ADC_EXTERNALTRIGCONV_T3_TRGO", adc_presc="RCC_ADCPCLK2_DIV6"))
+        self.assertTrue(ioc_editor.summarize(self.ioc)["precheck"])
+
+
 class TestStructureCheck(unittest.TestCase):
     """按 knowledge/rules/ioc_structure.yaml 做的写入后结构校验。"""
 

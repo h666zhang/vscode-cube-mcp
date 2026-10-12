@@ -72,6 +72,86 @@ def check_structure(ioc_path: str) -> list:
     return problems
 
 
+def _rule_data(rule_name: str) -> dict:
+    """按规则名读 knowledge/rules/<name>.yaml;读不到返回空 dict(预检不该因为缺规则就炸)。"""
+    try:
+        return knowledge_loader.rule(rule_name) or {}
+    except ToolError:
+        return {}
+
+
+def check_semantics(ioc_path: str) -> list:
+    """离线语义预检:抓那些"配错了但 CubeMX 不报错"的组合问题(只读、零 CubeMX 启动)。
+
+    为什么需要它:CubeMX 对很多错配是**静默**的 —— 例如 ADC 设了外部触发、触发源 TIM 却
+    没配 TRGO 输出,generate 照样 exit=0,但硬件上永远不转换。这类问题纯文本就能判定,
+    所以不必每次都起 CubeMX(启动一次 10~30s)。
+
+    阈值与枚举名全部取自 knowledge/rules/*.yaml(adc 的 trigger_prefix/clock、dma 的
+    ioc_keys、tim 的 precheck.master_output_for_trigger),不在这里硬编码。
+    返回问题描述列表(空 = 没发现问题)。
+    """
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        entries = ioc_diff.parse_ioc(f.read())
+    ips = {v for k, v in entries.items() if re.fullmatch(r"Mcu\.IP\d+", k)}
+    problems = []
+
+    # ① ADC 用外部触发 → 触发源 TIM 必须存在,且它的 TRGO 必须是 UPDATE
+    adc_rules = _rule_data("adc")
+    want_trgo = str((_rule_data("tim").get("precheck") or {}).get("master_output_for_trigger") or "TIM_TRGO_UPDATE")
+    trigger_prefix = str(adc_rules.get("trigger_prefix") or "ADC_EXTERNALTRIGCONV_")
+    software_start = str(adc_rules.get("software_start") or "ADC_SOFTWARE_START")
+    for key, value in sorted(entries.items()):
+        if not key.endswith(".ExternalTrigConv") or value == software_start:
+            continue
+        adc_name = key.split(".", 1)[0]
+        hit = re.match(rf"{re.escape(trigger_prefix)}T(\d+)_", value)
+        if not hit:
+            continue
+        tim = f"TIM{hit.group(1)}"
+        if tim not in ips:
+            problems.append(f"{adc_name} 用外部触发 {value},但 {tim} 不在 Mcu.IPx 外设列表里")
+            continue
+        master = entries.get(f"{tim}.TIM_MasterOutputTrigger", "")
+        if master != want_trgo:
+            problems.append(
+                f"{adc_name} 靠 {tim} 的 TRGO 触发,但 {tim}.TIM_MasterOutputTrigger="
+                f"{master or '(未设)'}(应为 {want_trgo})—— generate 不报错,但硬件不会触发"
+            )
+
+    # ② 配了 ADC → 必须有合法 ADC 时钟(不设会让 generate 弹 [Clock] 卡死)
+    clock = adc_rules.get("clock") or {}
+    adc_ips = sorted(n for n in ips if n.startswith("ADC"))
+    if adc_ips and clock:
+        presc = entries.get(f"RCC.{clock.get('parameter', 'ADCPresc')}", "")
+        max_hz = int(clock.get("max_hz") or 0)
+        if not presc:
+            problems.append(f"配了 {','.join(adc_ips)} 但没设 RCC.ADCPresc(generate 会弹 [Clock] 卡死)")
+        else:
+            div = int((clock.get("prescalers") or {}).get(presc, 0) or 0)
+            pclk2 = int(entries.get(clock.get("pclk2_key", ""), "") or clock.get("pclk2_default_hz", 72000000))
+            if div and max_hz and pclk2 / div > max_hz:
+                problems.append(f"ADCCLK = {int(pclk2 / div)} Hz 超过上限 {max_hz} Hz({presc} 分频不够)")
+
+    # ③ DMA 键组要自洽:外设列表里有 DMA、请求序号对得上、通道中断已使能
+    dma_keys = _rule_data("dma").get("ioc_keys") or {}
+    ip_entry = str(dma_keys.get("ip_list_entry") or "DMA")
+    for key, value in sorted(entries.items()):
+        # 注意:parse_ioc 已经把 key 与 value 分开,所以这里匹配的是 key(不带 "=值")
+        hit = re.match(r"Dma\.([A-Z0-9_]+)\.(\d+)\.Instance$", key)
+        if not hit:
+            continue
+        request, index, channel = hit.group(1), hit.group(2), value
+        if ip_entry not in ips:
+            problems.append(f"有 DMA 请求 {request},但 Mcu.IPx 里没有 {ip_entry}(saveas 时可能被当孤儿键丢掉)")
+        declared = entries.get(f"Dma.Request{index}", "")
+        if declared != request:
+            problems.append(f"Dma.{request}.{index}.* 的序号与 Dma.Request{index}={declared or '(缺)'} 对不上")
+        if channel and f"NVIC.{channel}_IRQn" not in entries:
+            problems.append(f"{request} 用了 {channel},但没使能 NVIC.{channel}_IRQn(DMA 完成回调不会进)")
+    return problems
+
+
 def _verify_after_write(ioc_path: str, expected_lines, baseline: list) -> None:
     """写盘后的统一收尾:回读校验 + 结构校验(只报"这次新引入的"结构问题)。
 
@@ -195,6 +275,8 @@ def summarize(ioc_path: str) -> dict:
         "nvic": nvic,
         "peripherals": peripherals,
         "init_order": init_order,
+        # 离线预检:配错了但 CubeMX 不报错的组合问题(纯文本判定,不启动 CubeMX)
+        "precheck": check_semantics(ioc_path),
     }
 
 

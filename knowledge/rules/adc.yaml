@@ -74,6 +74,9 @@ remove:
 # 外部触发:意图里可写简写(如 T2_TRGO),补成 ADC_EXTERNALTRIGCONV_T2_TRGO
 trigger_prefix: ADC_EXTERNALTRIGCONV_
 
+# 离线预检用:这个值是"不用外部触发"(有它就别去要求触发源的 TRGO)
+software_start: ADC_SOFTWARE_START
+
 known_issues:
   - "引脚侧信号名是 ADCx_IN0(带 x 占位符,是 CubeMX 自己写的),但 set pin 命令里要写 ADC1_IN0"
   - "模式名是通道号:IN0 / IN1 / ...(PA0-WKUP->IN0、PA1->IN1、PA5->IN5)"

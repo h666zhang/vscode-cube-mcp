@@ -2,6 +2,21 @@
 
 本项目的版本变更记录。开发笔记(原理、实测、SOP)见 [README.dev-notes.md](README.dev-notes.md)。
 
+## 0.4.4.3(未发布)
+
+- **新增离线语义预检**(`ioc_editor.check_semantics`):纯文本判定"配错了但 CubeMX 不报错"的
+  组合问题,**不必起 CubeMX**(省掉一次 10~30s 启动)。第一批规则:
+  - ADC 用了外部触发 → 触发源 TIM 必须在 `Mcu.IPx` 里,且它的 `TIM_MasterOutputTrigger`
+    必须是 `TIM_TRGO_UPDATE`(否则 generate 不报错,但硬件永远不转换)
+  - 配了 ADC → `RCC.ADCPresc` 必设,且 ADCCLK ≤ 上限(不设会让 generate 弹 `[Clock]` 卡死)
+  - DMA 键组要成套:`Mcu.IPx` 里有 `DMA`、`Dma.Request<n>` 的序号与请求名对得上、
+    `NVIC.<通道>_IRQn` 已使能
+  阈值与枚举名取自 `rules/*.yaml`(`adc.trigger_prefix` / `adc.software_start` / `adc.clock` /
+  `tim.precheck.master_output_for_trigger` / `dma.ioc_keys`),不硬编码。
+  接入:`cubemx_load` 摘要里多 `precheck` 字段;`cubemx_intent` / `cubemx_new_project`
+  改完直接把问题附在返回里
+- 测试 209 → **218**(210 单元/协议 + 8 集成)
+
 ## 0.4.4.2(2026-10-12)
 
 补三处"新会话实测"暴露的缺口 + 一处性能优化(完整实测记录见 dev-notes)。

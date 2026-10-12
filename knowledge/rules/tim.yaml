@@ -29,6 +29,11 @@ note: |
   CubeMX 会把 TIM_MasterOutputTrigger 自动补进 `TIM3.IPParameters`。
   这是"用 TIM 触发 ADC 外部触发"的必要一步(只设 ADC 的 ExternalTrigConv 会卡死 generate)。
 
+# 离线预检(ioc_editor.check_semantics)用:拿 TIM 当 ADC 触发源时,TRGO 必须是这个值 ——
+# 只设 ADC 的 ExternalTrigConv、TIM 这边没配时,generate 不报错,但硬件上永远不转换。
+precheck:
+  master_output_for_trigger: TIM_TRGO_UPDATE
+
 values:
   auto_reload_preload_enable: TIM_AUTORELOAD_PRELOAD_ENABLE
   counter_mode_up: TIM_COUNTERMODE_UP

@@ -49,6 +49,14 @@ guide: |-
     `set ip parameters TIMx TIM_MasterOutputTrigger TIM_TRGO_UPDATE` 放 commands;
     顺序反了 TRGO 会静默丢失(硬件不触发,但 generate 不报错)。
 
+  【离线预检(每次改完自动跑,不需要 CubeMX)】
+  改完 .ioc 后工具会用纯文本检查一遍"CubeMX 不会报错、但配置是错的"组合问题,例如:
+    - 设了 ADC 外部触发,但触发源的 TIM 不在外设列表里 / 没配 TIM_MasterOutputTrigger;
+    - 配了 ADC 但没设 RCC.ADCPresc(或 ADCCLK 超上限 —— 会让 generate 卡死);
+    - DMA 键组不成套(IP 列表里没有 DMA、请求序号对不上、通道中断没使能)。
+  问题会直接附在 cubemx_intent / cubemx_new_project 的返回里;cubemx_load 的结构化摘要
+  里也有(cubemx_load 返回里的 "precheck" 字段)。**所以这类错误不必起 CubeMX 试**。
+
   【cubemx_new_project 参数(默认值而非强制)】
     mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
     toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
