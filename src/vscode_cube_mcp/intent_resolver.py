@@ -225,6 +225,23 @@ def adc_clock_command(intent: dict, ioc_path: str) -> str:
                 "BAD_ARGUMENT",
                 f"adc_clock_div 只能写 {', '.join(sorted(prescalers))};收到 {explicit!r}",
             )
+        # 显式给的值同样要校验上限:超限时 generate 会弹 [Clock] 对话框、-q 批处理没人点,
+        # 卡到 240s 超时(实测)。以前只校验"值在候选表里",超限值会被静默接受。
+        div = int(prescalers[explicit])
+        max_hz = int(clock.get("max_hz") or 0)
+        if max_hz:
+            pclk2 = _read_int(
+                ioc_editor.read_key(ioc_path, clock.get("pclk2_key", "")), clock.get("pclk2_default_hz", 72000000)
+            )
+            if pclk2 / div > max_hz:
+                fits = [n for n, d in prescalers.items() if pclk2 / int(d) <= max_hz]
+                best = min(fits, key=lambda n: int(prescalers[n])) if fits else ""
+                raise ToolError(
+                    "BAD_ARGUMENT",
+                    f"adc_clock_div={explicit} 会让 ADCCLK = {int(pclk2 / div)} Hz 超过上限 {max_hz} Hz,"
+                    "generate 时会弹 [Clock] 对话框把批处理卡死到超时。"
+                    + (f"当前 APB2 = {int(pclk2)} Hz,这个频率下请用 {best}。" if best else ""),
+                )
         chosen = explicit
     else:
         max_hz = int(clock.get("max_hz") or 0)

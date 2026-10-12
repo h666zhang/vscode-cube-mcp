@@ -186,6 +186,20 @@ def mcu_pins(mcu: str = "") -> dict:
     return data
 
 
+def _pin_examples(pins: dict, per_port: int = 2) -> str:
+    """错误提示里的引脚名样例:每个端口各挑几个,并点明编号范围。
+
+    按字母序取前几个会只得到 PA/PB 混杂的少数项(实测:报 PB99 时给的例子里一个 PB 都没有),
+    对"端口不存在 / 编号超范围"这类错几乎没有提示价值。
+    """
+    by_port: dict = {}
+    for name in sorted(pins):
+        hit = re.match(r"^P[A-Z]", name)
+        by_port.setdefault(hit.group(0) if hit else name, []).append(name)
+    picked = [n for key in sorted(by_port) for n in by_port[key][:per_port]]
+    return ", ".join(picked) + f" …(每个端口最多到 Pxx15,共 {len(pins)} 个)"
+
+
 def resolve_pin_name(pin: str, mcu: str = "") -> str:
     """把用户写的引脚名归一化成引脚表里的键(不猜:有歧义就报错)。
 
@@ -200,15 +214,15 @@ def resolve_pin_name(pin: str, mcu: str = "") -> str:
     if upper in pins:
         return upper
     hits = sorted(k for k in pins if k.upper().startswith(upper + "-"))
-    examples = ", ".join(sorted(pins)[:12])
     if len(hits) == 1:
         return hits[0]
+    examples = _pin_examples(pins)
     if hits:
         raise ToolError(
             "UNKNOWN_PIN_SIGNAL",
-            f"{name} 有多个候选引脚: {', '.join(hits)};请写全名。引脚名示例: {examples} ...",
+            f"{name} 有多个候选引脚: {', '.join(hits)};请写全名。引脚名示例: {examples}",
         )
-    raise ToolError("UNKNOWN_PIN_SIGNAL", f"{name} 不在这颗芯片的引脚表里。引脚名示例: {examples} ...")
+    raise ToolError("UNKNOWN_PIN_SIGNAL", f"{name} 不在这颗芯片的引脚表里。引脚名示例: {examples}")
 
 
 def pin_signals(pin: str, mcu: str = "") -> list:

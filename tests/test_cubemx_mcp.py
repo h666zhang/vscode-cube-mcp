@@ -448,6 +448,14 @@ class TestPinAlias(unittest.TestCase):
             knowledge_loader.resolve_pin_name("PX9")
         self.assertIn("UNKNOWN_PIN_SIGNAL", str(ctx.exception))
 
+    def test_pin_error_examples_cover_ports(self):
+        # 示例要覆盖各端口:按字母序取前几个一个 PB 都挑不到,对"PB99"这种错没提示价值
+        with self.assertRaises(ValueError) as ctx:
+            knowledge_loader.resolve_pin_name("PB99")
+        msg = str(ctx.exception)
+        self.assertIn("PB", msg)
+        self.assertIn("每个端口最多到 Pxx15", msg)
+
 
 class TestAdcIntent(unittest.TestCase):
     """ADC 意图:自动补 ADC 时钟分频(缺它 CubeMX generate 会卡在 [Clock] 弹窗)。"""
@@ -495,6 +503,18 @@ class TestAdcIntent(unittest.TestCase):
                 self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "adc_clock_div": "RCC_ADCPCLK2_DIV3"}]
             )
         self.assertIn("BAD_ARGUMENT", str(ctx.exception))
+
+    def test_over_limit_clock_prescaler_rejected(self):
+        # 显式给的超上限分频必须拦住(DIV2 → 36MHz > F103 的 14MHz):以前只校验"值在候选表里",
+        # 超限值被静默接受,下一次 generate 会弹 [Clock] 卡到 240s 超时
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(
+                self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "adc_clock_div": "RCC_ADCPCLK2_DIV2"}]
+            )
+        msg = str(ctx.exception)
+        self.assertIn("超过上限", msg)
+        self.assertIn("RCC_ADCPCLK2_DIV6", msg)  # 顺便给出这个 APB2 频率下的可用值
 
     def test_sampling_time_field(self):
         self._seed()
@@ -1225,6 +1245,13 @@ class TestToolWrappers(unittest.TestCase):
         self.assertNotIn("project path", "".join(seen))
         self.assertIn("生成文件(1): Core/Src/main.c", r)
 
+    def test_load_rejects_directory_path(self):
+        # 把目录当 .ioc 传时要说清"你给的是目录",而不是笼统的"文件不存在"
+        self._allow_tmp()
+        with self.assertRaises(ValueError) as ctx:
+            cubemx_mcp.cubemx_load(self._td.name)
+        self.assertIn("是目录", str(ctx.exception))
+
     def test_generate_no_project_path_command(self):
         # 就地生成同样不发 project path
         seen = []
@@ -1725,6 +1752,15 @@ board=custom
         self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc=""))
         problems = ioc_editor.check_semantics(self.ioc)
         self.assertTrue(any("ADCPresc" in p for p in problems), problems)
+
+    def test_over_limit_clock_without_presc_key_is_reported(self):
+        # 值等于库默认分频时 CubeMX 不写 RCC.ADCPresc 行 —— 这时要靠 RCC.ADCFreqValue 判断
+        # (实测踩过:ADCPresc=DIV2 时文件里明明写着 ADCFreqValue=36MHz,预检却误报"没设",
+        #  既报了个假的、又漏掉真正的超限)
+        self._write(self.BASE.format(trigger="ADC_SOFTWARE_START", adc_presc="") + "RCC.ADCFreqValue=36000000\n")
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("超过上限" in p for p in problems), problems)
+        self.assertFalse([p for p in problems if "没设" in p], problems)
 
     def test_adc_clock_over_limit_is_reported(self):
         # PCLK2 72MHz / DIV2 = 36MHz,超过 F103 的 14MHz 上限

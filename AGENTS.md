@@ -88,6 +88,9 @@
 - **"移除外设再加回"会留下中间态**:`remove_peripheral` 删掉了 `ProjectManager.functionlistsort`
   里该外设的段,而"加回去"不补回 ⇒ 摘要的 `init_order` 会**暂时**少一项(下一次 generate 时
   CubeMX 自己重建,生成代码不受影响)。离线预检会提示这件事,别据此以为外设没配上。
+- **`RCC.ADCPresc` 那行缺失 ≠ 没设 ADC 时钟**:值等于库默认分频(DIV2)时 CubeMX 不写它,
+  要看 `RCC.ADCFreqValue`(实际频率);另外 `adc_clock_div` 显式给超上限的值现在会被**直接拒绝**
+  (以前静默接受 → 下一次 generate 弹 `[Clock]` 卡死到 240s)。
 - **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
   返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
   240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
@@ -106,7 +109,7 @@
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**245 个:235 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**249 个:239 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
   —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
 - **改了 `src/` 之后必须重启宿主**:Reasonix 把本 server 当长驻进程**复用**,开新会话并不会

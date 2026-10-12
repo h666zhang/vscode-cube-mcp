@@ -231,6 +231,12 @@ def _run_script(script: str, stage: str = "run_cubemx") -> dict:
 
 def _ioc_path(ioc: str) -> str:
     ap = _check_path(ioc)
+    if os.path.isdir(ap):
+        raise ToolError(
+            "IOC_NOT_FOUND",
+            f"{ap} 是目录,不是 .ioc 文件 —— 这里要传工程/模板自己的 .ioc"
+            f"(例如 {os.path.join(ap, os.path.basename(ap) + '.ioc')})",
+        )
     if not os.path.isfile(ap):
         raise ToolError("IOC_NOT_FOUND", f".ioc 文件不存在: {ap}")
     if not ap.lower().endswith(".ioc"):
@@ -493,8 +499,9 @@ def cubemx_inspect_output(project_dir: str, pattern: str = "") -> str:
     参数:
       project_dir: 工程目录(须在 ST_CUBEMX_ALLOWED_ROOTS 白名单内),
                    如 cubemx_new_project 的 project_dir / cubemx_generate 的生成目录
-      pattern:     可选正则;给了就在 **整个 Core/ 下**的 .c/.h/.txt/.s/.cmake 里取匹配行
-                   (最多 100 行)—— 不只是 Core/Src,Core/Inc 里的宏与声明也会命中
+      pattern:     可选正则(标准正则语法,可用 `|` 连接多个关键词);给了就在 **整个 Core/ 下**
+                   的 .c/.h/.txt/.s/.cmake 里取匹配行(最多 100 行)—— 不只是 Core/Src,
+                   Core/Inc 里的宏与声明也会命中
 
     只返回文件树、函数签名与命中的行,**不返回文件全文**,也不展开 Drivers/ 这类第三方目录。
     """

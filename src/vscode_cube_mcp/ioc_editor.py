@@ -123,15 +123,27 @@ def check_semantics(ioc_path: str) -> list:
     clock = adc_rules.get("clock") or {}
     adc_ips = sorted(n for n in ips if n.startswith("ADC"))
     if adc_ips and clock:
-        presc = entries.get(f"RCC.{clock.get('parameter', 'ADCPresc')}", "")
         max_hz = int(clock.get("max_hz") or 0)
-        if not presc:
-            problems.append(f"配了 {','.join(adc_ips)} 但没设 RCC.ADCPresc(generate 会弹 [Clock] 卡死)")
-        else:
-            div = int((clock.get("prescalers") or {}).get(presc, 0) or 0)
+        presc = entries.get(f"RCC.{clock.get('parameter', 'ADCPresc')}", "")
+        try:
             pclk2 = int(entries.get(clock.get("pclk2_key", ""), "") or clock.get("pclk2_default_hz", 72000000))
-            if div and max_hz and pclk2 / div > max_hz:
-                problems.append(f"ADCCLK = {int(pclk2 / div)} Hz 超过上限 {max_hz} Hz({presc} 分频不够)")
+        except ValueError:
+            pclk2 = int(clock.get("pclk2_default_hz", 72000000))
+        div = int((clock.get("prescalers") or {}).get(presc, 0) or 0)
+        try:
+            actual = int(entries.get("RCC.ADCFreqValue") or 0)
+        except ValueError:
+            actual = 0
+        # 优先按 ADCPresc 现算;没有该行(值等于库默认值时 CubeMX 不写它)就退回 CubeMX 自己算的
+        # ADCFreqValue —— 只看"ADCPresc 在不在"会把"用了默认分频"误报成"没设"
+        # (实测踩过:ADCPresc=DIV2 时文件里明明写着 ADCFreqValue=36MHz,预检却说没设,既误报
+        #  又把真正的超限漏掉了)
+        adcclk = int(pclk2 / div) if div else actual
+        if not adcclk:
+            problems.append(f"配了 {','.join(adc_ips)} 但没设 RCC.ADCPresc(generate 会弹 [Clock] 卡死)")
+        elif max_hz and adcclk > max_hz:
+            how = presc or "默认分频(取自 RCC.ADCFreqValue)"
+            problems.append(f"ADCCLK = {adcclk} Hz 超过上限 {max_hz} Hz({how};generate 会弹 [Clock] 卡死)")
 
     # ③ DMA 键组要自洽:外设列表里有 DMA、请求序号对得上、通道中断已使能
     dma_keys = _rule_data("dma").get("ioc_keys") or {}

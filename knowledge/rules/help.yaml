@@ -39,6 +39,16 @@ guide: |-
      - 其它工具链(EWARM / MDK-ARM)未实测,找各自的 user 目录即可
      别往 `cmake/stm32cubemx/CMakeLists.txt` 里加(每次 generate 全量重写)
 
+  【失败时会怎样(动手前先读)】
+  new_project 的步骤固定为 `locate_template → compose_ioc → resolve_intent → run_cubemx`,
+  报错信息里会写明是哪一步失败(形如 `[resolve_intent|PIN_CONFLICT]`)。**落盘时机**:
+  - 卡在 `locate_template`(芯片没模板)⇒ 不会建任何文件;
+  - 过了 `compose_ioc`(已复制模板、改工程名、写 .ioc)之后失败 ⇒ 目录里会留下**半成品 .ioc**
+    (只有模板内容、外设没配上);**工具不会自动清理**,换个新目录重来即可。
+  常见错误码:`MCU_TEMPLATE_MISSING`(没有该芯片模板,错误里给可用模板与新建模板的方法)、
+  `PIN_CONFLICT`(一个引脚被两个意图抢)、`UNKNOWN_PIN_SIGNAL`(引脚名不在这颗芯片上)、
+  `BAD_ARGUMENT`(参数值不合法,会列出可用取值)。
+
   【意图(intents / cubemx_intent)支持哪些外设】
   - **有专门解析的**(字段多,优先用意图):
       ADCx     pins(多通道,顺序即 Rank)/ sampling_time / continuous / scan / trigger / dma / interrupt
@@ -256,7 +266,11 @@ peripheral:
     - 和 TIM 不一样:USART 的 set mode 是有效的。
     - BaudRate 等于 db 默认值 115200 时,CubeMX 不会写出 USARTx.BaudRate 行;换成别的值才出现
       (探针里看不到不代表命令无效)。
-    - 中断:在 cubemx_intent 的意图里写 "interrupt": true(靠注入 .ioc 键实现)。
+    - 中断:**不写 `interrupt` 就是不开**(默认 false),不会生成 `USART2_IRQHandler`;要中断才写
+      "interrupt": true(靠注入 .ioc 键实现)。
+    - **别和 DMA 通道中断搞混**:加 `dma` 字段会另外开出 DMA 通道中断(`DMA1_ChannelX_IRQHandler`),
+      那是搬运中断、不是串口收发中断 —— 详见 topic="dma"。
+    - 接收用 DMA 时一般显式写 `"mode": "circular"`(不写的话 UART 接收默认是 `DMA_NORMAL`,只搬一次)。
   spi: |-
     【SPI(探针实测 2026-10-10)】
     - 命令:set mode SPI1 Full_Duplex_Master;set pin PA5 SPI1_SCK / PA6 SPI1_MISO / PA7 SPI1_MOSI
@@ -279,6 +293,10 @@ peripheral:
       得用 commands 单独 set SamplingTime-n#ChannelRegularConversion。
     - **必配 ADC 时钟**:不配 generate 会弹 [Clock] 对话框把 -q 批处理卡死;72MHz PCLK2 下
       用 RCC_ADCPCLK2_DIV6(12MHz ≤ F103 的 14MHz 上限)。工具按 .ioc 的 APB2 频率自动补。
+      `adc_clock_div` 的合法值:**DIV2 / DIV4 / DIV6 / DIV8**;而且**显式给超上限的值会被拒绝**,
+      报错里会告诉你当前 APB2 频率下该用哪个(超限的 generate 会卡死)。
+      注意 **值等于库默认分频(DIV2)时 CubeMX 不写 `RCC.ADCPresc` 这一行** ——
+      这时要看 `RCC.ADCFreqValue`(CubeMX 算出的实际频率),别把"没这行"读成"没设"。
     - 连续/扫描:**continuous 默认 false(不写就是不连续)**;写 continuous=True 才开。
       有外部触发(trigger)时:false = 每次触发转换一整轮;true = 第一次触发后 ADC 自由
       连续转换、触发退化成启动信号(此时让 TIM 定频触发就失去意义)。多通道 scan 默认开;
