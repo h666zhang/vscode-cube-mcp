@@ -15,6 +15,7 @@ Tools:
   cubemx_intent(ioc, intents)      按配置意图改 .ioc(内部名由知识库查出来)
   cubemx_probe(ioc, cmds)          探针:在副本上试跑,输出改前改后的差异
   cubemx_remove_peripheral(ioc, peripheral) 文本方式移除外设
+  cubemx_inspect_output(dir, pattern) 看生成产物(文件树/函数签名/匹配行;只读,不给全文)
 
 配置(环境变量,不硬编码本机路径):
   ST_CUBEMX_EXE            STM32CubeMX 可执行文件路径;未设置时尝试 PATH 中的
@@ -39,7 +40,7 @@ import threading
 
 from mcp.server import MCPServer
 
-from . import intent_resolver, ioc_diff, ioc_editor, knowledge_loader
+from . import intent_resolver, ioc_diff, ioc_editor, knowledge_loader, output_inspector
 from .cubemx_result import ToolError, render, render_run
 
 # .ioc 的文本编辑在 ioc_editor.py(纯文本操作,不起 CubeMX 进程)。
@@ -374,19 +375,33 @@ def cubemx_load(ioc: str, summary: bool = True, via_cubemx: bool = False) -> str
 
     via_cubemx=False(默认)时**只解析文本,秒回**;传 True 才会额外跑一次
     `config load` 让 CubeMX 自己读一遍(用于确认"这份 .ioc CubeMX 认不认",
-    代价是要等它启动,通常 10~30s)。
+    代价是要等它启动,通常 10~30s)。传了 True 时返回里会**明确写出结论**
+    (`CubeMX 接受这份 .ioc` / `CubeMX 拒绝/加载失败(...)`),不必自己去读 CubeMX 日志。
 
     参数:
       ioc:        工程 .ioc 文件绝对路径(须在允许目录内)
       summary:    是否返回结构化摘要(默认 True;传 False 则只返回 via_cubemx 的输出)
       via_cubemx: 是否额外让 CubeMX 真加载一次(默认 False,快)
+
+    注意:summary 与 via_cubemx 不能同时为 False(那样没有任何输出,直接报 BAD_ARGUMENT)。
+    另外 CubeMX 会省掉一部分参数行(例如 ADC 的 `ContinuousConvMode` / `ScanConvMode`
+    不在 .ioc 里),摘要里没有这些键不代表没配 —— 想知道**最终值**就用
+    `cubemx_inspect_output(project_dir, pattern="ContinuousConvMode|ScanConvMode")` 读生成的 adc.c。
     """
     ap = _ioc_path(ioc)
     if not summary and not via_cubemx:
         raise ToolError("BAD_ARGUMENT", "summary 和 via_cubemx 至少要一个为 True,否则没有任何输出")
     out = ""
     if via_cubemx:
-        out = render_run("cubemx_load", _run_script(f'config load "{ap}"'))
+        r = _run_script(f'config load "{ap}"')
+        # 明确给出"认不认"的结论 —— 以前只回显 CubeMX 原始日志,调用方看不出这算过还是没过
+        # (实测:有 agent 为此白跑一趟)
+        if r.get("ok"):
+            verdict = f"[OK] CubeMX 接受这份 .ioc(config load 成功,exit={r.get('exit_code')})"
+        else:
+            why = f",返回 KO 的命令: {r['ko_command']}" if r.get("ko_command") else ""
+            verdict = f"[FAIL] CubeMX 拒绝/加载失败({r.get('error_code')}{why}),见下面的原始输出"
+        out = verdict + "\n" + render_run("cubemx_load", r)
     if summary:
         try:
             data = ioc_editor.summarize(ap)
@@ -449,7 +464,50 @@ def cubemx_generate(ioc: str, project_dir: str = "") -> str:
             output=r.get("output", ""),
             extra=f"生成目录: {gen_dir}",
         )
-    return render_run("cubemx_generate", r, extra=f"生成目录: {gen_dir}\n生成文件({len(arts)}): " + ", ".join(arts))
+    return render_run(
+        "cubemx_generate",
+        r,
+        extra=f"生成目录: {gen_dir}\n生成文件({len(arts)}): "
+        + ", ".join(arts)
+        + "\n"
+        + output_inspector.tree_line(output_inspector.scan(gen_dir)),
+    )
+
+
+@mcp.tool()
+def cubemx_inspect_output(project_dir: str, pattern: str = "") -> str:
+    """看生成出来的工程产物(只读):文件树 + Core/Src 每个 .c 的函数签名;给 pattern 再回匹配行。
+
+    什么时候用:
+      - 想知道"到底生成了哪些文件"(generate / new_project 返回里的清单只覆盖 Core/Src/*.c)
+      - 想知道某个参数的**最终值** —— CubeMX 会省掉一些参数行(例如 ADC 的
+        ContinuousConvMode / ScanConvMode 不在 .ioc 里),只有在生成的代码里能看到;
+        这时用 pattern="ContinuousConvMode|ScanConvMode" 最直接
+      - 想知道某个 .c 里有哪些函数、或某个宏/枚举在代码里是怎么写的
+
+    参数:
+      project_dir: 工程目录(须在 ST_CUBEMX_ALLOWED_ROOTS 白名单内),
+                   如 cubemx_new_project 的 project_dir / cubemx_generate 的生成目录
+      pattern:     可选正则;给了就在 **整个 Core/ 下**的 .c/.h/.txt/.s/.cmake 里取匹配行
+                   (最多 100 行)—— 不只是 Core/Src,Core/Inc 里的宏与声明也会命中
+
+    只返回文件树、函数签名与命中的行,**不返回文件全文**,也不展开 Drivers/ 这类第三方目录。
+    """
+    info = output_inspector.scan(_check_path(project_dir), pattern)
+    lines = [f"[OK] cubemx_inspect_output — {info['root']}", f"文件共 {info['files']} 个:"]
+    lines += info["tree"]
+    for name, count in sorted(info["folded"].items()):
+        lines.append(f"  {name}/  ({count} 个文件,第三方代码已折叠)")
+    if info["functions"]:
+        lines.append("--- Core/Src 函数 ---")
+        for path, sigs in info["functions"].items():
+            lines.append(f"  {path}:")
+            lines += [f"    {s}" for s in sigs]
+    if pattern:
+        lines.append(f"--- 匹配 pattern={pattern!r} ---")
+        lines += info["matches"] or ["  (无匹配)"]
+    lines += [f"  ⚠ {note}" for note in info["notes"]]
+    return "\n".join(lines)
 
 
 @mcp.tool()
@@ -687,6 +745,7 @@ def cubemx_new_project(
             extra=f"工程目录: {pd}\n.ioc 已生成: {ioc_dst}(但没有 HAL 骨架产出)",
         )
     extra += f"\n生成文件({len(arts)}): " + ", ".join(arts)
+    extra += "\n" + output_inspector.tree_line(output_inspector.scan(pd))
     problems = ioc_editor.check_semantics(ioc_dst)
     if problems:
         extra += f"\n⚠ 离线预检(纯文本,不需要 CubeMX)发现 {len(problems)} 处问题:\n" + "\n".join(

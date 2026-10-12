@@ -10,7 +10,7 @@ guide: |-
   **不生成应用业务代码**（LED 闪烁、OLED 显示内容、传感器驱动、中断处理逻辑等），
   这些请在生成后的工程里自行编写——配置到骨架为止，剩下是你的代码。
 
-  【工具一览(10 个)】
+  【工具一览(11 个)】
     cubemx_help                本指南(当前)
     cubemx_new_project         从零生成 HAL 工程(首选入口)
     cubemx_intent              按"配置意图"改 .ioc(只说要什么,内部名查知识库;0.4.4.1 新增)
@@ -20,6 +20,7 @@ guide: |-
     cubemx_generate            加载 .ioc 生成 HAL 代码
     cubemx_export_pinout       导出引脚配置 CSV(只读)
     cubemx_remove_peripheral   从 .ioc 移除外设
+    cubemx_inspect_output      看生成产物:文件树 + Core/Src 函数签名 + pattern 匹配行(只读,不给全文)
     cubemx_script              任意 CubeMX 脚本命令(原始脚本接口)
 
   【从零生成工程(标准流程)】
@@ -33,6 +34,20 @@ guide: |-
      commands(原始 set 命令)仍可用,两者可以混用(intent 的命令排在前面)
   3) 自己的库(如 SPL_OLED/Src/OLED.c + SPL_OLED/Inc)写进工程根 CMakeLists.txt 的用户区
      (# Add sources to executable / # Add include paths);该文件 CubeMX 只生成一次,不会被覆盖
+
+  【意图(intents / cubemx_intent)支持哪些外设】
+  - **有专门解析的**(字段多,优先用意图):
+      ADCx     pins(多通道,顺序即 Rank)/ sampling_time / continuous / scan / trigger / dma / interrupt
+      TIMx     mode(pwm / input_capture / internal_clock)/ pin / freq_hz / duty / prescaler /
+               period / pulse / irq(或 interrupt)
+      GPIO     pin / mode(output 等)/ label
+  - **只按"引脚 + 模式"处理的**(字段少,更细的参数用 commands 或本 topic 里的 set 命令):
+      I2Cx / USARTx / SPIx / CAN / RTC / IWDG / WWDG
+      例如 {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}(内部就是 set pin + set mode 三条)
+  - 各外设的详细字段:**有 topic 看 topic**(adc / tim / dma / nvic / i2c / usart / spi …),
+    其余以 knowledge/rules/<外设>.yaml 为准;字段写错或查不到时工具会**报错**并给出可用值,
+    不会静默忽略。拿不准能不能用意图表达时,先按意图写 —— 工具返回里会写明它最终走的是
+    意图解析还是 set 命令。
 
   【执行顺序与注入时机(重要:写意图/命令前先读)】
   new_project 与 intent 的内部顺序固定,不要假设:
@@ -96,6 +111,13 @@ new_project: |-
      也可以用原始 commands=["set pin PB13 GPIO_Output"],两者可混用
   3) 自己的库(.c + .h 目录)写进工程根 CMakeLists.txt 的用户区(该文件只生成一次,不会被覆盖)
 
+  project_dir 行为:目录不存在会**自动创建**;**已存在则直接用**(不清理里面的旧文件,
+  上一次的产物和 .ioc.bak 会留下 —— 要干净工程就换个新目录)。
+  想额外生成到另一个目录:用 cubemx_generate(ioc, project_dir=别的目录)(工具会把 .ioc
+  复制过去就地生成,原 .ioc 不动);**不要**在脚本里用 `project path`(6.18 已失效)。
+  目标目录会因此**多出一份 <工程名>.ioc 副本**(以后想再生成,直接用那份即可);
+  它是新复制过去的,所以目标目录里**不会**有 `.ioc.bak`(备份只在工具改写已有 .ioc 时产生)。
+
   参数(默认值而非强制):
     mcu           默认 STM32F103C8T6,匹配 templates/{mcu}.ioc
     toolchain     默认 "CMake"(可覆盖 "EWARM V8.32"/"MDK-ARM"/"STM32CubeIDE")
@@ -128,11 +150,21 @@ peripheral:
       set gpio parameters PB13 GPIO_Label LED
     示例:LED 在 PB13 → 命令序列如上。
   i2c: |-
-    【I2C(已验证)】
+    【I2C(已验证;实测 2026-08-06 + 2026-10-12 生成回读)】
       set pin PB8 I2C1_SCL
       set pin PB9 I2C1_SDA
       set mode I2C1 I2C
     生成 i2c.c + main.c 调用 MX_I2C1_Init。
+    - **默认就是标准模式 100kHz,不用额外配**:生成代码里 hi2c1.Init.ClockSpeed = 100000、
+      DutyCycle = I2C_DUTYCYCLE_2(100kHz 下无意义,CubeMX 默认项)、AddressingMode = 7BIT、
+      OwnAddress1 = 0(从机地址,做主机时不用管)。
+    - **不要中断、不要 DMA 时什么都不用写**:上面三条命令不会使能任何 NVIC 中断、也不会挂
+      DMA 请求(要中断才写 {"interrupt": true};要 DMA 才加 dma 字段)。
+    - 用意图时写 {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}(内部就是那三条 set 命令);
+      想改时钟频率等细节用 commands 单独 set。
+    - **PB8/PB9 在 F103 上是 I2C1 的重映射引脚**:CubeMX 会自动补
+      `__HAL_AFIO_REMAP_I2C1_ENABLE()`(实测生成代码里有),属正常现象 ——
+      排查"PB8/PB9 没波形"时先确认这行在不在。
   tim: |-
     【TIM 内部时钟(重要,有坑)】
     - set mode TIM2 一律 KO;set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL
@@ -150,6 +182,19 @@ peripheral:
       实测有效(2026-10-12):CubeMX 会自动把 TIM_MasterOutputTrigger 补进 TIMx.IPParameters。
       用 TIM 触发 ADC 时这一步不能漏:只设 ADC 的 ExternalTrigConv、触发源没有 TRGO 输出,
       generate 会弹窗卡死(见 topic="adc")。
+
+    【TIM 意图字段(cubemx_intent / new_project 的 intents)】
+      {"peripheral": "TIM3", "mode": "internal_clock", "freq_hz": 10000, "irq": false}
+      mode              internal_clock / pwm / input_capture(必填)
+      pin               引脚(信号名由知识库查表,不猜)
+      freq_hz           业务参数:按该 TIM 的实际时钟自动算分频 —— **internal_clock 也支持**,
+                        不必自己手算 prescaler/period(72MHz + freq_hz=10000 会自动分配)
+      prescaler         分频**比**,注入时自动减 1 落成寄存器值(传 7200 → 寄存器 7199)
+      period            计数**值**,同样自动减 1(传 10000 → 寄存器 9999)
+      duty / pulse      pwm 专用:占空比 / 脉冲计数
+      irq(或 interrupt)**默认 true**:internal_clock 的注入片段默认带 NVIC(会生成
+                        TIMx_IRQHandler);只拿它当触发源、不要中断时才写 "irq": false
+      显式给的 prescaler/period 优先于 freq_hz。
 
     【TIM PWM(6.18 标准表达注入,0.4.1 起)】
     - 命令:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
@@ -178,6 +223,10 @@ peripheral:
   rcc: |-
     【时钟(RCC,有坑)】
     - 模板已配好 HSE 8MHz × PLL9 = 72MHz,一般无需改。
+    - **定时器时钟要按 APBx 的 2 倍算**:APB 分频 ≠ 1 时,TIMx 的计数时钟 = APBx × 2
+      (F103 默认 APB1 = 36MHz ⇒ TIM2/3/4 实际跑 **72MHz**;APB2 = 72MHz ⇒ TIM1 也是 72MHz)。
+      所以 10kHz = 72MHz ÷ 7200,不是 36MHz ÷ 3600 —— 摘要里的 `APB1Freq_Value` 看不出这一点。
+      用意图的 `freq_hz` 时工具按这条规则自动换算,不必自己算。
     - 对 RCC 执行 set 命令(如 PLLMUL)会把 RCC.PLLSourceVirtual=HSE 弄丢,
       时钟静默降级 HSI(如 64MHz 而非 72MHz)。
     - 改频率优先用 cubemx_new_project 的 clock_source/pll_mul 参数;
@@ -210,6 +259,8 @@ peripheral:
     - 多通道(实测):pins 顺序即 Rank 顺序,工具自动补 NbrOfConversion + 每个通道一组
       Rank-n / Channel-n / SamplingTime-n(set mode INn 本身不写转换序列)。
     - 采样时间:sampling_time="ADC_SAMPLETIME_55CYCLES_5"(默认 1.5 周期)。
+      **多通道时给一个值就统一用于所有通道**(SamplingTime-0..N 都写同一个);要逐通道不同
+      得用 commands 单独 set SamplingTime-n#ChannelRegularConversion。
     - **必配 ADC 时钟**:不配 generate 会弹 [Clock] 对话框把 -q 批处理卡死;72MHz PCLK2 下
       用 RCC_ADCPCLK2_DIV6(12MHz ≤ F103 的 14MHz 上限)。工具按 .ioc 的 APB2 频率自动补。
     - 连续/扫描:**continuous 默认 false(不写就是不连续)**;写 continuous=True 才开。
@@ -224,6 +275,11 @@ peripheral:
       T5_CC1、T5_CC3、T8_TRGO、T8_CC1(完整列表即 knowledge/ip 里 ExternalTrigConv 的
       values)。**写错的值会被工具直接拦下并列出合法取值** —— CubeMX 自己对不认识的枚举
       是静默忽略,不会报错。
+      注意**规则组和注入组的触发源不是一回事**:上面是规则组 `ExternalTrigConv`;
+      `T1_TRGO` / `T2_TRGO` 这类只属于**注入组** `ExternalTrigInjecConv`(要用注入组才配它)。
+      **常用配对(照抄即可)**:TIM3 当触发源 → ADC 写 `trigger="T3_TRGO"`,TIM3 侧配
+      `TIM_MasterOutputTrigger=TIM_TRGO_UPDATE`(见 topic="tim");想用 TIM2 的 TRGO **不行**
+      (规则组没有 T2_TRGO),要 TIM2 就用它的比较事件 `T2_CC2` / `T2_CC3`。
     - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
       generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
     - 还没实测:注入通道(InjectedConv)、模拟看门狗。
@@ -259,7 +315,10 @@ peripheral:
     - 通道由 db 导出的表查出(knowledge/mcu/<芯片>.dma.yaml,如 ADC1→DMA1_Channel1、
       USART2_RX→DMA1_Channel6),不用自己填;要指定就写 dma.channel。
     - 其它字段(默认值而非强制):direction / mode(normal/circular) / periph_inc / mem_inc /
-      periph_align / mem_align / priority / interrupt(false 则不注入通道中断)。
+      periph_align / mem_align / priority / interrupt。
+      **interrupt 默认 true**:不写就注入通道中断(`NVIC.<通道>_IRQn`,generate 后 it.c 里出现
+      `<通道>_IRQHandler`)—— 与 CubeMX GUI 里加 DMA 请求的默认行为一致;只有写
+      `"interrupt": false` 才不注入(只搬数据、不要中断回调时用)。
     - 数据宽度不用管:CubeMX 按请求类型补默认(ADC→HALFWORD、USART→BYTE,实测)。
       generate 后 dma.c 的 MX_DMA_Init、各外设 x.c 的 hdma_xxx + __HAL_LINKDMA、
       stm32f1xx_it.c 的 <通道>_IRQHandler 都会生成(实测三例:ADC1 / USART2_RX / RX+TX)。
@@ -271,6 +330,9 @@ peripheral:
       NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true
     - 实测:注入后 generate,Core/Src/stm32f1xx_it.c 里会出现对应的 <IRQ>Handler。
     - 用 cubemx_intent 时写成 {"interrupt": true}(用 {实例}_IRQn)或直接给中断名(如 I2C1_EV_IRQn)。
+    - `.ioc` 里**只写已使能**的中断 ⇒ cubemx_load 摘要的 `nvic` 段里**没有**某个 IRQn,就说明它没开
+      (例如没有 `TIM3_IRQn` ⇒ 不会生成 `TIM3_IRQHandler`)。摘要里恒出现的 BusFault/HardFault/
+      SysTick 等是模板自带的。
 remove: |-
   【移除外设(cubemx_remove_peripheral)】
   - 用法:cubemx_remove_peripheral(ioc, peripheral)

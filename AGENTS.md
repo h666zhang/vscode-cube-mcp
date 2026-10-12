@@ -18,12 +18,13 @@
 ## 项目结构
 
 - `src/vscode_cube_mcp/` — 包源码(src 布局,入口 `python -m vscode_cube_mcp`)
-  - `cubemx_mcp.py` — MCP server 源码(10 个工具;只做参数校验、编排与结果渲染)
+  - `cubemx_mcp.py` — MCP server 源码(11 个工具;只做参数校验、编排与结果渲染)
   - `cubemx_result.py` — 步骤名、错误码与统一渲染(失败时能看出卡在哪一步)
   - `knowledge_loader.py` — 读 `knowledge/` 里的 YAML;查不到就报错,不猜
   - `ioc_editor.py` — `.ioc` 文本编辑(注入/移除/模板改写;写前备份、写后回读校验)
   - `intent_resolver.py` — 把配置意图翻译成动作(信号名与参数都查表得到)
   - `ioc_diff.py` — 比较两份 `.ioc` 的结构化差异(探针用)
+  - `output_inspector.py` — 看生成产物:文件树 / `Core/Src` 函数签名 / pattern 匹配行(只读,不返回全文)
   - `__main__.py` — `python -m vscode_cube_mcp` 入口
 - `knowledge/` — 知识库:`ip/`、`mcu/` 从 CubeMX 的 db 导出,`rules/` 是实测规则(每条带 `verified`)
 - `tools/gen_knowledge_from_db.py` — 从 CubeMX 安装目录的 `db/` 导出知识库(只读)
@@ -32,11 +33,11 @@
 - `README.md` — 面向用户的手册(安装/配置/FAQ)
 - `docs/README.dev-notes.md` — 开发笔记(配置补丁原理、外设实测、发布流程)
 
-## 工具一览(10 个)
+## 工具一览(11 个)
 
 `cubemx_help` / `cubemx_script` / `cubemx_load` / `cubemx_configure` / `cubemx_generate`
 / `cubemx_export_pinout` / `cubemx_new_project` / `cubemx_intent` / `cubemx_probe`
-/ `cubemx_remove_peripheral`
+/ `cubemx_remove_peripheral` / `cubemx_inspect_output`
 
 - **`cubemx_intent`**:只写"要什么"(外设 / 模式 / 引脚 / 频率 / 占空比),`.ioc` 内部名由知识库查出来 —— 优先用它。
   目前支持:`TIMx`(pwm / input_capture / internal_clock)、`GPIO`、`I2Cx`、`USARTx`、`SPIx`、`ADCx`、
@@ -48,7 +49,13 @@
   (`{"type": "dma"|"tim_internal_clock"|"tim_pwm"|"tim_input_capture"|"lines", ...}`);给了 `inject` 时
   会让 CubeMX load + saveas 走一遍,并明确告诉你它是**原样保留**还是**改写/丢弃**了注入内容。
 - **`cubemx_load`**:回读配置,默认附一份**结构化摘要**(IP / 引脚 / DMA 请求 / 中断 / 时钟 / 各外设参数 /
-  初始化顺序,JSON),agent 判断"现在配了什么"不必读 `.ioc` 原文;`summary=False` 可关。
+  初始化顺序,JSON),agent 判断"现在配了什么"不必读 `.ioc` 原文;`summary=False` 需配合 `via_cubemx=True`
+  (两个都关会报错 —— 那样没有任何输出)。传 `via_cubemx=True` 时返回里会明确写
+  `CubeMX 接受这份 .ioc` / `CubeMX 拒绝/加载失败(...)`,不用自己去读 CubeMX 日志。
+- **`cubemx_inspect_output`**:看生成出来的工程产物 —— 文件树 + `Core/Src/*.c` 的函数签名 +
+  按 `pattern` 取匹配行(在整个 `Core/` 下搜,如 `pattern="ContinuousConvMode|ScanConvMode"`)。
+  只读、**不返回文件全文**、不展开 `Drivers/` 第三方目录;`cubemx_generate` / `cubemx_new_project`
+  成功时也会附一行结构摘要。
 
 ## 已知坑(实测结论,勿重踩)
 
@@ -73,6 +80,9 @@
   —— 那是注入组 `ExternalTrigInjecConv` 的值;规则组要用 TIM2 只能 `T2_CC2`/`T2_CC3`,要 TRGO
   得用 `T3_TRGO`/`T8_TRGO`。写非法值时 CubeMX 静默忽略(不报错、硬件永不转换),所以
   `cubemx_intent` 的 `trigger` 现在对照 db 的 values 直接拦下并列出合法取值。
+- **有些参数不在 `.ioc` 里**:CubeMX 会把 `ContinuousConvMode` / `ScanConvMode` 这类"取默认值"的行
+  省掉,所以 `cubemx_load` 摘要里看不到它们 —— **最终值要读生成的代码**:
+  `cubemx_inspect_output(project_dir, pattern="ContinuousConvMode|ScanConvMode")`。
 - **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
   返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
   240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
@@ -89,7 +99,7 @@
 
 ## 开发 / 验证
 
-- 测试:`python -m pytest`(**228 个:219 单元/协议 + 9 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 测试:`python -m pytest`(**239 个:229 单元/协议 + 10 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
 - 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
   —— **改了工具默认值或返回格式后务必跑一次**:它们默认跳过,断言容易悄悄过时(实测失修过一次)
 - **改了 `src/` 之后必须重启宿主**:Reasonix 把本 server 当长驻进程**复用**,开新会话并不会

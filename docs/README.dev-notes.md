@@ -369,6 +369,31 @@ TRGO 顺序、`irq: false` 成功抑制 `TIM3_IRQHandler`,全对)。
 > ②**黑箱测试的前置条件是宿主真的加载了新代码**(先查 server 进程的启动时间);
 > ③写进提示词的需求要先确认在硬件上成立,否则会把 agent 引到伪问题上。
 
+### 后续:补信息缺口(0.4.4.3 续修,2026-10-12)
+
+按"先解决信息缺口、再谈别的"补了两块。
+
+**新增 `cubemx_inspect_output`(第 11 个工具)**:文件树 + `Core/Src/*.c` 的函数签名 + 按
+`pattern` 取匹配行。**只给结构 / 签名 / 命中行,不返回文件全文**,也不展开 `Drivers/`
+这类第三方目录 —— 既是"看生成结果"的正当入口,又不至于变成读任意文件的后门。两个动机:
+
+1. `generate`/`new_project` 的清单只覆盖 `Core/Src/*.c`,agent 连 `Core/Inc/*.h`、`cmake/`、
+   `.ld`、`startup_*.s` 都看不到,更看不到函数名(第 3 问因此根本答不了);
+2. CubeMX 会把 `ContinuousConvMode` / `ScanConvMode` 这类"取默认值"的行**从 `.ioc` 里省掉**
+   (实测:`.ioc` 里就是没有这两行),摘要自然读不到 —— 唯一能看到真值的地方是生成的 `adc.c`。
+
+要不要在摘要里"合成隐含值"?**不做**:那等于用规则表去猜,和这次刚立的"不猜"原则相反。
+让它去读真实产物更硬。
+
+**知识库/文档补 5 处**:`topic="tim"` 的意图字段表(重点:`freq_hz` 对 `internal_clock` 也生效
+—— 那个 agent 手算 `7200/10000` 纯属文档没写;`prescaler/period` 是"分频比/计数"要减 1;
+`irq` 默认 **true**)、规则组与注入组的触发源对照、`.ioc` 只写已使能的中断、`project_dir`
+不存在会自建且已存在目录不清旧文件、`cubemx_load` docstring 的矛盾(两个输出开关不能同时关)。
+
+> 另:盲测里那两个 `.bak`(`ADCTest4.ioc.bak` / `ADCTest4.probe.ioc.bak`)是**工具备份机制**
+> 留下的 —— 给 probe 副本写 `inject` 前会 `backup()` 成 `<stem>.probe.ioc.bak`,而副本执行完
+> 被删,备份就成了孤儿。不是 bug,但会残留在工程目录里,知道就行。
+
 ## 加一个外设的 SOP
 
 1. **先探针**:把猜的写法写出来,`cubemx_probe` 在模板副本上跑一遍 —— `commands` 跑脚本命令、

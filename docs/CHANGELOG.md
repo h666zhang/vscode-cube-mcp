@@ -41,7 +41,30 @@
 - **知识库缓存改成按文件 mtime 失效**:以前 `knowledge/*.yaml` 是纯内存缓存,改了 YAML 只有
   重启 server 才生效(实测:改完 `help.yaml` 后工具一直返回旧文本)
 - `cubemx_help(topic="adc")` 补 `trigger` 的写法与 F103 合法取值表
-- 测试 209 → **228**(219 单元/协议 + 9 集成);顺手修集成测试失修:8 个用例里 5 个的
+- **新增 `cubemx_inspect_output`(第 11 个工具)**:看生成出来的工程产物 —— 文件树 +
+  `Core/Src/*.c` 的函数签名 + 按 `pattern` 取匹配行(只读,**不返回文件全文**,也不展开
+  `Drivers/` 这类第三方目录)。解决两个信息缺口:①`generate`/`new_project` 的清单只覆盖
+  `Core/Src/*.c`,agent 连 `.h` / `cmake/` / `.ld` 都看不到,更看不到函数名;②CubeMX 会把
+  `ContinuousConvMode` / `ScanConvMode` 这类"取默认值"的行**从 `.ioc` 里省掉**,摘要自然读不到
+  —— 唯一能看到真值的地方就是生成的代码。`cubemx_generate` / `cubemx_new_project` 成功时
+  也附一行结构摘要
+- 知识库/文档补 5 处(第三轮盲测暴露):`topic="tim"` 新增**意图字段表**(`freq_hz` 对
+  `internal_clock` 也生效、`prescaler`/`period` 是"分频比/计数"要减 1、`irq` 默认 true)、
+  `topic="adc"` 说明规则组与注入组触发源不同、`topic="nvic"` 说明摘要只列已使能中断、
+  `new_project` 段写明 `project_dir` 不存在会自建且已存在目录不清理旧文件、`cubemx_load`
+  docstring 补"两个输出开关不能同时关"
+- `cubemx_load(via_cubemx=True)` 现在**明确给出结论**:`CubeMX 接受这份 .ioc` /
+  `CubeMX 拒绝/加载失败(CUBEMX_KO, 返回 KO 的命令: ...)` + 原始输出。以前只回显
+  `config load ... OK`,调用方看不出这算不算通过(实测有 agent 为此白跑一趟)
+- **知识库续补 8 处**(第四轮盲测暴露):DMA 意图 `interrupt` **默认 true**(= GUI 默认,会注入
+  通道中断)、I2C 默认即标准模式 100kHz 且"不要中断/DMA 时什么都不用写"、PB8/PB9 在 F103 上是
+  I2C1 重映射引脚(CubeMX 会自动补 `__HAL_AFIO_REMAP_I2C1_ENABLE()`)、**意图支持的外设清单与
+  各自的处理方式**写进 guide、`sampling_time` 多通道时统一用于所有通道、**TIM 计数时钟 = APBx×2**
+  (APB1=36MHz 但 TIM2/3/4 实跑 72MHz)、`cubemx_generate(project_dir=…)` 会在目标目录多出一份
+  `.ioc` 且不产生 `.bak`、ADC 的 `TRGO_UPDATE ↔ T3_TRGO` 常用配对
+- `cubemx_inspect_output` 两处措辞:折叠第三方目录时不再误报"明细被截断"(实测踩过);
+  `pattern` 的搜索范围改成"整个 `Core/` 下",避免被误读成只搜 `Core/Src`
+- 测试 209 → **239**(229 单元/协议 + 10 集成);顺手修集成测试失修:8 个用例里 5 个的
   断言在 `cubemx_load` 改成默认 `via_cubemx=False` 后就过时了(默认跳过所以一直没暴露),
   已改用真加载断言;新增 1 条覆盖 `project_dir` 生成路径
 

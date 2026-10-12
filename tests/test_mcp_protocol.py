@@ -36,6 +36,7 @@ EXPECTED_TOOLS = {
     "cubemx_probe",
     "cubemx_intent",
     "cubemx_remove_peripheral",
+    "cubemx_inspect_output",
 }
 
 

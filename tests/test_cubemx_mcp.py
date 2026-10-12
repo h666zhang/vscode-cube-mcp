@@ -1241,6 +1241,51 @@ class TestToolWrappers(unittest.TestCase):
         self.assertEqual(cubemx_mcp._ko_command("a\nOK\nb\nKO\nc\nOK"), "b")
         self.assertEqual(cubemx_mcp._ko_command("a\nOK"), "")
 
+    def _allow_tmp(self):
+        old = cubemx_mcp.ALLOWED_ROOTS
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+        self.addCleanup(setattr, cubemx_mcp, "ALLOWED_ROOTS", old)
+
+    def test_inspect_output_ok(self):
+        # 生成产物查看:文件树 + 函数签名 + pattern 匹配行(只有白名单内目录可看)
+        self._allow_tmp()
+        gen = os.path.join(self._td.name, "out", "Core", "Src")
+        os.makedirs(gen, exist_ok=True)
+        with open(os.path.join(gen, "adc.c"), "w", encoding="utf-8") as f:
+            f.write("void MX_ADC1_Init(void)\n{\n  hadc1.Init.ContinuousConvMode = DISABLE;\n}\n")
+        out = cubemx_mcp.cubemx_inspect_output(os.path.join(self._td.name, "out"), pattern="ContinuousConvMode")
+        self.assertIn("[OK] cubemx_inspect_output", out)
+        self.assertIn("void MX_ADC1_Init(void)", out)  # 函数签名
+        self.assertIn("ContinuousConvMode = DISABLE", out)  # 最终值(不看全文也能拿到)
+        self.assertIn("Core/Src/adc.c", out)
+
+    def test_inspect_output_rejects_outside_roots(self):
+        self._allow_tmp()
+        with self.assertRaises(ValueError):
+            cubemx_mcp.cubemx_inspect_output("C:/Windows")
+
+    def test_load_via_cubemx_gives_verdict(self):
+        # via_cubemx=True 要明确给出"CubeMX 认不认"的结论,而不是只回显原始日志
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
+            ok = cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True)
+        self.assertIn("CubeMX 接受这份 .ioc", ok)
+
+    def test_load_via_cubemx_reports_rejection(self):
+        with mock.patch.object(
+            cubemx_mcp,
+            "_run_script",
+            return_value={
+                "ok": False,
+                "output": 'config load "x"\nKO',
+                "exit_code": 1,
+                "error_code": "CUBEMX_KO",
+                "ko_command": 'config load "x"',
+            },
+        ):
+            bad = cubemx_mcp.cubemx_load(self.ioc, summary=False, via_cubemx=True)
+        self.assertIn("CubeMX 拒绝", bad)
+        self.assertIn('config load "x"', bad)
+
     def test_export_pinout_ok(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
             r = cubemx_mcp.cubemx_export_pinout(self.ioc)
@@ -2509,6 +2554,88 @@ INTEGRATION = os.environ.get("ST_CUBEMX_RUN_INTEGRATION") == "1"
 TEMPLATE_IOC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "STM32F103C8T6.ioc")
 
 
+ADC_C_SAMPLE = """\
+#include "adc.h"
+
+ADC_HandleTypeDef hadc1;
+
+void MX_ADC1_Init(void)
+{
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  if (hadc1.Init.NbrOfConversion != 5)
+  {
+    Error_Handler();
+  }
+}
+
+void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
+{
+  if (adcHandle->Instance == ADC1)
+  {
+    __HAL_RCC_ADC1_CLK_ENABLE();
+  }
+}
+"""
+
+
+class TestOutputInspector(unittest.TestCase):
+    """cubemx_inspect_output 的底层:文件树 / 函数签名 / pattern 匹配(只读,不返回全文)。"""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.root = self._td.name
+        self._write("Core/Src/adc.c", ADC_C_SAMPLE)
+        self._write("Core/Src/main.c", "int main(void)\n{\n  return 0;\n}\n")
+        self._write("Core/Inc/adc.h", "/* adc */\n")
+        self._write("Drivers/STM32F1xx_HAL_Driver/Src/hal.c", "void HAL_Init(void)\n{\n}\n")
+        self._write("CMakeLists.txt", "project(x)\n")
+
+    def _write(self, rel, text):
+        path = os.path.join(self.root, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_function_signatures(self):
+        sigs = cubemx_mcp.output_inspector.function_signatures(ADC_C_SAMPLE)
+        self.assertIn("void MX_ADC1_Init(void)", sigs)
+        self.assertIn("void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)", sigs)
+        # 控制语句与变量声明不能被当成函数
+        self.assertFalse([s for s in sigs if s.split(" ", 1)[0] in ("if", "for", "while")])
+        self.assertFalse([s for s in sigs if s.startswith("ADC_HandleTypeDef ")])
+        self.assertFalse([s for s in sigs if s.startswith("#")])
+
+    def test_scan_reports_tree_functions_and_fold(self):
+        info = cubemx_mcp.output_inspector.scan(self.root)
+        self.assertIn("CMakeLists.txt", info["root_files"])
+        self.assertEqual(info["functions"]["Core/Src/adc.c"][0], "void MX_ADC1_Init(void)")
+        self.assertEqual(info["dirs"]["Core/Src"], 2)
+        # 第三方目录(Drivers/)只计数,不列明细
+        self.assertEqual(info["folded"]["Drivers"], 1)
+        self.assertFalse([t for t in info["tree"] if "Drivers" in t])
+
+    def test_scan_pattern_returns_lines_with_location(self):
+        info = cubemx_mcp.output_inspector.scan(self.root, pattern=r"ContinuousConvMode|ScanConvMode")
+        self.assertTrue(info["matches"])
+        self.assertTrue(info["matches"][0].startswith("Core/Src/adc.c:"))
+        self.assertTrue(any("ContinuousConvMode = DISABLE" in m for m in info["matches"]))
+
+    def test_scan_does_not_warn_when_only_folded(self):
+        # 折叠的第三方目录不该被报成"明细被截断"(实测踩过:ADCTest5 报"只列了前 29 行(共 103 个)")
+        info = cubemx_mcp.output_inspector.scan(self.root)
+        self.assertEqual(info["notes"], [])
+
+    def test_scan_rejects_bad_pattern(self):
+        with self.assertRaises(ValueError):
+            cubemx_mcp.output_inspector.scan(self.root, pattern="(")
+
+    def test_scan_rejects_missing_dir(self):
+        with self.assertRaises(ValueError):
+            cubemx_mcp.output_inspector.scan(os.path.join(self.root, "nope"))
+
+
 @unittest.skipUnless(
     INTEGRATION,
     "集成测试默认跳过;要跑就设 ST_CUBEMX_RUN_INTEGRATION=1(会启动 CubeMX,每个用例约 15s)",
@@ -2602,6 +2729,20 @@ class TestCubeMXIntegration(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(gen, "Core", "Src", "main.c")))
         self.assertTrue(os.path.isfile(os.path.join(gen, "it.ioc")))  # .ioc 被复制过去了
         self.assertIn("生成文件(", out)
+
+    def test_inspect_output_sees_generated_values(self):
+        # 真生成后能直接看到"最终值":CubeMX 不在 .ioc 里写 ContinuousConvMode/ScanConvMode,
+        # 只有生成的 adc.c 里有 —— 这正是 cubemx_inspect_output 存在的理由
+        proj = os.path.join(self._td.name, "it_inspect")
+        self.assertIn(
+            "[OK",
+            cubemx_mcp.cubemx_new_project("it_inspect", proj, intents=[{"peripheral": "ADC1", "pins": ["PA0", "PA1"]}]),
+        )
+        out = cubemx_mcp.cubemx_inspect_output(proj, pattern="ContinuousConvMode|ScanConvMode")
+        self.assertIn("[OK] cubemx_inspect_output", out)
+        self.assertIn("MX_ADC1_Init", out)
+        self.assertIn("ContinuousConvMode", out)
+        self.assertIn("ADC_SCAN_ENABLE", out)
 
     def test_remove_peripheral_leaves_loadable_ioc(self):
         # 配外设 + 它的 DMA 请求,再移除:连带清理后 CubeMX 仍要能 load
