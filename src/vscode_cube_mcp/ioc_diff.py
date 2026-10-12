@@ -50,8 +50,13 @@ def _is_ignored(key: str, ignore) -> bool:
     return any(key.startswith(prefix) for prefix in ignore)
 
 
+def _summary(diff: dict) -> str:
+    """差异摘要串,如 "+3 -1 ~2"。"""
+    return f"+{len(diff['added'])} -{len(diff['removed'])} ~{len(diff['changed'])}"
+
+
 def diff_texts(old_text: str, new_text: str, ignore=DEFAULT_IGNORE) -> dict:
-    """比较两份 .ioc 文本,返回 {"added": [...], "removed": [...], "changed": [...]}。"""
+    """比较两份 .ioc 文本,返回 {"added", "removed", "changed", "summary"}。"""
     old = parse_ioc(old_text)
     new = parse_ioc(new_text)
     added = [f"{k}={v}" for k, v in new.items() if k not in old and not _is_ignored(k, ignore)]
@@ -59,25 +64,25 @@ def diff_texts(old_text: str, new_text: str, ignore=DEFAULT_IGNORE) -> dict:
     changed = [
         f"{k}: {old[k]} -> {new[k]}" for k in new if k in old and old[k] != new[k] and not _is_ignored(k, ignore)
     ]
-    return {"added": sorted(added), "removed": sorted(removed), "changed": sorted(changed)}
+    result = {"added": sorted(added), "removed": sorted(removed), "changed": sorted(changed)}
+    result["summary"] = _summary(result)
+    return result
 
 
 def diff_files(old_path: str, new_path: str, ignore=DEFAULT_IGNORE) -> dict:
-    """比较两个 .ioc 文件,额外带一个 summary 字符串。"""
+    """比较两个 .ioc 文件(和 diff_texts 一样带 summary)。"""
     with open(old_path, encoding="utf-8", errors="replace") as f:
         old_text = f.read()
     with open(new_path, encoding="utf-8", errors="replace") as f:
         new_text = f.read()
-    result = diff_texts(old_text, new_text, ignore)
-    result["summary"] = f"+{len(result['added'])} -{len(result['removed'])} ~{len(result['changed'])}"
-    return result
+    return diff_texts(old_text, new_text, ignore)
 
 
 def render_diff(diff: dict, limit: int = 40) -> str:
     """把差异渲染成给人看的文本(每类最多列 limit 行)。"""
     from .cubemx_result import render
 
-    lines = [f"  差异: {diff['summary']}"]
+    lines = [f"  差异: {diff.get('summary') or _summary(diff)}"]
     for title, key in (("新增", "added"), ("修改", "changed"), ("删除", "removed")):
         items = diff.get(key) or []
         if not items:

@@ -96,6 +96,22 @@ HSE 8MHz + PLL ×9 = 72MHz、SWD、SysTick,**无外设**)。新增芯片:把 6.1
 复制成 `templates/{芯片型号}.ioc` 即可(必须是 6.18 原生文件,否则加载会报错)。
 
 **配套工具**:`cubemx_remove_peripheral`(文本方式移除外设,解决 `set noparam` 无效)。
+删除范围不只是 `Mcu.IPx` 那一行 —— 它按下面的顺序连带清理(缺一项都会留下"孤儿配置",
+下一次 generate 行为不可预期):
+
+1. `Mcu.IPx=<外设>` 与 `{外设}.*` 参数行、虚拟引脚 `VP_{外设}*`;
+2. 物理引脚 `{pin}.*` 与 `SH.{信号}*`:判据是引脚行的 `Signal` 值 —— 含实例名
+   (`I2C1_SCL` / `S_TIM3_CH1` / `USART2_TX`)就算它的;ADC 的引脚信号是 `ADCx_IN0`
+   (里面没有 "ADC1"),所以由 `rules/adc.yaml` 的 `remove.pin_signal_patterns` 给出模式;
+3. `NVIC.{外设}_IRQn`;规则文件声明了共用向量时(如 ADC 的 `ADC1_2_IRQn`)一并删,
+   但同族实例还在时不删(删 ADC1 而 ADC2 还开着 → 向量必须留着);
+4. **DMA 连带**:`Dma.{请求}.*`(请求名 == 实例名或以 `{实例}_` 开头)、`Dma.Request<n>`、
+   剩余请求**重新连续编号**(键前缀里的序号同步改)、`Dma.RequestsNb`、被删请求占用的
+   `NVIC.<通道>_IRQn`;请求清空时连 `Mcu.IPx=DMA` 与 functionlistsort 的 `MX_DMA_Init` 段;
+5. functionlistsort 里该外设的 `MX_*_Init` 段;`Mcu.IP*` / `Mcu.Pin*` 编号重排、`Nb` 修正。
+
+> 回归保护:单元测试覆盖上述 1~5(`TestRemovePeripheral`),集成测试里有一个
+> "配 I2C1 + 它的 DMA 请求 → 移除 → CubeMX 仍能 load"的真跑用例。
 
 > 自定义源文件(自己的库)不需要工具:直接写进工程根 `CMakeLists.txt` 的用户区
 > (`# Add sources to executable` / `# Add include paths`)——该文件 CubeMX 只生成一次,generate 不会覆盖。
@@ -118,12 +134,17 @@ HSE 8MHz + PLL ×9 = 72MHz、SWD、SysTick,**无外设**)。新增芯片:把 6.1
 | `TIMx` | pwm / input_capture / internal_clock | 三种都得**注入 .ioc 片段**(`set mode TIMx` 一律 KO) |
 | `GPIO` / `I2Cx` / `USARTx` / `SPIx` / `ADCx` / `IWDG` / `WWDG` / `CAN` / `RTC` | 见各自 `knowledge/rules/*.yaml` | `set mode` 有效(参数细节见下) |
 | **中断** | 意图里写 `interrupt` 字段 | 脚本配不了,靠**注入 `NVIC.*_IRQn`**(实测 generate 后 it.c 里有 handler) |
-| **DMA** | — | **脚本与注入都不行**,要用请先用 CubeMX GUI 配 |
+| **DMA** | 意图里写 `dma` 子对象 | 脚本配不了,靠**注入 `.ioc` 键组**(等价 GUI 的 DMA Settings→Add);通道/方向查 db 表,数据宽度由 CubeMX 补 |
 
 同类外设因为规则按前缀匹配会自动支持(`USART1/3`、`SPI2`、`I2C2`、`TIM1/4` …)。
 
 **还没实测的参数细节**:RTC 时钟源(LSE/LSI)与日历、ADC 采样时间/多通道扫描、SPI 波特率与 NSS、
 CAN 位时序、USART 的同步/半双工等模式。
+
+> **改 .ioc 的双保险**:所有写入函数写前备份 `.bak`、写后回读校验(`READBACK_MISMATCH`),
+> 再按 `knowledge/rules/ioc_structure.yaml` 做**结构校验**(IP / Pin 编号必须从 0 连续、
+> 计数键与实际条目数一致;只报"这次新引入的问题",抛 `STRUCTURE_MISMATCH`)——
+> 那个规则文件不再只是文档,写入路径上真的执行它。
 
 **实现机制(伪从零)**:CubeMX 的 `-q` 脚本模式没有 `new project` 命令,实际流程是
 复制 `templates/{芯片型号}.ioc`(6.18 原生种子)→ 改工程名 → set 命令 / 片段注入 → generate。
@@ -150,13 +171,16 @@ Mcu.Pin8=VP_TIM2_VS_ClockSourceINT
 NVIC.TIM2_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 TIM2.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE
 TIM2.IPParameters=Period,AutoReloadPreload,Prescaler      ← 无 ClockFilter/ClockPolarity/CounterMode
-TIM2.Period=10000-1
-TIM2.Prescaler=7200-1
+TIM2.Period=9999
+TIM2.Prescaler=7199
 VP_TIM2_VS_ClockSourceINT.Mode=Internal
 VP_TIM2_VS_ClockSourceINT.Signal=TIM2_VS_ClockSourceINT
 ```
 
-- 1s 中断参数:72MHz 下 `Prescaler=7200-1` + `Period=10000-1`(`72-1`/`1000-1` = 1ms,常见错误!)
+- 1s 中断参数:72MHz 下 `Prescaler=7199` + `Period=9999`(即 7200 分频 / 10000 计数)。
+  工具接口上传的是"分频比 / 计数"(7200 / 10000),注入时自动减 1 落成寄存器值 ——
+  早先把 `10000-1` 这种未求值表达式写进 `.ioc`,CubeMX 会**原样抄进 C 代码**
+  (`htim2.Init.Period = 10000-1;`,实测 2026-10-12),所以改成先算好。
 - TIM3 默认参数版:只写 `Mcu.IP5=TIM3` + `Mcu.Pin9=VP_TIM3_VS_ClockSourceINT` + `NVIC.TIM3_IRQn` +
   `VP_TIM3_VS_ClockSourceINT.Mode=Internal/Signal`,**无 Prescaler/Period/IPParameters 行** = 默认 0/65535
 
@@ -170,9 +194,11 @@ SH.S_TIM2_CH1_ETR.0=TIM2_ETR,ClockSourceETR_Mode2   ← 信号句柄:ETR 模式
 SH.S_TIM2_CH1_ETR.ConfNb=1
 NVIC.TIM2_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 TIM2.IPParameters=Period,AutoReloadPreload,Prescaler
-TIM2.Period=10000-1
-TIM2.Prescaler=7200-1
+TIM2.Period=9999
+TIM2.Prescaler=7199
 ```
+
+> (ETR 示例里的 Prescaler/Period 也按寄存器值写;`10000-1` 这种表达式会被 CubeMX 原样抄进 C 代码)
 
 > 生成代码含 `ClockSource=TIM_CLOCKSOURCE_ETRMODE2` + PA0 配置为 TIM2_ETR 输入;
 > ClockPolarity/ClockPrescaler/ClockFilter 用默认值(NONINVERTED/DIV1/0),.ioc 不写这些行。
@@ -262,12 +288,15 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
 > **技巧:CubeMX 认哪些脚本命令,可以直接问它** —— `cubemx_script("help")` 会列出全部命令。
 > 实测(6.18)给出的 `set` 子命令是:`mode` / `username` / `pin` / `pinreservation` / `gpio` /
 > `ip` / `AllIpInContext` / `context*` / `noparam` / `userconst` / `bsp` / `tpl_path` / `dest_path` ——
-> **里面没有 DMA,也没有中断相关项**,这正是 DMA 与 NVIC 脚本配不了的原因(见 `rules/dma.yaml`、`rules/nvic.yaml`)。
+> **里面没有 DMA,也没有中断相关项**,这两者都走"注入 `.ioc` 键"这条路(见 `rules/dma.yaml`、`rules/nvic.yaml`)。
 > 另外 `help` 里的 `possible_value ip` 可以查某个 IP 的合法取值。
 
 ## 加一个外设的 SOP
 
-1. **先探针**:把猜的命令写出来,`cubemx_probe` 在模板副本上跑一遍,看 `ioc_diff` 给出的真实差异;
+1. **先探针**:把猜的写法写出来,`cubemx_probe` 在模板副本上跑一遍 —— `commands` 跑脚本命令、
+   `inject` 跑**键注入类**(DMA / TIM 内部时钟 / PWM / 输入捕获 / NVIC 行,用法见
+   `cubemx_help(topic="probe")`);给了 `inject` 时输出还会写明 CubeMX 是**原样保留**还是
+   **改写/丢弃**了注入内容。看 `ioc_diff` 给出的真实差异;
 2. **写规则**:`knowledge/rules/<外设>.yaml` 里写 `command_examples` + `ioc_result` + `known_issues`,
    标 `verified: true` 与 `source`(日期 / CubeMX 版本);
 3. **加意图(可选)**:要让 `cubemx_intent` 支持它,就在 `intent_resolver.py` 加一个分支 ——

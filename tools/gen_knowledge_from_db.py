@@ -211,6 +211,52 @@ def find_ip_xml(ip_dir: Path, name: str, version: str) -> Path | None:
     return None
 
 
+def parse_dma_requests(path: Path) -> dict:
+    """解析 DMA 的 Modes XML,返回 {"channels": {请求: 通道}, "directions": {请求: 方向}}。
+
+    通道藏在 ModeLogicOperator 树里(不是 config/DMA-*_Configs.xml —— 那个只有 HAL 函数定义):
+      IP[DMA] -> ModeLogicOperator[OR] -> Mode[DMA1] -> ModeLogicOperator[OR]
+        -> Mode[DMA1_Channel1] -> ModeLogicOperator[XOR] -> Mode[<请求名>]
+
+    方向来自同一文件里 RefMode(BaseMode="DMA_Request") 的 Direction 参数;取值不唯一时不写
+    (调用方回落到 rules/dma.yaml 的默认值)。MEMTOMEM(内存到内存)不是外设请求,跳过。
+    同一请求映射到多个通道时收成列表(F1 上每个请求只有一个固定通道)。
+    """
+    root = ET.parse(path).getroot()
+    found: dict = {}
+    directions: dict = {}
+    for el in root.iter():
+        tag = local_name(el.tag)
+        if tag == "RefMode" and el.get("BaseMode") == "DMA_Request":
+            name = el.get("Name", "")
+            values = []
+            for param in el:
+                if local_name(param.tag) != "Parameter" or param.get("Name") != "Direction":
+                    continue
+                values = [pv.text.strip() for pv in param if local_name(pv.tag) == "PossibleValue" and pv.text]
+            if name and len(set(values)) == 1:
+                directions[name] = values[0]
+        elif tag == "Mode":
+            dma_name = el.get("Name", "")
+            if not dma_name.startswith("DMA"):
+                continue
+            for group in [c for c in el if local_name(c.tag) == "ModeLogicOperator"]:
+                for channel in [c for c in group if local_name(c.tag) == "Mode"]:
+                    channel_name = channel.get("Name", "")
+                    if not channel_name.startswith(f"{dma_name}_Channel"):
+                        continue
+                    for sub in [c for c in channel if local_name(c.tag) == "ModeLogicOperator"]:
+                        for request in [c for c in sub if local_name(c.tag) == "Mode"]:
+                            name = request.get("Name", "")
+                            if not name or name == "MEMTOMEM":
+                                continue
+                            found.setdefault(name, []).append(channel_name)
+    return {
+        "channels": {k: (v[0] if len(v) == 1 else sorted(set(v))) for k, v in found.items()},
+        "directions": directions,
+    }
+
+
 def dump_yaml(path: Path, data: dict) -> None:
     """写 YAML(保留键顺序、不转义中文)。"""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -262,6 +308,31 @@ def main() -> None:
         dump_yaml(out_dir / "ip" / f"{xml.stem}.yaml", data)
         sources[ip["instance"]] = xml.name
         print(f"  {ip['instance']:<12} -> {xml.name}  ({len(data['modes'])} 模式, {len(data['parameters'])} 参数)")
+
+    # DMA 请求 -> 通道/方向(db 的 ModeLogicOperator 树;cubemx_intent 的 dma 意图用它查表)
+    dma_ip = next((ip for ip in mcu_data["ips"] if ip["name"] == "DMA"), None)
+    if dma_ip:
+        dma_xml = find_ip_xml(ip_dir, dma_ip["name"], dma_ip.get("version", ""))
+        if dma_xml:
+            parsed = parse_dma_requests(dma_xml)
+            dump_yaml(
+                out_dir / "mcu" / f"{mcu_name}.dma.yaml",
+                {
+                    "mcu": mcu_name,
+                    "cpn": ident.get("Mcu.CPN", ""),
+                    "source": f"db/mcu/IP/{dma_xml.name}",
+                    "channels_nb": len(parsed["channels"]),
+                    "channels": parsed["channels"],
+                    "directions": parsed["directions"],
+                },
+            )
+            print(
+                f"DMA 请求->通道: {len(parsed['channels'])} 条"
+                f"(另有 {len(parsed['directions'])} 条带 db 默认方向)"
+                f" -> {out_dir / 'mcu' / f'{mcu_name}.dma.yaml'}"
+            )
+        else:
+            print(f"  (找不到 DMA 的 Modes XML,跳过通道表: {dma_ip['name']})")
 
     dump_yaml(
         out_dir / "meta.yaml",

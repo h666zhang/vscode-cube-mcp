@@ -28,6 +28,7 @@ Tools:
 """
 
 import asyncio
+import json
 import os
 import re
 import shutil
@@ -260,6 +261,7 @@ def cubemx_help(topic: str = "") -> str:
       templates    可用芯片模板列表与各自内容
       gpio / i2c / tim / rcc(或 clock)  常用外设配置命令与已知坑
       usart / spi / adc / can / rtc / iwdg / wwdg / dma / nvic  其余已收录外设与功能
+      probe        探针(commands 脚本命令 / inject 键注入);
       remove       移除外设
     """
     t = topic.strip().lower()
@@ -306,15 +308,28 @@ def cubemx_script(script: str) -> str:
 
 
 @mcp.tool()
-def cubemx_load(ioc: str) -> str:
+def cubemx_load(ioc: str, summary: bool = True) -> str:
     """加载 .ioc 工程并回读关键配置(只读,不修改任何文件)。
 
+    summary=True(默认)时额外返回一份**结构化摘要** —— 直接解析 .ioc 文本得到的
+    IP 列表 / 引脚→信号 / DMA 请求与参数 / 中断 / 时钟 / 各外设参数 / 初始化顺序,
+    省得为了"现在配了什么"去读整个 .ioc 原文(摘要里都是 .ioc 原始字符串,
+    "这样写合不合法"由知识库判定)。
+
     参数:
-      ioc: 工程 .ioc 文件绝对路径(须在允许目录内)
+      ioc:     工程 .ioc 文件绝对路径(须在允许目录内)
+      summary: 是否附带结构化摘要(默认 True;显式传 False 只要 CubeMX 的回读输出)
     """
     ap = _ioc_path(ioc)
     r = _run_script(f'config load "{ap}"')
-    return render_run("cubemx_load", r)
+    out = render_run("cubemx_load", r)
+    if summary:
+        try:
+            data = ioc_editor.summarize(ap)
+        except OSError as exc:
+            return out + f"\n(结构化摘要解析失败: {exc})"
+        out += "\n--- 结构化摘要 ---\n" + json.dumps(data, ensure_ascii=False, indent=2)
+    return out
 
 
 @mcp.tool()
@@ -383,6 +398,7 @@ def cubemx_new_project(
     project_dir: str,
     mcu: str = "STM32F103C8T6",
     commands: list = None,
+    intents: list = None,
     template: str = "",
     toolchain: str = "CMake",
     couple_files: bool = True,
@@ -392,8 +408,13 @@ def cubemx_new_project(
     """从零生成一个新的 HAL 工程(基于内置模板改造)。
 
     流程:从 templates/ 选 6.18 原生 .ioc 模板(或显式 template)复制到
-    project_dir,改写工程名,依次执行 set 命令,再 project generate 生成 HAL 代码。
-    这样无需预先手写 .ioc,即"从零开始"。
+    project_dir,改写工程名,依次执行意图 / set 命令,注入中断与 DMA 这类"脚本配不了"的键,
+    再 project generate 生成 HAL 代码。这样无需预先手写 .ioc,即"从零开始"。
+
+    传 intents 时走的是与 cubemx_intent **同一套**解析:配 ADC 自动补合法时钟、配 DMA 查
+    通道表、配 TIM 内部时钟注入标准表达。推荐用它,而不是在 commands 里手写这些命令 ——
+    手写 `set mode ADC1 IN0` 不会自动补 ADC 时钟(36MHz 超 F103 上限),generate 会
+    弹 [Clock] 对话框把 -q 批处理卡死到超时(实测)。
 
     知识提示(生成前建议先调 cubemx_help 查看指南与坑):
       - 模板按 mcu 匹配 templates/{mcu}.ioc(最小模板:仅芯片标识+基础时钟
@@ -417,7 +438,13 @@ def cubemx_new_project(
                      默认 True(勾选);显式传 False 则集中到 main.c
       clock_source:  PLL 时钟源,默认 "HSE"(外部晶振,默认 72MHz);显式传 "HSI" 用内部 RC
       pll_mul:       PLL 倍频,默认 9(8MHz×9=72MHz);可显式覆盖(如 HSI 配 16 → 64MHz)
-      commands:     set 命令列表,如 ["set pin PB13 GPIO_Output", "set ip parameters RCC PLLMUL RCC_PLL_MUL9"]
+      commands:     set 命令列表(原始接口),如 ["set pin PB13 GPIO_Output",
+                    "set ip parameters RCC PLLMUL RCC_PLL_MUL9"]
+      intents:      配置意图列表(推荐;与 cubemx_intent 同一套解析),如
+                    [{"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}},
+                     {"peripheral": "TIM3", "mode": "internal_clock", "prescaler": 72, "period": 100},
+                     {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}]
+                    intent 的命令排在显式 commands 之前(显式给的可覆盖意图)
       template:     可选,直接指定模板 .ioc 路径(优先于 mcu 查找)
     """
     if not project_name or not re.fullmatch(r"[A-Za-z0-9_]+", project_name):
@@ -435,9 +462,15 @@ def cubemx_new_project(
         pll_mul=pll_mul,
     )
 
+    # 意图(intents):与 cubemx_intent 共用同一套解析 —— 配 ADC 自动补合法时钟、配 DMA 查
+    # 通道表、配 TIM 内部时钟注入标准表达。intent 的命令排在显式 commands 之前(可被覆盖)。
+    plan = {"notes": [], "commands": [], "ioc_lines": [], "dma": []}
+    if intents:
+        plan = intent_resolver.apply_intents(ioc_dst, intents)
+    all_commands = [*plan["commands"], *(commands or [])]
+
     lines = [f'config load "{ioc_dst}"']
-    if commands:
-        lines.extend(commands)
+    lines.extend(all_commands)
     lines.append(f'config saveas "{ioc_dst}"')
     r = _run_script("\n".join(lines))
     if not r["ok"]:
@@ -452,8 +485,8 @@ def cubemx_new_project(
     # 命令里可附 Prescaler/Period 覆盖默认 1s 参数(默认值而非强制),如
     # "set ip parameters TIM2 ClockSource TIM_CLOCKSOURCE_INTERNAL Prescaler 720 Period 1000"。
     tim_notes = []
-    if commands:
-        for cmd in commands:
+    if all_commands:
+        for cmd in all_commands:
             m = re.search(r"set ip parameters (TIM\d+) ClockSource TIM_CLOCKSOURCE_INTERNAL", cmd)
             if m:
                 pm = re.search(r"\bPrescaler (\d+)", cmd)
@@ -502,12 +535,21 @@ def cubemx_new_project(
                         period=int(pd_m.group(1)) if pd_m else 65535,
                     )
                 )
+    # 注入类配置(NVIC 中断行、DMA 键组)必须排在 CubeMX saveas 之后(否则被覆盖)、
+    # generate 之前(这样本次 generate 就带上它们)。
+    added = ioc_editor.add_lines(ioc_dst, plan.get("ioc_lines") or [])
+    if added:
+        plan["notes"].append("已注入 .ioc 行: " + "; ".join(added))
+    for params in plan.get("dma") or []:
+        plan["notes"].append(ioc_editor.inject_dma(ioc_dst, **params))
+
     lines = [f'config load "{ioc_dst}"']
     lines.append("project generate")
     r2 = _run_script("\n".join(lines))
     if r2["ok"]:
         r = r2
     note_internal = "\n".join(tim_notes) if tim_notes else ""
+    note_intent = "\n".join(plan["notes"]) if plan["notes"] else ""
     # 生成后:若工程被生成到 project_dir 的同级目录(以工程名命名),把 .ioc 移到工程目录,
     # 保证 .ioc 与 HAL 工程在同一目录(cubemx generate 默认行为)。
     gen_dir = os.path.join(os.path.dirname(pd), project_name)
@@ -532,36 +574,114 @@ def cubemx_new_project(
                 warnings.append("CLOCK_DEGRADED")
         except OSError:
             pass
-    return render_run(
-        "cubemx_new_project",
-        r,
-        steps=[("locate_template", "ok"), ("compose_ioc", "ok"), ("run_cubemx", "ok")],
-        extra=f"工程目录: {pd}{note}{note_internal}",
-        warnings=warnings,
-    )
+    steps = [("locate_template", "ok"), ("compose_ioc", "ok")]
+    if intents:
+        steps.append(("resolve_intent", "ok"))
+    steps.append(("run_cubemx", "ok"))
+    extra = f"工程目录: {pd}{note}"
+    if note_intent:
+        extra += f"\n{note_intent}"
+    if note_internal:
+        extra += f"\n{note_internal}"
+    return render_run("cubemx_new_project", r, steps=steps, extra=extra, warnings=warnings)
+
+
+# 探针能做的"键注入"动作(脚本 set 配不了的写法都走这里)
+_PROBE_INJECTIONS = {
+    "dma": ioc_editor.inject_dma,
+    "tim_internal_clock": ioc_editor.inject_tim_internal_clock,
+    "tim_pwm": ioc_editor.inject_tim_pwm,
+    "tim_input_capture": ioc_editor.inject_tim_input_capture,
+}
+
+
+def _apply_probe_injects(ioc_path: str, injects: list) -> list:
+    """在探针副本上执行注入动作,返回说明列表。
+
+    每项形如 {"type": "dma", ...其余参数透传给对应注入函数}:
+      {"type": "dma", "request": "ADC1", "channel": "DMA1_Channel1", "mode": "DMA_CIRCULAR"}
+      {"type": "tim_internal_clock", "target_tim": "TIM2", "prescaler": 72, "period": 100}
+      {"type": "lines", "lines": ["NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true"]}
+    """
+    notes = []
+    for item in injects:
+        if not isinstance(item, dict):
+            raise ToolError("BAD_ARGUMENT", f"inject 每一项都要是对象,收到: {item!r}")
+        kind = str(item.get("type", "")).strip().lower()
+        args = {k: v for k, v in item.items() if k != "type"}
+        if kind == "lines":
+            added = ioc_editor.add_lines(ioc_path, args.get("lines") or [])
+            notes.append("已注入 .ioc 行: " + "; ".join(added) if added else "没有新增行(基线里已有)")
+            continue
+        func = _PROBE_INJECTIONS.get(kind)
+        if func is None:
+            known = ", ".join(["lines", *sorted(_PROBE_INJECTIONS)])
+            raise ToolError("BAD_ARGUMENT", f"不认识的 inject type {kind!r};可用: {known}")
+        notes.append(func(ioc_path, **args))
+    return notes
 
 
 @mcp.tool()
-def cubemx_probe(ioc: str, commands: list, keep_copy: bool = False) -> str:
-    """跑一次探针:在副本上执行命令,对比改前改后,拿到可写进知识库的真实差异。
+def cubemx_probe(ioc: str, commands: list = None, inject: list = None, keep_copy: bool = False) -> str:
+    """跑一次探针:在副本上执行命令或键注入,对比改前改后,拿到可写进知识库的真实差异。
 
-    用在某个外设的写法还没收录的时候:先用它跑出真实差异,再把结果整理进
-    knowledge/rules/<外设>.yaml。基线 .ioc 只读,不会被改动。
+    用在某个外设/写法的还没收录的时候:先跑出真实差异,再整理进 knowledge/rules/<外设>.yaml。
+    基线 .ioc 只读,不会被改动。
+
+    两种输入(可同时给):
+      commands: CubeMX 脚本命令(set 类写法),如 ["set mode USART2 Asynchronous"]
+      inject:   .ioc 键注入(脚本配不了的写法:DMA / TIM 内部时钟 / NVIC 行等),每项形如
+                {"type": "dma", "request": "ADC1", "channel": "DMA1_Channel1"}
+                {"type": "tim_internal_clock", "target_tim": "TIM2", "prescaler": 72, "period": 100}
+                {"type": "lines", "lines": ["NVIC.USART2_IRQn=true\\:0\\:0\\:…"]}
+    给了 inject 时,工具会先把键写进副本,再让 CubeMX load + saveas 走一遍 —— 输出里会明确
+    告诉你 CubeMX 是**原样保留**还是**改写/丢弃**了注入内容(这是"它认不认"的关键情报),
+    并附第二段差异(注入后 vs 归一化后)。
 
     参数:
       ioc:       基线 .ioc 绝对路径(只读,不改)
-      commands:  CubeMX 脚本命令,如 ["set mode USART2 Asynchronous", "set ip parameters USART2 BaudRate 115200"]
+      commands:  CubeMX 脚本命令列表
+      inject:    键注入动作列表(见上)
       keep_copy: 是否保留副本(默认执行完删掉);保留时会告诉你在哪
     """
+    if not commands and not inject:
+        raise ToolError("BAD_ARGUMENT", "commands 和 inject 至少要给一个,否则探针没有可执行的动作")
     ap = _ioc_path(ioc)
     probe = f"{ap[:-4]}.probe.ioc"
     shutil.copy2(ap, probe)
+    notes = []
     try:
-        script = "\n".join([f'config load "{probe}"', *commands, f'config saveas "{probe}"'])
-        result = _run_script(script)
-        if not result["ok"]:
-            return render_run("cubemx_probe", result, steps=[("check_path", "ok"), ("run_cubemx", "FAIL")])
+        if commands:
+            script = "\n".join([f'config load "{probe}"', *commands, f'config saveas "{probe}"'])
+            result = _run_script(script)
+            if not result["ok"]:
+                return render_run("cubemx_probe", result, steps=[("check_path", "ok"), ("run_cubemx", "FAIL")])
+        injected_text = ""
+        after_text = ""
+        if inject:
+            notes.extend(_apply_probe_injects(probe, inject))
+            with open(probe, encoding="utf-8", errors="replace") as f:
+                injected_text = f.read()
+            result = _run_script(f'config load "{probe}"\nconfig saveas "{probe}"')
+            if not result["ok"]:
+                return render_run(
+                    "cubemx_probe",
+                    result,
+                    steps=[("check_path", "ok"), ("compose_ioc", "ok"), ("run_cubemx", "FAIL")],
+                )
+            with open(probe, encoding="utf-8", errors="replace") as f:
+                after_text = f.read()
+            notes.append(
+                "CubeMX **原样保留**了注入内容(load + saveas 没改写)"
+                if after_text == injected_text
+                else "CubeMX **改动了**注入内容 —— 第二段差异就是它改了哪些"
+            )
         text = ioc_diff.render_diff(ioc_diff.diff_files(ap, probe))
+        if inject and after_text != injected_text:
+            text += "\n\n--- 注入后 vs CubeMX 归一化后 ---\n"
+            text += ioc_diff.render_diff(ioc_diff.diff_texts(injected_text, after_text))
+        if notes:
+            text = "\n".join(notes) + "\n\n" + text
     finally:
         if not keep_copy:
             try:
@@ -585,6 +705,11 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
       {"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}
       {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}
 
+    DMA(挂在外设意图下,等价 GUI 里"在该外设的 DMA Settings 里 Add 一次"):
+      {"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}}
+      {"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX"}}
+    通道从 db 导出的表查出(不猜),对齐/优先级交给 CubeMX 补默认;字段见 rules/dma.yaml。
+
     引脚与信号名(.ioc 里的 S_TIM3_CH1 之类)一律查表得到;查不到会带错误码拒绝,
     不会猜。改之前自动备份成 .ioc.bak,改完回读校验。
 
@@ -607,15 +732,18 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
         if not result["ok"]:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
         steps.append(("run_cubemx", "ok"))
+    # 脚本配不了的靠注入 .ioc 行(中断 NVIC、DMA 键组):必须放在 CubeMX saveas 之后
+    # (否则会被 saveas 覆盖),又要在 generate 之前(这样本次 generate 就带上它们)。
+    added = ioc_editor.add_lines(ap, plan.get("ioc_lines") or [])
+    if added:
+        plan["notes"].append("已注入 .ioc 行: " + "; ".join(added))
+    for params in plan.get("dma") or []:
+        plan["notes"].append(ioc_editor.inject_dma(ap, **params))
     if generate:
         result = _run_script(f'config load "{ap}"\nproject generate')
         if not result["ok"]:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
         steps.append(("run_cubemx", "ok"))
-    # 中断这类"脚本配不了"的,靠注入 .ioc 行;必须放在 CubeMX saveas 之后,否则会被覆盖
-    added = ioc_editor.add_lines(ap, plan.get("ioc_lines") or [])
-    if added:
-        plan["notes"].append("已注入 .ioc 行: " + "; ".join(added))
     return render("cubemx_intent", True, steps=steps, extra="\n".join(plan["notes"]))
 
 
@@ -642,7 +770,9 @@ def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
         steps=[("check_path", "ok"), ("compose_ioc", "ok")],
         extra=(
             f"已从 {ap} 移除外设 {peripheral}\n"
-            f"删除 {len(info['removed'])} 行相关配置,外设列表已重排(Mcu.IPNb={len(info['keep_ips'])})"
+            f"删除 {len(info['removed'])} 行外设配置、{len(info.get('removed_pins') or [])} 行引脚"
+            f"(含 SH 句柄)、{len(info.get('removed_dma') or [])} 行 DMA 配置"
+            f"(含通道中断);外设列表已重排(Mcu.IPNb={len(info['keep_ips'])})"
         ),
     )
 

@@ -1,34 +1,108 @@
-# DMA:三种路径都试过,**都不行** —— 需要 DMA 就先用 CubeMX GUI 配一次
+# DMA:脚本 set 配不了,但**注入完整 .ioc 键组有效**(2026-10-12 实测,含 generate 回读)
 #
-# 实测(2026-10-10,CubeMX 6.18.0):
-#   ① 脚本 set mode(两种写法都 KO):
-#        set mode DMA SPI1_RX     -> KO
-#        set mode DMA DMA1        -> KO
-#   ② 命令表核对:`cubemx_script("help")` 列出的 set 子命令里**没有任何 DMA 相关项**
-#      (只有 mode / username / pin / pinreservation / gpio / ip / AllIpInContext /
-#        context* / noparam / userconst / bsp / tpl_path / dest_path)
-#   ③ 注入 .ioc 键(只写请求、不给通道):
-#        Dma.Request0=SPI1_RX
-#        Dma.RequestsNb=1
-#      -> config load 返回 OK,但 config saveas 时 CubeMX 把这两行**丢掉了**
-#         (归一化后一行 Dma.* 都不剩),也没有自己补通道。
+# 实测(2026-10-12,CubeMX 6.18.0,STM32F103C8T6,基线 = templates/STM32F103C8T6.ioc 副本):
+#   ① 脚本 set 这条路依然不通(和 2026-10-10 结论一致,未变):
+#        set mode DMA SPI1_RX / set mode DMA DMA1 -> 一律 KO
+#        cubemx_script("help") 的命令表里没有任何 DMA 子命令
+#   ② 注入路径**可行**,0.4.4.1 之前记的"注入会被 saveas 丢掉"是错的 ——
+#      当时只注入了 Dma.Request0 / Dma.RequestsNb 两行,缺参数块、缺 Mcu.IPx=DMA、
+#      缺 NVIC 行,CubeMX 归一化时把"挂不到 IP 上的孤儿键"丢掉了。写全就全部保留。
+#      GUI 里 DMA Settings → Add 干的就是"写全这一组键",所以注入等价于 GUI 操作。
+#   ③ 最小键组够用:只写 Instance/Direction/PeriphInc/MemInc/Mode(+ RequestParameters
+#      列出这 5 项),CubeMX 会自己补 PeriphDataAlignment / MemDataAlignment / Priority,
+#      并把 RequestParameters 补成 8 项 —— 数据宽度由 CubeMX 按请求类型决定,工具不必猜:
+#        ADC1      -> 补 HALFWORD / HALFWORD / DMA_PRIORITY_LOW
+#        USART2_RX -> 补 BYTE / BYTE / DMA_PRIORITY_LOW
+#   ④ 多请求:Dma.Request0=USART2_RX + Dma.Request1=USART2_TX + RequestsNb=2,
+#      键前缀里的序号就用请求序号(Dma.USART2_RX.0 / Dma.USART2_TX.1),CubeMX 原样保留。
+#   ⑤ 通道映射在 db 里,不在"请求名"里:DMA-<ver>_Modes.xml 的 ModeLogicOperator 树
+#      (DMA1_Channel1 = MEMTOMEM | ADC1 | TIM2_CH3 | TIM4_CH1 ...)。
+#      db/mcu/config/DMA-STM32F1xx_Configs.xml 只有 HAL 函数定义 —— 当时查错了文件。
+#      导出见 knowledge/mcu/<mcu>.dma.yaml(tools/gen_knowledge_from_db.py)。
 #
-# 顺带查过:通道映射不在 db 里 —— db/mcu/config/DMA-STM32F1xx_Configs.xml 只有 HAL 函数定义
-# (HAL_DMA_Init / HAL_DMA_DeInit / REMAP_*),没有"SPI1_RX 用哪个通道"的对应关系。
-#
-# 结论:脚本和注入都不行。要用 DMA,请先用 CubeMX GUI 给外设 Add 一次 DMA,
-#       然后在此基础上继续用其它工具(工具不会去动已有的 DMA 配置)。
-verified: false
-source: "探针实测 2026-10-10,CubeMX 6.18.0(脚本 / 命令表 / 注入 三条路径都试过)"
+# 加载带 DMA 的 .ioc 时 CubeMX 会打 8 条
+#   "(OptionalMessage_ERROR) IP (DMA) : Parameter (…) has Id (…) currently not set"
+# —— 这是 6.18 自己的噪音:GUI 生成的 .ioc 加载时一模一样,saveas / generate 都正常。
+verified: true
+source: "实测 2026-10-12,CubeMX 6.18.0(注入键组 + config saveas + project generate 回读;ADC1 / USART2_RX / USART2_RX+USART2_TX 三例)"
 
-tried:
-  - "set mode DMA SPI1_RX -> KO"
-  - "set mode DMA DMA1 -> KO"
-  - "注入 Dma.Request0=SPI1_RX + Dma.RequestsNb=1 -> load OK,但 saveas 时被丢弃"
-  - "查 db 的 DMA-STM32F1xx_Configs.xml -> 没有通道映射"
+# .ioc 键的形态(注入时按这些模板拼)
+ioc_keys:
+  param_prefix: "Dma.{request}.{index}."                                  # 参数键前缀(请求名 + 全局请求序号)
+  param_list_key: "Dma.{request}.{index}.RequestParameters"               # 已设置参数的声明列表
+  request_index_key: "Dma.Request{index}"                                 # Dma.Request0=ADC1
+  requests_nb_key: "Dma.RequestsNb"                                       # 请求总数
+  nvic_pattern: 'NVIC.{channel}_IRQn=true\:0\:0\:false\:false\:true\:false\:true\:true'
+  ip_list_entry: "DMA"                                                    # Mcu.IPx 里必须有 DMA
+  functionlist_segment: "MX_DMA_Init-DMA-false-HAL-true"                  # ProjectManager.functionlistsort 段
+  # 必需参数(工具会写)与可选参数(不写则由 CubeMX 补默认)
+  required_params: [Instance, Direction, PeriphInc, MemInc, Mode]
+  optional_params: [PeriphDataAlignment, MemDataAlignment, Priority]
+  # RequestParameters 里的完整顺序(和 GUI 输出一致)
+  param_order: [Instance, Direction, PeriphInc, MemInc, PeriphDataAlignment, MemDataAlignment, Mode, Priority]
 
-todo:
-  - "如果将来非要脚本化:可以考虑在 GUI 里配一次 DMA 的工程上,把 CubeMX 写出的完整键抄进 rules(需要先实测确认哪些键是必须的)"
+# 枚举值全部取自 db/mcu/IP/DMA-STM32F103G_dma_v1_0_Modes.xml 的 RefParameter
+values:
+  direction:
+    periph_to_memory: DMA_PERIPH_TO_MEMORY
+    memory_to_periph: DMA_MEMORY_TO_PERIPH
+  mode:
+    normal: DMA_NORMAL
+    circular: DMA_CIRCULAR
+  periph_inc:
+    enable: DMA_PINC_ENABLE
+    disable: DMA_PINC_DISABLE
+  mem_inc:
+    enable: DMA_MINC_ENABLE
+    disable: DMA_MINC_DISABLE
+  periph_align:
+    byte: DMA_PDATAALIGN_BYTE
+    halfword: DMA_PDATAALIGN_HALFWORD
+    word: DMA_PDATAALIGN_WORD
+  mem_align:
+    byte: DMA_MDATAALIGN_BYTE
+    halfword: DMA_MDATAALIGN_HALFWORD
+    word: DMA_MDATAALIGN_WORD
+  priority:
+    low: DMA_PRIORITY_LOW
+    medium: DMA_PRIORITY_MEDIUM
+    high: DMA_PRIORITY_HIGH
+    very_high: DMA_PRIORITY_VERY_HIGH
+  # 意图里没给方向/模式/自增时用的默认值(默认值而非强制)
+  defaults:
+    direction: DMA_PERIPH_TO_MEMORY
+    mode: DMA_NORMAL
+    periph_inc: DMA_PINC_DISABLE
+    mem_inc: DMA_MINC_ENABLE
 
-dma_from_db:
-  note: "CubeMX 的 db 里 DMA 有 53 个模式名(DMA_Request / DMA1 / SPI1_RX / I2C1_RX / USART2_RX ...),它们的参数是 Direction / DMA_Handle / Mode / IpInstance / PeriphInc —— 没有'用哪个通道'"
+# 通道查表:数据在 knowledge/mcu/<mcu>.dma.yaml,由 tools/gen_knowledge_from_db.py 从
+# db/mcu/IP/DMA-<ver>_Modes.xml 导出(每个请求在 F1 上只有一个固定通道)。
+channel_map:
+  knowledge_file: "mcu/{mcu}.dma.yaml"
+  db_source: "db/mcu/IP/DMA-<version>_Modes.xml(IP 的 Modes XML,不是 config/DMA-*_Configs.xml)"
+  note: "同名字段里带 / 的请求(如 TIM3_CH4/UP)是多个复用信号共用一个通道,查表时按整名匹配"
+
+# generate 回读证据(每条都真的生成过)
+verified_by:
+  - "ADC1 + DMA1_Channel1(P2M/循环/半字):dma.c 有 MX_DMA_Init + __HAL_RCC_DMA1_CLK_ENABLE + HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);adc.c 有 hdma_adc1 全参数 + HAL_DMA_Init + __HAL_LINKDMA(adcHandle,DMA_Handle,hdma_adc1);stm32f1xx_it.c 有 DMA1_Channel1_IRQHandler → HAL_DMA_IRQHandler(&hdma_adc1);main.c 里 MX_DMA_Init() 在 MX_ADC1_Init() 之前"
+  - "USART2_RX + DMA1_Channel6(P2M/普通/字节):usart.c 有 hdma_usart2_rx + __HAL_LINKDMA(uartHandle,hdmarx,hdma_usart2_rx);it.c 有 DMA1_Channel6_IRQHandler"
+  - "USART2_RX + USART2_TX(DMA1_Channel6 + DMA1_Channel7):usart.c 里 hdmarx / hdmatx 两个句柄都生成;it.c 里两个 IRQHandler 都在"
+  - "最小键组(只写 5 个必需参数)saveas 之后,CubeMX 把 RequestParameters 补成 8 项并写入对齐/优先级默认值"
+
+known_issues:
+  - "DMA 的键前缀用的是**请求名**(Dma.USART2_RX.0.*),不是外设实例名(Dma.USART2.*);请求名取自 db 的 RefMode(DMA_Request 组)"
+  - "键里的序号与 Dma.Request<n> 的 n 是同一个全局请求序号:第一个请求 .0,第二个 .1;写错序号 CubeMX 不会纠正"
+  - "Mcu.IPx 里必须有 DMA,否则 Dma.* 键在 saveas 时被当成孤儿键丢掉(0.4.4.1 前就是这么误判的)"
+  - "配 ADC + DMA 时 ADC 时钟仍必须同时配(ADCPresc),否则 generate 弹 [Clock] 对话框卡死 —— 与 DMA 无关的既有坑,见 rules/adc.yaml"
+  - "DMA 中断(NVIC.<channel>_IRQn)默认一起注入:CubeMX 的 DMA Settings 里 Add 之后就是这个状态;不用中断的话可以不注入,但 HAL_ADC_Start_DMA / HAL_UART_Receive_DMA 的完成回调依赖它"
+  - "通道由 db 查表得到,不靠猜:同芯片同一请求只有一个通道;跨芯片(如 F4)通道自由度更大,该表需按芯片重新导出"
+  - "还没实测:DMA 的 MEMTOMEM(内存到内存)请求、多个同名前缀请求(同一请求挂两个通道)、DMA 回调(USE_HAL_DMA_REGISTER_CALLBACKS)"
+  - "移除外设(cubemx_remove_peripheral)会连带删掉它的 DMA 键:请求名 == 实例名或以 '{实例}_' 开头的都算,剩余请求会重新连续编号(键前缀序号同步改);没有请求后连 Mcu.IPx=DMA 与 MX_DMA_Init 段一起清掉"
+  - "同一请求挂两个通道(非 F1 芯片可能出现)时 dma_channel() 会拒绝自动选,要显式给 channel —— 这条按代码逻辑设计,未在第二颗芯片上实测"
+
+# 脚本不能配(留档,免得再试一遍)
+set_command_not_supported:
+  tried:
+    - "set mode DMA SPI1_RX -> KO"
+    - "set mode DMA DMA1 -> KO"
+  note: "CubeMX 的 help 命令表里没有 DMA 相关子命令;DMA 一律走注入"

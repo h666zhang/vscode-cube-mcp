@@ -122,20 +122,53 @@ def require_rule_verified(peripheral: str) -> dict:
     return require_verified(rule(peripheral), peripheral)
 
 
+# 实例名 -> 规则文件名(ADC1 -> adc、TIM3 -> tim);移除/中断查找都要用
+_RULE_PATTERNS = (
+    (re.compile(r"ADC\d+"), "adc"),
+    (re.compile(r"USART\d+"), "usart"),
+    (re.compile(r"UART\d+"), "usart"),
+    (re.compile(r"SPI\d+"), "spi"),
+    (re.compile(r"I2C\d+"), "i2c"),
+    (re.compile(r"TIM\d+"), "tim"),
+    (re.compile(r"CAN\d*"), "can"),
+    (re.compile(r"RTC"), "rtc"),
+    (re.compile(r"GPIO"), "gpio"),
+    (re.compile(r"IWDG"), "iwdg"),
+    (re.compile(r"WWDG"), "wwdg"),
+)
+
+
+def rule_name_for(instance: str) -> str:
+    """实例名 -> 规则文件名(如 ADC1 -> adc / TIM2 -> tim);没有对应规则时返回空串。"""
+    name = str(instance).strip().upper()
+    for pattern, rule_name in _RULE_PATTERNS:
+        if pattern.fullmatch(name):
+            return rule_name
+    return ""
+
+
 # ------------------------------------------------------------------ 芯片(mcu/)
 
 
-def mcu_pins(mcu: str = "") -> dict:
-    """读芯片的引脚表。mcu 传型号(如 STM32F103C8T6);留空则用 meta 里记录的那颗。"""
+def _mcu_name_checked(mcu: str = "") -> str:
+    """校验请求的芯片和知识库导出的那颗一致,返回 mcu_name(用于定位 mcu/*.yaml)。
+
+    mcu 留空表示"就用当前知识库那颗";给了别的型号直接报错(并提示怎么导出新芯片)。
+    """
     info = meta()
     want = (mcu or "").strip().upper()
     have = str(info.get("mcu", "")).strip().upper()
     if want and have and want != have:
         raise ToolError(
             "MCU_TEMPLATE_MISSING",
-            f"knowledge/ 里只有 {have} 的引脚表;要 {want} 请先跑 tools/gen_knowledge_from_db.py --mcu {want}",
+            f"knowledge/ 里只有 {have} 的数据;要 {want} 请先跑 tools/gen_knowledge_from_db.py --mcu {want}",
         )
-    name = info.get("mcu_name", "")
+    return str(info.get("mcu_name", ""))
+
+
+def mcu_pins(mcu: str = "") -> dict:
+    """读芯片的引脚表。mcu 传型号(如 STM32F103C8T6);留空则用 meta 里记录的那颗。"""
+    name = _mcu_name_checked(mcu)
     data = _load(f"mcu/{name}.pins.yaml")
     if data is None:
         raise ToolError("MCU_TEMPLATE_MISSING", f"找不到 mcu/{name}.pins.yaml;请先跑 tools/gen_knowledge_from_db.py")
@@ -175,6 +208,59 @@ def pin_signals(pin: str, mcu: str = "") -> list:
     key = resolve_pin_name(pin, mcu)
     pins = mcu_pins(mcu).get("pins") or {}
     return list((pins.get(key) or {}).get("signals") or [])
+
+
+# ------------------------------------------------------------------ DMA 请求 -> 通道(mcu/)
+
+
+def dma_channels(mcu: str = "") -> dict:
+    """读芯片的 DMA 表(mcu/<mcu_name>.dma.yaml)。
+
+    结构:channels(请求 -> 通道)+ directions(请求 -> db 里登记的方向)。数据来自
+    CubeMX db 的 DMA Modes XML(ModeLogicOperator 树 + RefMode),由
+    tools/gen_knowledge_from_db.py 导出;没导出过就报错(通道一律查表,不靠猜)。
+    """
+    name = _mcu_name_checked(mcu)
+    data = _load(f"mcu/{name}.dma.yaml")
+    if data is None:
+        raise ToolError(
+            "MCU_TEMPLATE_MISSING",
+            f"找不到 mcu/{name}.dma.yaml(DMA 请求表);请重新跑 tools/gen_knowledge_from_db.py",
+        )
+    return data
+
+
+def dma_requests(mcu: str = "") -> list:
+    """这颗芯片上可用的 DMA 请求名(如 ADC1 / USART2_RX / SPI1_TX),查不到通道时给提示用。"""
+    return sorted(dma_channels(mcu).get("channels") or {})
+
+
+def dma_channel(request: str, mcu: str = "") -> str:
+    """查某个 DMA 请求用哪个通道(如 ADC1 -> DMA1_Channel1);查不到就报错,不猜。
+
+    一个请求对应多个通道时(非 F1 芯片可能出现)拒绝自动选择,要求显式指定。
+    """
+    req = str(request).strip().upper()
+    channels = dma_channels(mcu).get("channels") or {}
+    hit = channels.get(req)
+    if not hit:
+        known = ", ".join(sorted(channels)[:15])
+        raise ToolError(
+            "UNKNOWN_PARAM",
+            f"知识库里没有 DMA 请求 {request!r} 的通道。已知请求: {known}{' ...' if len(channels) > 15 else ''}",
+        )
+    if isinstance(hit, list):
+        raise ToolError(
+            "UNKNOWN_PARAM",
+            f"DMA 请求 {req} 有多个候选通道: {', '.join(str(x) for x in hit)};请显式指定 channel",
+        )
+    return str(hit)
+
+
+def dma_direction(request: str, mcu: str = "") -> str:
+    """查某个 DMA 请求在 db 里登记的方向(如 ADC1 -> DMA_PERIPH_TO_MEMORY);没登记返回空串。"""
+    req = str(request).strip().upper()
+    return str((dma_channels(mcu).get("directions") or {}).get(req) or "")
 
 
 # ------------------------------------------------------------------ db 事实(ip/)

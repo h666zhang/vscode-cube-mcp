@@ -18,6 +18,17 @@ note: |
       不改 SH/VP 表达,生成后 GUI 里仍显示 ETR。
   所以三个模式都靠往 .ioc 文本里注入下面这些片段实现。
 
+  片段里的 {prescaler} / {period} 一律是**寄存器值**(即分频比-1、计数-1):
+  .ioc 里写 `TIM3.Prescaler=72-1` 这种未求值表达式,CubeMX 会**原样抄进 C 代码**
+  (`htim3.Init.Prescaler = 72-1;` —— 能编译但难看),所以注入器先算好再写。
+  接口上传的仍是想表达的"分频比/计数"(如 72 分频 / 100 计数),
+  由 ioc_editor 的注入函数换算成 71 / 99。
+
+  另:TRGO 输出可以用脚本配(实测 2026-10-12)——
+  `set ip parameters TIM3 TIM_MasterOutputTrigger TIM_TRGO_UPDATE`,
+  CubeMX 会把 TIM_MasterOutputTrigger 自动补进 `TIM3.IPParameters`。
+  这是"用 TIM 触发 ADC 外部触发"的必要一步(只设 ADC 的 ExternalTrigConv 会卡死 generate)。
+
 values:
   auto_reload_preload_enable: TIM_AUTORELOAD_PRELOAD_ENABLE
   counter_mode_up: TIM_COUNTERMODE_UP
@@ -49,8 +60,8 @@ modes:
       {tim}.AutoReloadPreload={v.auto_reload_preload_enable}
       {tim}.CounterMode={v.counter_mode_up}
       {tim}.IPParameters=Prescaler,Period,CounterMode,AutoReloadPreload
-      {tim}.Period={period}-1
-      {tim}.Prescaler={prescaler}-1
+      {tim}.Period={period}
+      {tim}.Prescaler={prescaler}
       VP_{tim}_VS_ClockSourceINT.Mode=Internal
       VP_{tim}_VS_ClockSourceINT.Signal={tim}_VS_ClockSourceINT
       NVIC.{tim}_IRQn={v.nvic_enabled}
@@ -78,8 +89,8 @@ modes:
       {tim}.Channel-{mode_name_in_key}={channel_key}
       {tim}.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-{mode_name}
       {tim}.OCMode={v.oc_mode_pwm1}
-      {tim}.Period={period}-1
-      {tim}.Prescaler={prescaler}-1
+      {tim}.Period={period}
+      {tim}.Prescaler={prescaler}
       {tim}.Pulse={pulse}
     known_issue: |
       .ioc 内部枚举名带序号:"PWM Generation1 CH1"。
@@ -114,8 +125,8 @@ modes:
       {tim}.IC2Prescaler={v.ic_prescaler_div1}
       {tim}.IC2Selection={v.ic_selection_indirectti}
       {tim}.IPParameters=Prescaler,Period,IC1Polarity,IC1Selection,IC1Prescaler,IC1Filter,IC2Polarity,IC2Selection,IC2Prescaler,IC2Filter,Channel-{ic_mode}
-      {tim}.Period={period}-1
-      {tim}.Prescaler={prescaler}-1
+      {tim}.Period={period}
+      {tim}.Prescaler={prescaler}
       {tim}.Channel-{ic_mode}={channel_key}
     known_issue: |
       PA0 在 .ioc 里的信号名是组合名 S_TIM2_CH1_ETR(不是 S_TIM2_CH1);

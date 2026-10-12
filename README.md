@@ -20,11 +20,11 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 |------|------|
 | `cubemx_help` | **server 内置帮助**:工具清单、可用模板、外设配置方法(陌生 agent 建议先调用) |
 | `cubemx_intent` | **按意图配置外设**:只写"要什么"(外设/模式/引脚/频率),`.ioc` 内部名由知识库查出来 —— 优先用它 |
-| `cubemx_new_project` | **从零生成新工程**(内置模板库,无需预先 .ioc) |
+| `cubemx_new_project` | **从零生成新工程**(内置模板库,无需预先 .ioc;可直接吃 `intents` 意图) |
 | `cubemx_generate` | 加载 .ioc 并生成 HAL 工程 |
-| `cubemx_load` | 加载 .ioc 并回读关键配置(只读) |
+| `cubemx_load` | 加载 .ioc 回读配置 + **结构化摘要**(IP / 引脚 / DMA / 中断 / 时钟,只读) |
 | `cubemx_configure` | 加载 .ioc,执行 `set` 命令序列并写回 |
-| `cubemx_probe` | **探针**:在 .ioc 副本上试跑命令,输出改前改后的差异(用来收录还没实测过的外设写法) |
+| `cubemx_probe` | **探针**:在 .ioc 副本上试跑脚本命令或**键注入**(DMA / TIM / NVIC),输出差异 + CubeMX 是否保留 |
 | `cubemx_export_pinout` | 导出引脚配置 CSV(只读) |
 | `cubemx_remove_peripheral` | 从 .ioc 移除外设 |
 | `cubemx_script` | 任意 CubeMX 脚本命令序列(高级/原始脚本接口) |
@@ -114,7 +114,8 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 ### 用意图配置外设(推荐)
 
 `cubemx_intent` 只描述"要什么";`.ioc` 里的内部名(`S_TIM3_CH1`、`PWM Generation1 CH1` 这类)
-全部由知识库查出来,AI 不需要记住它们:
+全部由知识库查出来,AI 不需要记住它们。**同一套意图也能直接喂给 `cubemx_new_project` 的
+`intents` 参数** —— 从零建工程一步到位,不必"先建再配"。
 
 ```json
 [{"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "freq_hz": 10000, "duty": 0.5},
@@ -122,7 +123,8 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
  {"peripheral": "I2C1", "pins": ["PB8", "PB9"]},
  {"peripheral": "USART2", "pins": ["PA2", "PA3"], "baudrate": 9600},
  {"peripheral": "ADC1", "pins": ["PA0", "PA1"], "sampling_time": "ADC_SAMPLETIME_55CYCLES_5",
-  "continuous": true, "interrupt": true},
+  "continuous": true, "interrupt": true, "dma": {"mode": "circular"}},
+ {"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX"}},
  {"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}]
 ```
 
@@ -135,7 +137,9 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 - 配 ADC 时按 `.ioc` 里的 APB2 频率自动选合法的 ADC 预分频 —— 不配的话 CubeMX 会弹
   `[Clock]` 对话框,`-q` 批处理没人点 → generate 卡死到超时;
 - ADC 多通道时自动补转换序列(`NbrOfConversion` + 每个通道的 `Rank-n` / `Channel-n` / `SamplingTime-n`);
-- `interrupt: true` 自动注入对应的 NVIC 键,并按外设选对向量名(如 ADC 用共用的 `ADC1_2_IRQn`)。
+- `interrupt: true` 自动注入对应的 NVIC 键,并按外设选对向量名(如 ADC 用共用的 `ADC1_2_IRQn`);
+- `dma` 子对象按 db 表查出通道与方向(`ADC1`→`DMA1_Channel1`、`USART2_RX`→`DMA1_Channel6`),
+  数据宽度交给 CubeMX 补默认 —— 请求名有歧义(USART2 的 RX/TX)时会报错让你挑,不替你选。
 
 ## 知识库(`knowledge/`)
 
@@ -159,7 +163,12 @@ setx ST_CUBEMX_ALLOWED_ROOTS "C:\你的工程目录"          # 允许 AI 访问
 | `couple_files` | `True` | 每个外设生成独立 `.c/.h`(CubeMX 的 "Generate peripheral initialization as a pair of '.c/.h' files per peripheral");`False` 则全部初始化集中到 main.c |
 | `clock_source` | `"HSE"` | PLL 时钟源,默认外部晶振 72MHz;`"HSI"` 用内部 RC |
 | `pll_mul` | `9` | PLL 倍频(8MHz×9=72MHz),可覆盖(如 HSI 配 16 → 64MHz) |
-| `commands` | 空 | `set` 命令列表,如 `["set pin PB13 GPIO_Output"]` |
+| `commands` | 空 | `set` 命令列表(原始接口),如 `["set pin PB13 GPIO_Output"]` |
+| `intents` | 空 | **配置意图列表(推荐)** —— 与 `cubemx_intent` 同一套解析:配 ADC 自动补合法时钟、配 DMA 查通道表;与 `commands` 可混用(intent 的命令排在前面) |
+
+> **优先用 `intents` 而不是 `commands` 手写**:手写 `set mode ADC1 IN0` 不会自动补 ADC 时钟
+> (模板默认 36MHz 超 F103 的 14MHz 上限),`project generate` 会弹 `[Clock]` 对话框把 `-q`
+> 批处理卡死到超时(实测)。
 
 > **默认值而非强制**:默认生成 CMake 工具链 + 外设独立 `.c/.h` + 72MHz(HSE×9),
 > 显式传其他值即覆盖,不会被工具卡死。写 .ioc 时会按默认值补回 `RCC.PLLSourceVirtual=HSE`

@@ -7,6 +7,7 @@
 """
 
 import os
+import pathlib
 import shutil
 import subprocess
 import tempfile
@@ -171,7 +172,7 @@ NVIC.TIM3_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true
 ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_GPIO_Init-GPIO-false-HAL-true,3-MX_TIM2_Init-TIM2-false-HAL-true,4-MX_TIM3_Init-TIM3-false-HAL-true
 TIM3.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE
 TIM3.CounterMode=TIM_COUNTERMODE_UP
-TIM3.Period=10000-1
+TIM3.Period=9999
 VP_TIM3_VS_ClockSourceINT.Mode=Internal
 VP_TIM3_VS_ClockSourceINT.Signal=TIM3_VS_ClockSourceINT
 board=custom
@@ -179,6 +180,71 @@ board=custom
 
 
 class TestRemovePeripheral(unittest.TestCase):
+    """cubemx_remove_peripheral:文本方式移除外设(连带引脚 / 中断 / DMA 请求)。"""
+
+    # 带 DMA 请求 + 5 通道 ADC 里的一部分引脚(信号名 ADCx_IN0 不含 "ADC1")
+    SAMPLE_DMA_IOC = """#MicroXplorer Configuration settings - do not modify
+ADC1.ExternalTrigConv=ADC_EXTERNALTRIGCONV_T3_TRGO
+ADC1.NbrOfConversion=2
+CAD.provider=
+Dma.ADC1.0.Direction=DMA_PERIPH_TO_MEMORY
+Dma.ADC1.0.Instance=DMA1_Channel1
+Dma.ADC1.0.Mode=DMA_CIRCULAR
+Dma.ADC1.0.RequestParameters=Instance,Direction,Mode
+Dma.Request0=ADC1
+Dma.RequestsNb=1
+Mcu.IP0=ADC1
+Mcu.IP1=DMA
+Mcu.IP2=NVIC
+Mcu.IP3=RCC
+Mcu.IP4=SYS
+Mcu.IPNb=5
+Mcu.Pin0=PA0-WKUP
+Mcu.Pin1=PA1
+Mcu.Pin2=VP_SYS_VS_Systick
+Mcu.PinsNb=3
+NVIC.ADC1_2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false
+NVIC.DMA1_Channel1_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:true\\:true
+NVIC.ForceEnableDMAVector=true
+PA0-WKUP.Locked=true
+PA0-WKUP.Signal=ADCx_IN0
+PA1.Locked=true
+PA1.Signal=ADCx_IN1
+ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_DMA_Init-DMA-false-HAL-true,3-MX_ADC1_Init-ADC1-false-HAL-true
+SH.ADCx_IN0.0=ADC1_IN0,IN0
+SH.ADCx_IN0.ConfNb=1
+SH.ADCx_IN1.0=ADC1_IN1,IN1
+SH.ADCx_IN1.ConfNb=1
+board=custom
+"""
+
+    # 两个 DMA 请求(ADC1 + USART2_RX),用来验证删除后剩余请求重新编号
+    SAMPLE_DMA_IOC_TWO = """#MicroXplorer Configuration settings - do not modify
+CAD.provider=
+Dma.ADC1.0.Instance=DMA1_Channel1
+Dma.ADC1.0.Mode=DMA_CIRCULAR
+Dma.ADC1.0.RequestParameters=Instance,Mode
+Dma.Request0=ADC1
+Dma.Request1=USART2_RX
+Dma.RequestsNb=2
+Dma.USART2_RX.1.Instance=DMA1_Channel6
+Dma.USART2_RX.1.Mode=DMA_NORMAL
+Dma.USART2_RX.1.RequestParameters=Instance,Mode
+Mcu.IP0=ADC1
+Mcu.IP1=DMA
+Mcu.IP2=NVIC
+Mcu.IP3=RCC
+Mcu.IP4=SYS
+Mcu.IP5=USART2
+Mcu.IPNb=6
+Mcu.Pin0=VP_SYS_VS_Systick
+Mcu.PinsNb=1
+NVIC.ADC1_2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false
+NVIC.DMA1_Channel1_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:true\\:true
+NVIC.DMA1_Channel6_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:true\\:true
+board=custom
+"""
+
     def _write_ioc(self, content):
         fd, path = tempfile.mkstemp(suffix=".ioc")
         os.close(fd)
@@ -252,6 +318,57 @@ class TestRemovePeripheral(unittest.TestCase):
                 text = f.read()
             self.assertNotIn("USART1", text)
             self.assertIn("Mcu.IPNb=5", text)
+        finally:
+            os.remove(path)
+
+    def test_remove_cleans_dma_irq_and_pins(self):
+        # 删 ADC 要把它的参数、引脚(含 SH 句柄)、共用向量中断、DMA 请求、DMA 实例与初始化段全带走
+        path = self._write_ioc(self.SAMPLE_DMA_IOC)
+        try:
+            cubemx_mcp.cubemx_remove_peripheral(path, "ADC1")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("ADC1", text)  # 参数 + Dma.ADC1.0.* + NVIC.ADC1_2_IRQn + MX_ADC1_Init
+            self.assertNotIn("Dma.", text)
+            self.assertNotIn("PA0-WKUP", text)  # 引脚行与 Mcu.Pin 条目
+            self.assertNotIn("SH.ADCx_IN0", text)
+            self.assertNotIn("MX_DMA_Init", text)  # 没有 DMA 请求了,MX_DMA_Init 段一起删
+            self.assertIn("Mcu.IP0=NVIC", text)  # DMA 实例也摘掉
+            self.assertIn("Mcu.IPNb=3", text)
+            self.assertIn("Mcu.PinsNb=1", text)  # 只剩 VP_SYS_VS_Systick
+            self.assertNotIn("Mcu.Pin1=", text)
+        finally:
+            os.remove(path)
+
+    def test_remove_keeps_shared_irq_when_sibling_present(self):
+        # ADC1 删掉但 ADC2 还在 → 共用的 ADC1_2_IRQn 必须保留
+        ioc = self.SAMPLE_DMA_IOC.replace("Mcu.IP4=SYS\nMcu.IPNb=5", "Mcu.IP4=SYS\nMcu.IP5=ADC2\nMcu.IPNb=6")
+        path = self._write_ioc(ioc)
+        try:
+            cubemx_mcp.cubemx_remove_peripheral(path, "ADC1")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("NVIC.ADC1_2_IRQn=", text)
+            self.assertNotIn("ADC1.", text)
+            self.assertIn("Mcu.IP3=ADC2", text)
+        finally:
+            os.remove(path)
+
+    def test_remove_dma_request_renumbers_remaining(self):
+        # 删掉 ADC1 后,剩下的 USART2_RX 要重新编号成 0(键前缀里的序号同步改)
+        path = self._write_ioc(self.SAMPLE_DMA_IOC_TWO)
+        try:
+            cubemx_mcp.cubemx_remove_peripheral(path, "ADC1")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("ADC1", text)
+            self.assertIn("Dma.Request0=USART2_RX", text)
+            self.assertIn("Dma.RequestsNb=1", text)
+            self.assertIn("Dma.USART2_RX.0.Instance=DMA1_Channel6", text)
+            self.assertNotIn("Dma.USART2_RX.1.", text)
+            self.assertNotIn("NVIC.DMA1_Channel1_IRQn", text)  # 被删请求占的通道中断
+            self.assertIn("NVIC.DMA1_Channel6_IRQn=", text)  # 保留请求的通道中断留着
+            self.assertIn("Mcu.IP0=DMA", text)  # 还有请求 → DMA 实例保留(IP 列表重排后排在最前)
         finally:
             os.remove(path)
 
@@ -484,8 +601,8 @@ class TestInjectTimInternalClock(unittest.TestCase):
             self.assertIn("Mcu.Pin2=VP_TIM2_VS_ClockSourceINT", text)
             self.assertIn("Mcu.PinsNb=3", text)
             # 参数 + VP 表达 + NVIC
-            self.assertIn("TIM2.Prescaler=7200-1", text)
-            self.assertIn("TIM2.Period=10000-1", text)
+            self.assertIn("TIM2.Prescaler=7199", text)
+            self.assertIn("TIM2.Period=9999", text)
             self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", text)
             self.assertIn("NVIC.TIM2_IRQn=", text)
             # functionlistsort 追加段
@@ -526,8 +643,8 @@ class TestInjectTimInternalClock(unittest.TestCase):
             with open(path, encoding="utf-8") as f:
                 text = f.read()
             self.assertIn("Mcu.IP3=TIM3", text)
-            self.assertIn("TIM3.Prescaler=72-1", text)
-            self.assertIn("TIM3.Period=1000-1", text)
+            self.assertIn("TIM3.Prescaler=71", text)
+            self.assertIn("TIM3.Period=999", text)
             self.assertNotIn("NVIC.TIM3_IRQn", text)
         finally:
             os.remove(path)
@@ -607,8 +724,8 @@ class TestInjectTimPwm(unittest.TestCase):
             self.assertIn("SH.S_TIM3_CH1.ConfNb=1", text)
             # 参数
             self.assertIn("TIM3.OCMode=TIM_OCMODE_PWM1", text)
-            self.assertIn("TIM3.Period=100-1", text)
-            self.assertIn("TIM3.Prescaler=72-1", text)
+            self.assertIn("TIM3.Period=99", text)
+            self.assertIn("TIM3.Prescaler=71", text)
             self.assertIn("TIM3.Pulse=50", text)
             # Channel 键(黄金样本:空格转义 \ ,值 TIM_CHANNEL_1)
             self.assertIn("TIM3.Channel-PWM\\ Generation1\\ CH1=TIM_CHANNEL_1", text)
@@ -682,8 +799,8 @@ class TestInjectTimInputCapture(unittest.TestCase):
             self.assertIn("TIM2.IC1Selection=TIM_ICSELECTION_DIRECTTI", text)
             self.assertIn("TIM2.IC2Polarity=TIM_ICPOLARITY_FALLING", text)
             self.assertIn("TIM2.IC2Selection=TIM_ICSELECTION_INDIRECTTI", text)
-            self.assertIn("TIM2.Period=65535-1", text)
-            self.assertIn("TIM2.Prescaler=72-1", text)
+            self.assertIn("TIM2.Period=65534", text)
+            self.assertIn("TIM2.Prescaler=71", text)
             # Channel 键(黄金样本) + ConfNb=1
             self.assertIn("TIM2.Channel-Input_Capture1_from_TI1=TIM_CHANNEL_1", text)
             self.assertIn("SH.S_TIM2_CH1_ETR.ConfNb=1", text)
@@ -869,6 +986,51 @@ class TestNewProjectDispatch(unittest.TestCase):
             r = cubemx_mcp.cubemx_new_project("Proj1", self.project_dir)
         self.assertIn("工程目录", r)
         self.assertTrue(os.path.isfile(os.path.join(self.project_dir, "Proj1.ioc")))
+
+    def test_intents_resolved_like_cubemx_intent(self):
+        # intents 走与 cubemx_intent 同一套解析:ADC 意图自动补时钟、DMA 键组在 saveas 之后注入
+        scripts = []
+
+        def fake_run(script, stage="run_cubemx"):
+            scripts.append(script)
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake_run):
+            out = cubemx_mcp.cubemx_new_project(
+                "ProjDma",
+                self.project_dir,
+                intents=[{"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}}],
+            )
+        self.assertIn("resolve_intent", out)
+        # 第一次调用:load + set 命令(含自动补的 ADC 时钟)+ saveas
+        self.assertIn("set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6", scripts[0])
+        self.assertIn("config saveas", scripts[0])
+        # 第二次调用才是 generate
+        self.assertIn("project generate", scripts[1])
+        # DMA 键组由本工具注入进 .ioc(不是交给 CubeMX 脚本)
+        with open(os.path.join(self.project_dir, "ProjDma.ioc"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", text)
+        self.assertIn("NVIC.DMA1_Channel1_IRQn=", text)
+        self.assertIn("DMA 请求 ADC1", out)
+
+    def test_commands_still_supported_alongside_intents(self):
+        # 显式 commands 与 intents 可以一起用;两者都进同一次 CubeMX 调用
+        seen = {}
+
+        def fake_run(script, stage="run_cubemx"):
+            seen.setdefault("first", script)
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=fake_run):
+            cubemx_mcp.cubemx_new_project(
+                "ProjMix",
+                self.project_dir,
+                commands=["set pin PB13 GPIO_Output"],
+                intents=[{"peripheral": "I2C1", "pins": ["PB8", "PB9"]}],
+            )
+        self.assertIn("set pin PB13 GPIO_Output", seen["first"])
+        self.assertIn("set mode I2C1 I2C", seen["first"])
 
     def test_tim_internal_clock_command(self):
         with self._mock_run():
@@ -1118,6 +1280,22 @@ class TestKnowledgeLoader(unittest.TestCase):
     def test_verified_rule_passes(self):
         self.assertTrue(knowledge_loader.require_rule_verified("tim").get("verified"))
 
+    def test_dma_channel_from_db(self):
+        # 通道来自 db 的 DMA Modes XML(不是猜的):ADC1 只有 DMA1_Channel1
+        self.assertEqual(knowledge_loader.dma_channel("ADC1"), "DMA1_Channel1")
+        self.assertEqual(knowledge_loader.dma_channel("USART2_RX"), "DMA1_Channel6")
+        self.assertIn("SPI1_TX", knowledge_loader.dma_requests())
+
+    def test_dma_direction_from_db(self):
+        self.assertEqual(knowledge_loader.dma_direction("USART2_TX"), "DMA_MEMORY_TO_PERIPH")
+        self.assertEqual(knowledge_loader.dma_direction("ADC1"), "DMA_PERIPH_TO_MEMORY")
+        self.assertEqual(knowledge_loader.dma_direction("no_such_request"), "")
+
+    def test_unknown_dma_request_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            knowledge_loader.dma_channel("ADC9")
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
     def test_help_text(self):
         self.assertIn("工具一览", knowledge_loader.help_text())
         self.assertIn("set pin PB13 GPIO_Output", knowledge_loader.help_text("gpio"))
@@ -1141,11 +1319,11 @@ class TestRenderFragment(unittest.TestCase):
         rule = knowledge_loader.rule("tim")
         item = knowledge_loader.rule_mode("tim", "internal_clock")
         out = knowledge_loader.render_fragment(
-            item["ioc_fragment"], rule["values"], tim="TIM2", prescaler=7200, period=10000
+            item["ioc_fragment"], rule["values"], tim="TIM2", prescaler=7199, period=9999
         )
         self.assertIn("TIM2.AutoReloadPreload=TIM_AUTORELOAD_PRELOAD_ENABLE", out)
-        self.assertIn("TIM2.Period=10000-1", out)
-        self.assertIn("TIM2.Prescaler=7200-1", out)
+        self.assertIn("TIM2.Period=9999", out)
+        self.assertIn("TIM2.Prescaler=7199", out)
         self.assertIn("VP_TIM2_VS_ClockSourceINT.Mode=Internal", out)
         self.assertIn("VP_TIM2_VS_ClockSourceINT.Signal=TIM2_VS_ClockSourceINT", out)
         self.assertIn("NVIC.TIM2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true", out)
@@ -1220,6 +1398,337 @@ class TestIocEditorWrite(unittest.TestCase):
                 f.write(SAMPLE_IOC)
             ioc_editor.remove_peripheral(path, "TIM3")
             self.assertTrue(os.path.isfile(path + ".bak"))
+
+
+class TestStructureCheck(unittest.TestCase):
+    """按 knowledge/rules/ioc_structure.yaml 做的写入后结构校验。"""
+
+    BAD_IOC = "Mcu.IP0=RCC\nMcu.IP2=SYS\nMcu.IPNb=3\nMcu.Pin0=PA0\nMcu.PinsNb=2\nboard=custom\n"
+    GOOD_IOC = "Mcu.IP0=RCC\nMcu.IP1=SYS\nMcu.IPNb=2\nMcu.Pin0=PA0\nMcu.PinsNb=1\nboard=custom\n"
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+
+    def _write(self, text):
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_consistent_ioc_has_no_problems(self):
+        self._write(self.GOOD_IOC)
+        self.assertEqual(ioc_editor.check_structure(self.ioc), [])
+
+    def test_detects_numbering_gap_and_count_mismatch(self):
+        self._write(self.BAD_IOC)
+        problems = ioc_editor.check_structure(self.ioc)
+        self.assertTrue(any("Mcu.IP 编号不连续" in p for p in problems))
+        self.assertTrue(any("Mcu.IPNb=3 与实际 2 条不符" in p for p in problems))
+        self.assertTrue(any("Mcu.PinsNb=2 与实际 1 条不符" in p for p in problems))
+
+    def test_preexisting_problems_do_not_block_writes(self):
+        # 用户 .ioc 本来就有的结构问题不算在工具头上:写入仍然成功
+        self._write(self.BAD_IOC)
+        added = ioc_editor.add_lines(self.ioc, ["USART2.BaudRate=9600"])
+        self.assertEqual(added, ["USART2.BaudRate=9600"])
+
+    def test_new_problem_raises_structure_mismatch(self):
+        # 写入后新引入结构问题 → 报 STRUCTURE_MISMATCH(baseline 为空 = 写前没问题)
+        self._write(self.BAD_IOC)
+        with self.assertRaises(ValueError) as ctx:
+            ioc_editor._verify_after_write(self.ioc, ["Mcu.IPNb=3"], [])
+        self.assertEqual(ctx.exception.code, "STRUCTURE_MISMATCH")
+        self.assertIn("编号不连续", str(ctx.exception))
+
+
+class TestIocSummary(unittest.TestCase):
+    """ioc_editor.summarize / cubemx_load 的结构化摘要(只读解析,不依赖 CubeMX)。"""
+
+    IOC = """#MicroXplorer Configuration settings - do not modify
+ADC1.ExternalTrigConv=ADC_EXTERNALTRIGCONV_T3_TRGO
+ADC1.IPParameters=NbrOfConversion,ExternalTrigConv
+ADC1.NbrOfConversion=2
+CAD.provider=
+Dma.ADC1.0.Instance=DMA1_Channel1
+Dma.ADC1.0.Mode=DMA_CIRCULAR
+Dma.Request0=ADC1
+Dma.RequestsNb=1
+Mcu.CPN=STM32F103C8T6
+Mcu.Family=STM32F1
+Mcu.IP0=ADC1
+Mcu.IP1=DMA
+Mcu.IP2=NVIC
+Mcu.IP3=RCC
+Mcu.IP4=SYS
+Mcu.IPNb=5
+Mcu.Name=STM32F103C(8-B)Tx
+Mcu.Package=LQFP48
+MxCube.Version=6.18.0
+NVIC.ADC1_2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false
+NVIC.DMA1_Channel1_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:true\\:true
+NVIC.PriorityGroup=NVIC_PRIORITYGROUP_4
+PA0-WKUP.Signal=ADCx_IN0
+PA1.Signal=ADCx_IN1
+ProjectManager.CoupleFile=true
+ProjectManager.ProjectName=Demo
+ProjectManager.TargetToolchain=CMake
+ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_DMA_Init-DMA-false-HAL-true,3-MX_ADC1_Init-ADC1-false-HAL-true
+RCC.ADCFreqValue=12000000
+RCC.ADCPresc=RCC_ADCPCLK2_DIV6
+RCC.APB2Freq_Value=72000000
+RCC.PLLSourceVirtual=RCC_PLLSOURCE_HSE
+RCC.SYSCLKFreq_VALUE=72000000
+VP_SYS_VS_Systick.Signal=SYS_VS_Systick
+board=custom
+"""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(self.IOC)
+        cubemx_mcp.ALLOWED_ROOTS = [self._td.name]
+        self.addCleanup(setattr, cubemx_mcp, "ALLOWED_ROOTS", [os.getcwd()])
+
+    def test_summary_fields(self):
+        s = ioc_editor.summarize(self.ioc)
+        self.assertEqual(s["mcu"]["cpn"], "STM32F103C8T6")
+        self.assertEqual(s["project"], {"name": "Demo", "toolchain": "CMake", "couple_files": "true"})
+        self.assertEqual(s["ips"], ["ADC1", "DMA", "NVIC", "RCC", "SYS"])
+        self.assertEqual(s["pins"], {"PA0-WKUP": "ADCx_IN0", "PA1": "ADCx_IN1"})
+        self.assertEqual(s["virtual_pins"], {"VP_SYS_VS_Systick": "SYS_VS_Systick"})
+        self.assertEqual(s["dma"]["requests_nb"], "1")
+        self.assertEqual(s["dma"]["requests"], [{"index": 0, "name": "ADC1"}])
+        self.assertEqual(s["dma"]["configs"]["ADC1"]["Instance"], "DMA1_Channel1")
+        self.assertIn("DMA1_Channel1_IRQn", s["nvic"])
+        self.assertNotIn("PriorityGroup", s["nvic"])  # PriorityGroup 不是中断
+        self.assertEqual(s["clock"]["ADCPresc"], "RCC_ADCPCLK2_DIV6")
+        self.assertEqual(s["clock"]["PLLSourceVirtual"], "RCC_PLLSOURCE_HSE")
+        # 各外设参数(时钟/中断单独成节);IPParameters 拆成列表更好读
+        self.assertEqual(s["peripherals"]["ADC1"]["ExternalTrigConv"], "ADC_EXTERNALTRIGCONV_T3_TRGO")
+        self.assertEqual(s["peripherals"]["ADC1"]["IPParameters"], ["NbrOfConversion", "ExternalTrigConv"])
+        self.assertNotIn("RCC", s["peripherals"])
+        self.assertEqual(s["init_order"], ["SystemClock_Config", "MX_DMA_Init", "MX_ADC1_Init"])
+
+    def test_cubemx_load_appends_summary(self):
+        ok = {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": "run_cubemx"}
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value=ok):
+            out = cubemx_mcp.cubemx_load(self.ioc)
+        self.assertIn("结构化摘要", out)
+        self.assertIn('"cpn": "STM32F103C8T6"', out)
+
+    def test_cubemx_load_summary_can_be_skipped(self):
+        ok = {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": "run_cubemx"}
+        with mock.patch.object(cubemx_mcp, "_run_script", return_value=ok):
+            out = cubemx_mcp.cubemx_load(self.ioc, summary=False)
+        self.assertNotIn("结构化摘要", out)
+
+
+class TestInjectDma(unittest.TestCase):
+    """ioc_editor.inject_dma:DMA 请求写成 .ioc 键组(形态照实测,不依赖 CubeMX)。"""
+
+    IOC = """#MicroXplorer Configuration settings - do not modify
+CAD.formats=
+CAD.provider=
+File.Version=6
+Mcu.Family=STM32F1
+Mcu.IP0=ADC1
+Mcu.IP1=NVIC
+Mcu.IP2=RCC
+Mcu.IP3=SYS
+Mcu.IPNb=4
+NVIC.DebugMonitor_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false
+NVIC.ForceEnableDMAVector=true
+NVIC.HardFault_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false
+ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_GPIO_Init-GPIO-false-HAL-true
+board=custom
+"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(self.IOC)
+
+    def _read(self):
+        with open(self.ioc, encoding="utf-8") as f:
+            return f.read()
+
+    def test_writes_required_key_group(self):
+        note = ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1", mode="DMA_CIRCULAR")
+        text = self._read()
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", text)
+        self.assertIn("Dma.ADC1.0.Direction=DMA_PERIPH_TO_MEMORY", text)  # rules 里的默认方向
+        self.assertIn("Dma.ADC1.0.Mode=DMA_CIRCULAR", text)
+        self.assertIn("Dma.ADC1.0.PeriphInc=DMA_PINC_DISABLE", text)
+        self.assertIn("Dma.ADC1.0.MemInc=DMA_MINC_ENABLE", text)
+        # 只写必需参数时,RequestParameters 就只列这几项(对齐/优先级由 CubeMX 补)
+        self.assertIn("Dma.ADC1.0.RequestParameters=Instance,Direction,PeriphInc,MemInc,Mode", text)
+        self.assertNotIn("PeriphDataAlignment", text)
+        self.assertIn("Dma.Request0=ADC1", text)
+        self.assertIn("Dma.RequestsNb=1", text)
+        self.assertIn("Mcu.IP0=ADC1", text)
+        self.assertIn("Mcu.IP1=DMA", text)  # 按字母序插在 ADC1 与 NVIC 之间
+        self.assertIn("Mcu.IPNb=5", text)
+        self.assertIn("NVIC.DMA1_Channel1_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:true\\:true", text)
+        self.assertIn("MX_DMA_Init-DMA-false-HAL-true", text)
+        self.assertIn("ADC1 已注入 DMA 键组", note)
+
+    def test_optional_params_written_in_db_order(self):
+        ioc_editor.inject_dma(
+            self.ioc,
+            "ADC1",
+            "DMA1_Channel1",
+            periph_align="DMA_PDATAALIGN_HALFWORD",
+            mem_align="DMA_MDATAALIGN_HALFWORD",
+            priority="DMA_PRIORITY_HIGH",
+        )
+        text = self._read()
+        self.assertIn("Dma.ADC1.0.PeriphDataAlignment=DMA_PDATAALIGN_HALFWORD", text)
+        self.assertIn("Dma.ADC1.0.MemDataAlignment=DMA_MDATAALIGN_HALFWORD", text)
+        self.assertIn("Dma.ADC1.0.Priority=DMA_PRIORITY_HIGH", text)
+        self.assertIn(
+            "Dma.ADC1.0.RequestParameters=Instance,Direction,PeriphInc,MemInc,"
+            "PeriphDataAlignment,MemDataAlignment,Mode,Priority",
+            text,
+        )
+
+    def test_idempotent_and_value_updated(self):
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1")
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1", mode="DMA_CIRCULAR")
+        text = self._read()
+        self.assertEqual(text.count("Dma.ADC1.0.Instance="), 1)
+        self.assertEqual(text.count("Dma.Request0="), 1)
+        self.assertEqual(text.count("NVIC.DMA1_Channel1_IRQn="), 1)
+        self.assertIn("Dma.ADC1.0.Mode=DMA_CIRCULAR", text)
+        self.assertNotIn("Dma.ADC1.0.Mode=DMA_NORMAL", text)
+        self.assertIn("Dma.RequestsNb=1", text)
+
+    def test_second_request_gets_next_index_and_keeps_first(self):
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1")
+        ioc_editor.inject_dma(self.ioc, "USART2_RX", "DMA1_Channel6")
+        text = self._read()
+        self.assertIn("Dma.Request0=ADC1", text)
+        self.assertIn("Dma.Request1=USART2_RX", text)
+        self.assertIn("Dma.RequestsNb=2", text)
+        self.assertIn("Dma.USART2_RX.1.Instance=DMA1_Channel6", text)
+        self.assertIn("NVIC.DMA1_Channel6_IRQn=", text)
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", text)
+
+    def test_nvic_can_be_skipped(self):
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1", nvic=False)
+        self.assertNotIn("NVIC.DMA1_Channel1_IRQn", self._read())
+
+    def test_backup_written(self):
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1")
+        self.assertTrue(os.path.isfile(self.ioc + ".bak"))
+
+    def test_rejects_bad_channel_and_enum(self):
+        with self.assertRaises(ValueError) as ctx:
+            ioc_editor.inject_dma(self.ioc, "ADC1", "DMA9_ChannelX")
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+        with self.assertRaises(ValueError) as ctx:
+            ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1", mode="DMA_ROUND_ROBIN")
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+
+class TestDmaIntent(unittest.TestCase):
+    """意图里的 dma 子对象 -> 注入参数(通道/方向查 db 表,不猜)。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ioc = os.path.join(self._td.name, "demo.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(SAMPLE_IOC)
+
+    def test_adc_plan_uses_db_channel_and_direction(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "ADC1", "pins": ["PA0"], "dma": {"mode": "circular"}}]
+        )
+        self.assertEqual(len(plan["dma"]), 1)
+        item = plan["dma"][0]
+        self.assertEqual(item["request"], "ADC1")
+        self.assertEqual(item["channel"], "DMA1_Channel1")
+        self.assertEqual(item["direction"], "DMA_PERIPH_TO_MEMORY")
+        self.assertEqual(item["mode"], "DMA_CIRCULAR")
+        self.assertEqual(item["periph_align"], "")  # 留空 = 交给 CubeMX 补默认
+        self.assertTrue(item["nvic"])
+        self.assertIn("DMA 请求 ADC1", "\n".join(plan["notes"]))
+
+    def test_dma_true_keeps_defaults_for_cubemx(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "dma": True}])
+        self.assertEqual(plan["dma"][0]["mode"], "")
+        self.assertEqual(plan["dma"][0]["direction"], "DMA_PERIPH_TO_MEMORY")
+
+    def test_usart_requires_explicit_request(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "USART2", "pin": "PA2", "dma": True}])
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+        self.assertIn("USART2_RX", str(ctx.exception))
+
+    def test_usart_rx_from_db(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX"}}]
+        )
+        self.assertEqual(plan["dma"][0]["channel"], "DMA1_Channel6")
+        self.assertEqual(plan["dma"][0]["direction"], "DMA_PERIPH_TO_MEMORY")
+
+    def test_usart_tx_direction_from_db(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc, [{"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_TX"}}]
+        )
+        self.assertEqual(plan["dma"][0]["channel"], "DMA1_Channel7")
+        self.assertEqual(plan["dma"][0]["direction"], "DMA_MEMORY_TO_PERIPH")
+
+    def test_explicit_overrides_win(self):
+        plan = intent_resolver.apply_intents(
+            self.ioc,
+            [
+                {
+                    "peripheral": "ADC1",
+                    "pin": "PA0",
+                    "dma": {
+                        "channel": "DMA1_Channel1",
+                        "periph_align": "halfword",
+                        "mem_align": "halfword",
+                        "priority": "very_high",
+                        "interrupt": False,
+                    },
+                }
+            ],
+        )
+        item = plan["dma"][0]
+        self.assertEqual(item["periph_align"], "DMA_PDATAALIGN_HALFWORD")
+        self.assertEqual(item["mem_align"], "DMA_MDATAALIGN_HALFWORD")
+        self.assertEqual(item["priority"], "DMA_PRIORITY_VERY_HIGH")
+        self.assertFalse(item["nvic"])
+
+    def test_bad_align_value_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(
+                self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "dma": {"periph_align": "quadword"}}]
+            )
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_unknown_request_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "dma": {"request": "ADC9"}}])
+        self.assertEqual(ctx.exception.code, "UNKNOWN_PARAM")
+
+    def test_plan_applied_to_ioc_end_to_end(self):
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "ADC1", "pin": "PA0", "dma": True}])
+        for params in plan["dma"]:
+            ioc_editor.inject_dma(self.ioc, **params)
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", text)
+        self.assertIn("Mcu.IP0=DMA", text)  # SAMPLE_IOC 的 IP 列表里 DMA 排在最前(NVIC 之前)
 
 
 class TestIntentResolver(unittest.TestCase):
@@ -1448,13 +1957,149 @@ class TestIntentResolver(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "UNKNOWN_PIN_SIGNAL")
 
     def test_dma_not_supported(self):
-        # DMA 的脚本写法没找到(knowledge/rules/dma.yaml 记着试过什么)
+        # DMA 要挂到具体外设意图下(见 rules/dma.yaml);独立的 "peripheral": "DMA" 仍然不支持
         with self.assertRaises(ValueError) as ctx:
             intent_resolver.apply_intents(self.ioc, [{"peripheral": "DMA", "mode": "SPI1_RX", "pin": "PA5"}])
         self.assertEqual(ctx.exception.code, "UNKNOWN_PERIPHERAL")
+        self.assertIn("dma", str(ctx.exception))
 
-    def test_dma_rule_is_unverified(self):
-        self.assertFalse(knowledge_loader.rule("dma").get("verified"))
+    def test_dma_rule_is_verified(self):
+        self.assertTrue(knowledge_loader.rule("dma").get("verified"))
+
+
+class TestGenKnowledgeParsers(unittest.TestCase):
+    """tools/gen_knowledge_from_db.py 的 db XML 解析(喂内联 XML,不需要 CubeMX 安装)。
+
+    单独测的理由:知识库里的"事实"(引脚表 / IP 模式 / DMA 请求→通道表)全靠这几个
+    解析函数从 db 导出,它们错了下游全错 —— 而这块原先零覆盖。
+    """
+
+    DMA_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" IPType="service" Name="DMA" Version="STM32F103G_dma_v1_0"
+    xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <RefMode BaseMode="DMA_Request" Comment="ADC1" Name="ADC1">
+        <Parameter Name="Direction"><PossibleValue>DMA_PERIPH_TO_MEMORY</PossibleValue></Parameter>
+        <Parameter Name="Mode">
+            <PossibleValue>DMA_NORMAL</PossibleValue>
+            <PossibleValue>DMA_CIRCULAR</PossibleValue>
+        </Parameter>
+    </RefMode>
+    <RefMode BaseMode="DMA_Request" Comment="USART2_RX" Name="USART2_RX">
+        <Parameter Name="Direction">
+            <PossibleValue>DMA_PERIPH_TO_MEMORY</PossibleValue>
+            <PossibleValue>DMA_MEMORY_TO_PERIPH</PossibleValue>
+        </Parameter>
+    </RefMode>
+    <ModeLogicOperator Name="OR">
+        <Mode Name="DMA1">
+            <ModeLogicOperator Name="OR">
+                <Mode Name="DMA1_Channel1">
+                    <ModeLogicOperator Name="XOR">
+                        <Mode Name="MEMTOMEM"/>
+                        <Mode Name="ADC1"/>
+                    </ModeLogicOperator>
+                </Mode>
+                <Mode Name="DMA1_Channel6">
+                    <ModeLogicOperator Name="XOR">
+                        <Mode Name="USART2_RX"/>
+                    </ModeLogicOperator>
+                </Mode>
+            </ModeLogicOperator>
+        </Mode>
+    </ModeLogicOperator>
+</IP>
+"""
+
+    DMA_MULTI_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" Name="DMA" Version="x" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <ModeLogicOperator Name="OR">
+        <Mode Name="DMA1">
+            <ModeLogicOperator Name="OR">
+                <Mode Name="DMA1_Channel6">
+                    <ModeLogicOperator Name="XOR"><Mode Name="USART2_RX"/></ModeLogicOperator>
+                </Mode>
+                <Mode Name="DMA1_Channel7">
+                    <ModeLogicOperator Name="XOR"><Mode Name="USART2_RX"/></ModeLogicOperator>
+                </Mode>
+            </ModeLogicOperator>
+        </Mode>
+    </ModeLogicOperator>
+</IP>
+"""
+
+    MODES_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<IP DBVersion="V3.0" Name="USART" Version="sci2_v1_1" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <RefParameter Comment="Baud rate" Name="BaudRate" Type="int" DefaultValue="115200" Min="0" Max="9000000"/>
+    <RefSignal IOMode="Tx" Direction="I/O" Name="USART2_TX" ShareableGroupName="S_$IpInstance_TX"/>
+    <RefMode BaseMode="Asynchronous" HalMode="Asynchronous" Name="Asynchronous">
+        <Parameter Name="BaudRate"><PossibleValue>9600</PossibleValue></Parameter>
+    </RefMode>
+</IP>
+"""
+
+    MCU_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<Mcu RefName="STM32F103C8Tx" Family="STM32F1" Package="LQFP48"
+    xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Core>Arm Cortex-M3</Core>
+    <Frequency>72</Frequency>
+    <IP ConfigFile="ADC-aditf_v2_5F1" InstanceName="ADC1" Name="ADC" Version="aditf_v2_5F1_Cube"/>
+    <Pin Name="PA0-WKUP" Position="10" Type="I/O">
+        <Signal Name="ADC1_IN0"/>
+        <Signal Name="TIM2_CH1" IOModes="Input"/>
+    </Pin>
+</Mcu>
+"""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+
+        path = pathlib.Path(__file__).resolve().parent.parent / "tools" / "gen_knowledge_from_db.py"
+        spec = importlib.util.spec_from_file_location("gen_knowledge_from_db", path)
+        cls.gen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.gen)
+
+    def _parse(self, func, xml_text):
+        with tempfile.TemporaryDirectory() as td:
+            path = pathlib.Path(td) / "db.xml"
+            path.write_text(xml_text, encoding="utf-8")
+            return func(path)
+
+    def test_dma_channel_tree_with_default_namespace(self):
+        # 真实 db 的 XML 带默认命名空间 —— 踩过坑:root.iter("Mode") 一个都找不到
+        parsed = self._parse(self.gen.parse_dma_requests, self.DMA_XML)
+        self.assertEqual(parsed["channels"]["ADC1"], "DMA1_Channel1")
+        self.assertEqual(parsed["channels"]["USART2_RX"], "DMA1_Channel6")
+        self.assertNotIn("MEMTOMEM", parsed["channels"])  # 内存到内存不是外设请求
+        self.assertEqual(parsed["directions"]["ADC1"], "DMA_PERIPH_TO_MEMORY")
+        self.assertNotIn("USART2_RX", parsed["directions"])  # 方向不唯一 → 不写,由规则兜底
+
+    def test_dma_request_on_two_channels_becomes_list(self):
+        parsed = self._parse(self.gen.parse_dma_requests, self.DMA_MULTI_XML)
+        self.assertEqual(parsed["channels"]["USART2_RX"], ["DMA1_Channel6", "DMA1_Channel7"])
+
+    def test_parse_modes_xml_parameters_signals_modes(self):
+        data = self._parse(self.gen.parse_modes_xml, self.MODES_XML)
+        self.assertEqual(data["parameters"]["BaudRate"]["default"], "115200")
+        self.assertEqual(data["signals"]["USART2_TX"]["shareable_group"], "S_$IpInstance_TX")
+        self.assertEqual(data["modes"][0]["name"], "Asynchronous")
+        self.assertEqual(data["modes"][0]["possible_values"]["BaudRate"], ["9600"])
+
+    def test_parse_mcu_xml_ips_and_pins(self):
+        data = self._parse(self.gen.parse_mcu_xml, self.MCU_XML)
+        self.assertEqual(data["chip"]["core"], "Arm Cortex-M3")
+        self.assertEqual(data["ips"][0]["instance"], "ADC1")
+        self.assertIn("ADC1_IN0", data["pins"]["PA0-WKUP"]["signals"])
+        self.assertEqual(data["pins"]["PA0-WKUP"]["gpio_io_modes"], "Input")
+
+    def test_dump_yaml_keeps_order_and_unicode(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = pathlib.Path(td) / "x.yaml"
+            self.gen.dump_yaml(out, {"channels_nb": 1, "channels": {"ADC1": "DMA1_Channel1"}, "note": "中文不转义"})
+            text = out.read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("channels_nb: 1"))
+        self.assertIn("中文不转义", text)
+        self.assertNotIn("\\u", text)
 
 
 class TestIocDiff(unittest.TestCase):
@@ -1523,6 +2168,67 @@ class TestProbeTool(unittest.TestCase):
         self.assertIn("副本保留在", out)
         self.assertTrue(os.path.exists(os.path.join(self._td.name, "demo.probe.ioc")))
 
+    def test_probe_requires_some_action(self):
+        with self.assertRaises(ValueError) as ctx:
+            cubemx_mcp.cubemx_probe(self.ioc)
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_probe_inject_reports_cubemx_kept_it(self):
+        # inject:先把键写进副本,再让 CubeMX load + saveas —— 这里模拟"它原样保留"
+        def run(script, stage="run_cubemx"):
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=run):
+            out = cubemx_mcp.cubemx_probe(
+                self.ioc,
+                inject=[{"type": "dma", "request": "ADC1", "channel": "DMA1_Channel1", "mode": "DMA_CIRCULAR"}],
+            )
+        self.assertIn("原样保留", out)
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", out)
+        self.assertIn("NVIC.DMA1_Channel1_IRQn=", out)
+
+    def test_probe_inject_reports_cubemx_rewrote_it(self):
+        # CubeMX 改写注入内容时必须明确报出来,并附"注入后 vs 归一化后"第二段差异
+        def run(script, stage="run_cubemx"):
+            probe = os.path.join(self._td.name, "demo.probe.ioc")
+            with open(probe, encoding="utf-8") as f:
+                text = f.read()
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write(text.replace("Dma.ADC1.0.Mode=DMA_CIRCULAR", "Dma.ADC1.0.Mode=DMA_NORMAL"))
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=run):
+            out = cubemx_mcp.cubemx_probe(
+                self.ioc,
+                inject=[{"type": "dma", "request": "ADC1", "channel": "DMA1_Channel1", "mode": "DMA_CIRCULAR"}],
+            )
+        self.assertIn("改动了", out)
+        self.assertIn("注入后 vs CubeMX 归一化后", out)
+        self.assertIn("Dma.ADC1.0.Mode: DMA_CIRCULAR -> DMA_NORMAL", out)
+
+    def test_probe_inject_lines(self):
+        def run(script, stage="run_cubemx"):
+            return {"ok": True, "output": "OK", "exit_code": 0, "error_code": "", "stage": stage}
+
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=run):
+            out = cubemx_mcp.cubemx_probe(
+                self.ioc,
+                inject=[
+                    {
+                        "type": "lines",
+                        "lines": ["NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true"],
+                    }
+                ],
+            )
+        self.assertIn("已注入 .ioc 行", out)
+        self.assertIn("USART2_IRQn", out)
+
+    def test_probe_unknown_inject_type_raises(self):
+        with mock.patch.object(cubemx_mcp, "_run_script", side_effect=self._fake_run("")):
+            with self.assertRaises(ValueError) as ctx:
+                cubemx_mcp.cubemx_probe(self.ioc, inject=[{"type": "nope"}])
+        self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
 
 # ---------------------------------------------------------------- 集成测试(默认跳过)
 INTEGRATION = os.environ.get("ST_CUBEMX_RUN_INTEGRATION") == "1"
@@ -1582,6 +2288,45 @@ class TestCubeMXIntegration(unittest.TestCase):
             ],
         )
         self.assertIn("[OK", out)
+
+    def test_dma_injection_survives_cubemx_saveas(self):
+        # 注入的 DMA 键组必须经得起 CubeMX 的 load + saveas(真跑;保存后键还在才算数)
+        cubemx_mcp.cubemx_configure(
+            self.ioc,
+            [
+                "set mode ADC1 IN0",
+                "set pin PA0-WKUP ADC1_IN0",
+                "set ip parameters RCC ADCPresc RCC_ADCPCLK2_DIV6",
+            ],
+        )
+        ioc_editor.inject_dma(self.ioc, "ADC1", "DMA1_Channel1", mode="DMA_CIRCULAR")
+        self.assertIn("[OK", cubemx_mcp.cubemx_configure(self.ioc, []))  # load + saveas,不改任何配置
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("Dma.ADC1.0.Instance=DMA1_Channel1", text)
+        self.assertIn("Dma.Request0=ADC1", text)
+        self.assertIn("NVIC.DMA1_Channel1_IRQn=", text)
+        self.assertIn("Mcu.IP1=DMA", text)
+
+    def test_nvic_injection_survives_cubemx_saveas(self):
+        cubemx_mcp.cubemx_configure(self.ioc, ["set mode USART2 Asynchronous", "set pin PA2 USART2_TX"])
+        ioc_editor.add_lines(self.ioc, ["NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true"])
+        self.assertIn("[OK", cubemx_mcp.cubemx_configure(self.ioc, []))
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("NVIC.USART2_IRQn=", text)
+
+    def test_remove_peripheral_leaves_loadable_ioc(self):
+        # 配外设 + 它的 DMA 请求,再移除:连带清理后 CubeMX 仍要能 load
+        cubemx_mcp.cubemx_configure(self.ioc, ["set pin PB8 I2C1_SCL", "set pin PB9 I2C1_SDA", "set mode I2C1 I2C"])
+        ioc_editor.inject_dma(self.ioc, "I2C1_RX", "DMA1_Channel7")
+        self.assertIn("[OK", cubemx_mcp.cubemx_remove_peripheral(self.ioc, "I2C1"))
+        with open(self.ioc, encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("Dma.", text)
+        self.assertNotIn("PB8", text)
+        self.assertNotIn("NVIC.DMA1_Channel7_IRQn", text)  # I2C1_RX 占的通道中断也一并清掉
+        self.assertIn("[OK", cubemx_mcp.cubemx_load(self.ioc))
 
 
 if __name__ == "__main__":

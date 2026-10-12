@@ -11,6 +11,7 @@
   inject_tim_internal_clock(...)  把 TIM 配成内部时钟(片段注入)
   inject_tim_pwm(...)             把 TIM 配成 PWM 输出(片段注入)
   inject_tim_input_capture(...)   把 TIM 配成输入捕获(片段注入)
+  inject_dma(...)                 给某个 DMA 请求注入 .ioc 键组(等价 GUI 的 DMA Settings→Add)
   remove_peripheral(...)          从 .ioc 移除一个外设
 """
 
@@ -20,7 +21,7 @@ import os
 import re
 import shutil
 
-from . import knowledge_loader
+from . import ioc_diff, knowledge_loader
 from .cubemx_result import ToolError
 
 
@@ -43,6 +44,45 @@ def verify_written(ioc_path: str, expected_lines) -> None:
     if missing:
         shown = "\n".join(f"  {ln}" for ln in missing[:10])
         raise ToolError("READBACK_MISMATCH", f"写入 {ioc_path} 后回读,有 {len(missing)} 行没找到:\n{shown}")
+
+
+# ------------------------------------------- 结构校验(按 rules/ioc_structure.yaml)
+def check_structure(ioc_path: str) -> list:
+    """按 knowledge/rules/ioc_structure.yaml 校验 .ioc 结构,返回问题描述(空 = 没问题)。
+
+    检查 IP / Pin 列表:编号必须从 0 连续,且计数键与实际条目数一致 —— 这两项正是 CubeMX
+    读列表的依据,编号有洞或计数对不上,它读到的外设/引脚就是错的(规则文件里写着这条)。
+    """
+    rules = knowledge_loader.rule("ioc_structure")
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        parsed = ioc_diff.parse_ioc(f.read())
+    problems = []
+    for spec in (rules.get("entries") or {}).values():
+        pattern = str(spec.get("key_pattern") or "")
+        count_key = str(spec.get("count_key") or "")
+        if "{N}" not in pattern or not count_key:
+            continue
+        prefix = pattern.split("{N}", 1)[0]  # "Mcu.IP{N}={instance}" -> "Mcu.IP"
+        idx = sorted(int(k[len(prefix) :]) for k in parsed if re.fullmatch(rf"{re.escape(prefix)}\d+", k))
+        if idx != list(range(len(idx))):
+            problems.append(f"{prefix} 编号不连续: {idx}")
+        raw = str(parsed.get(count_key, ""))
+        if raw.isdigit() and int(raw) != len(idx):
+            problems.append(f"{count_key}={raw} 与实际 {len(idx)} 条不符")
+    return problems
+
+
+def _verify_after_write(ioc_path: str, expected_lines, baseline: list) -> None:
+    """写盘后的统一收尾:回读校验 + 结构校验(只报"这次新引入的"结构问题)。
+
+    baseline 是写盘前的 check_structure 结果 —— 用户 .ioc 本来就有的结构问题不算在工具头上,
+    工具只保证自己不会把结构改坏。
+    """
+    verify_written(ioc_path, expected_lines)
+    new_problems = [p for p in check_structure(ioc_path) if p not in baseline]
+    if new_problems:
+        shown = "\n".join(f"  {p}" for p in new_problems)
+        raise ToolError("STRUCTURE_MISMATCH", f"写入 {ioc_path} 后新增了结构问题:\n{shown}")
 
 
 def used_pins(ioc_path: str) -> dict:
@@ -71,6 +111,93 @@ def read_key(ioc_path: str, key: str) -> str:
     return ""
 
 
+def summarize(ioc_path: str) -> dict:
+    """把 .ioc 解析成结构化摘要(只读,不改文件)。
+
+    返回:project / mcu / clock / ips / pins / virtual_pins / dma / nvic / peripherals / init_order。
+    值一律是 .ioc 里的**原始字符串**(不做语义解释、不查知识库)—— "这样写合不合法"
+    由 knowledge/ 回答,这里只负责把现状讲清楚,省得 agent 去读整个 .ioc 原文。
+    """
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        entries = ioc_diff.parse_ioc(f.read())
+
+    ips = [v for k, v in sorted(entries.items()) if re.fullmatch(r"Mcu\.IP\d+", k)]
+    pins = {}
+    virtual_pins = {}
+    for k, v in entries.items():
+        if not k.endswith(".Signal"):
+            continue
+        pin = k[: -len(".Signal")]
+        (virtual_pins if pin.startswith("VP_") else pins)[pin] = v
+
+    dma_configs = {}
+    for k, v in sorted(entries.items()):
+        hit = re.match(r"Dma\.([A-Z0-9_]+)\.\d+\.(\w+)$", k)
+        if hit:
+            dma_configs.setdefault(hit.group(1), {})[hit.group(2)] = v
+    dma_requests = [
+        {"index": int(k[len("Dma.Request") :]), "name": v}
+        for k, v in sorted(entries.items(), key=lambda kv: kv[0])
+        if re.fullmatch(r"Dma\.Request\d+", k)
+    ]
+
+    nvic = {k.split(".", 1)[1]: v for k, v in entries.items() if k.startswith("NVIC.") and k != "NVIC.PriorityGroup"}
+    clock_keys = (
+        "RCC.PLLSourceVirtual",
+        "RCC.PLLMUL",
+        "RCC.SYSCLKSource",
+        "RCC.SYSCLKFreq_VALUE",
+        "RCC.HCLKFreq_Value",
+        "RCC.APB1CLKDivider",
+        "RCC.APB1Freq_Value",
+        "RCC.APB2Freq_Value",
+        "RCC.ADCPresc",
+        "RCC.ADCFreqValue",
+    )
+    clock = {k.split(".", 1)[1]: entries[k] for k in clock_keys if k in entries}
+
+    peripherals = {}
+    ip_names = set(ips)
+    for k, v in sorted(entries.items()):
+        head, sep, name = k.partition(".")
+        if not sep or head not in ip_names or head in ("RCC", "NVIC", "SYS"):
+            continue
+        # IPParameters 的值是一长串参数名,拆成列表更好读;其它参数原样
+        peripherals.setdefault(head, {})[name] = [p for p in v.split(",") if p] if name == "IPParameters" else v
+
+    init_order = [
+        seg.split("-")[1]
+        for seg in entries.get("ProjectManager.functionlistsort", "").split(",")
+        if seg.strip() and len(seg.split("-")) > 1
+    ]
+    return {
+        "project": {
+            "name": entries.get("ProjectManager.ProjectName", ""),
+            "toolchain": entries.get("ProjectManager.TargetToolchain", ""),
+            "couple_files": entries.get("ProjectManager.CoupleFile", ""),
+        },
+        "mcu": {
+            "cpn": entries.get("Mcu.CPN", ""),
+            "name": entries.get("Mcu.Name", ""),
+            "family": entries.get("Mcu.Family", ""),
+            "package": entries.get("Mcu.Package", ""),
+            "cube_version": entries.get("MxCube.Version", ""),
+        },
+        "clock": clock,
+        "ips": ips,
+        "pins": pins,
+        "virtual_pins": virtual_pins,
+        "dma": {
+            "requests_nb": entries.get("Dma.RequestsNb", ""),
+            "requests": dma_requests,
+            "configs": dma_configs,
+        },
+        "nvic": nvic,
+        "peripherals": peripherals,
+        "init_order": init_order,
+    }
+
+
 def add_lines(ioc_path: str, lines) -> list:
     """把若干 .ioc 行插到 board=custom 之前(锚点和 TIM 注入一致)。
 
@@ -87,10 +214,11 @@ def add_lines(ioc_path: str, lines) -> list:
         text = text.replace("board=custom", block + "board=custom", 1)
     else:
         text += block
+    baseline = check_structure(ioc_path)
     backup(ioc_path)
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
         f.write(text)
-    verify_written(ioc_path, wanted)
+    _verify_after_write(ioc_path, wanted, baseline)
     return wanted
 
 
@@ -220,8 +348,8 @@ def inject_tim_internal_clock(
     参数:
       ioc_path:    .ioc 文件绝对路径(会被改写)
       target_tim:  目标 TIM 名,如 TIM2
-      prescaler:   预分频(72MHz 下 7200-1),默认 7200
-      period:      周期(1s 中断 = 7200-1/10000-1),默认 10000
+      prescaler:   预分频(接口上传"分频比",如 7200 表示 72MHz/7200;.ioc 里落成寄存器值 7199)
+      period:      计数(如 10000 表示计满 10000 次;.ioc 里落成 9999。1s 中断 = 7200 / 10000)
       irq:         是否启用 NVIC 中断,默认 True
     返回:描述字符串
     """
@@ -249,6 +377,10 @@ def inject_tim_internal_clock(
     new_ips = ip_entries + [tim]
     new_pins = pin_entries + [f"VP_{tim}_VS_ClockSourceINT"]
 
+    # 接口上的 prescaler/period 是"分频比 / 计数",而 .ioc 里要写寄存器值(各减 1)。
+    # 必须在这里算好:把 "72-1" 这种未求值表达式写进 .ioc 时,CubeMX 会原样抄进 C 代码
+    # (实测:htim3.Init.Prescaler = 72-1; —— 合法但难看)。
+    prescaler, period = int(prescaler) - 1, int(period) - 1
     values = knowledge_loader.rule("tim")["values"]
     fragment = knowledge_loader.rule_mode("tim", "internal_clock")["ioc_fragment"]
     if not irq:
@@ -313,12 +445,13 @@ def inject_tim_internal_clock(
         out.append(f"Mcu.PinsNb={len(new_pins)}\n")
     if not inserted_params:
         out.append(tim_params)
+    baseline = check_structure(ioc_path)
     backup(ioc_path)
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
         f.writelines(out)
-    verify_written(ioc_path, tim_params.splitlines())
+    _verify_after_write(ioc_path, tim_params.splitlines(), baseline)
     return (
-        f"{tim} 已注入内部时钟标准表达(Prescaler={prescaler}-1, Period={period}-1, "
+        f"{tim} 已注入内部时钟标准表达(Prescaler={prescaler}, Period={period}, "
         f"NVIC={'开' if irq else '关'});IPNb={len(new_ips)}, PinsNb={len(new_pins)}"
     )
 
@@ -411,12 +544,14 @@ def _finish_ioc_write(ioc_path, out_lines, new_ips, new_pins, counts, params_blo
                 break
         else:
             out_lines.append(params_block)
+    baseline = check_structure(ioc_path)
     backup(ioc_path)
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
         f.writelines(out_lines)
-    verify_written(
+    _verify_after_write(
         ioc_path,
         list((params_block or "").splitlines()) + [f"Mcu.IPNb={len(new_ips)}", f"Mcu.PinsNb={len(new_pins)}"],
+        baseline,
     )
 
 
@@ -432,7 +567,8 @@ def inject_tim_pwm(
       SH.S_TIM3_CH1.0=TIM3_CH1,PWM Generation1 CH1
       SH.S_TIM3_CH1.ConfNb=1
       TIM3.IPParameters=Prescaler,Period,OCMode,Pulse
-      TIM3.OCMode=TIM_OCMODE_PWM1 / Period={period}-1 / Prescaler={prescaler}-1 / Pulse={pulse}
+      TIM3.OCMode=TIM_OCMODE_PWM1 / Period={period} / Prescaler={prescaler} / Pulse={pulse}
+      (片段的 {period}/{prescaler} 已是寄存器值:接口传 100 计数 → .ioc 里 99)
     引脚由调用方显式给出(pin + signal),如 PA6 / S_TIM3_CH1;本函数不猜引脚。
     若该 TIM 已有 PWM 表达则先删除再注入(幂等)。
     """
@@ -443,6 +579,8 @@ def inject_tim_pwm(
     if not ch:
         raise ToolError("BAD_ARGUMENT", f"无法从信号名解析通道: {signal!r}(应为 S_TIM3_CH1 形式)")
     n = ch.group(1)
+    # 接口上传"分频比 / 计数",.ioc 里写寄存器值(各减 1);见 inject_tim_internal_clock 的说明
+    prescaler, period = int(prescaler) - 1, int(period) - 1
     values = knowledge_loader.rule("tim")["values"]
     mode_name = values["pwm_mode"].format(n=n)
     mode_esc = mode_name.replace(" ", "\\ ")  # .ioc 键名里空格要转义,见 knowledge/rules/tim.yaml
@@ -480,8 +618,8 @@ def inject_tim_pwm(
     )
     _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
     return (
-        f"{tim} 已注入 PWM 标准表达(引脚 {pin}/{signal},Prescaler={prescaler}-1, "
-        f"Period={period}-1, Pulse={pulse});IPNb={len(new_ips)}, PinsNb={len(new_pins)}"
+        f"{tim} 已注入 PWM 标准表达(引脚 {pin}/{signal},Prescaler={prescaler}, "
+        f"Period={period}, Pulse={pulse});IPNb={len(new_ips)}, PinsNb={len(new_pins)}"
     )
 
 
@@ -503,6 +641,8 @@ def inject_tim_input_capture(
     if not ch:
         raise ToolError("BAD_ARGUMENT", f"无法从信号名解析通道: {signal!r}(应为 S_TIM2_CH1_ETR 形式)")
     n = ch.group(1)
+    # 接口上传"分频比 / 计数",.ioc 里写寄存器值(各减 1);见 inject_tim_internal_clock 的说明
+    prescaler, period = int(prescaler) - 1, int(period) - 1
     values = knowledge_loader.rule("tim")["values"]
     sig_body = signal[2:] if signal.startswith("S_") else signal  # S_TIM2_CH1_ETR -> TIM2_CH1_ETR
     sig_body = re.sub(r"_ETR$", "", sig_body)  # TIM2_CH1_ETR -> TIM2_CH1
@@ -537,21 +677,267 @@ def inject_tim_input_capture(
     _finish_ioc_write(ioc_path, out, new_ips, new_pins, counts, params)
     return (
         f"{tim} 已注入输入捕获标准表达(引脚 {pin}/{signal},IC1 上升沿 + IC2 下降沿,"
-        f"Prescaler={prescaler}-1, Period={period}-1);IPNb={len(new_ips)}, PinsNb={len(new_pins)}"
+        f"Prescaler={prescaler}, Period={period});IPNb={len(new_ips)}, PinsNb={len(new_pins)}"
     )
 
 
 # help 文本来自 knowledge/rules/help.yaml(cubemx_help 直接读它),不再硬编码在这里。
 
 
-def remove_peripheral(ioc_path: str, peripheral: str) -> dict:
-    """从 .ioc 里移除一个外设:删 Mcu.IPx、关联引脚/参数、NVIC、functionlistsort 段,并重排编号。
+# ---------------------------------------------------------------- DMA 请求(注入 .ioc 键组)
+def _insert_sorted_line(out_lines: list, line: str, prefix: str) -> bool:
+    """把 line 按 key 的字母序插到以 prefix 开头的行段里(CubeMX 自己写出的段大致是字典序)。"""
+    key = line.split("=", 1)[0]
+    last = None
+    for i, ln in enumerate(out_lines):
+        s = ln.strip()
+        if not s.startswith(prefix):
+            continue
+        last = i
+        if s.split("=", 1)[0] > key:
+            out_lines.insert(i, line)
+            return True
+    if last is not None:
+        out_lines.insert(last + 1, line)
+        return True
+    return False
 
-    返回 {"removed": [被删的行...], "keep_ips": [剩余外设...]};没有该外设抛 PERIPHERAL_NOT_FOUND。
+
+def inject_dma(
+    ioc_path: str,
+    request: str,
+    channel: str,
+    *,
+    index: int = -1,
+    direction: str = "",
+    mode: str = "",
+    periph_inc: str = "",
+    mem_inc: str = "",
+    periph_align: str = "",
+    mem_align: str = "",
+    priority: str = "",
+    nvic: bool = True,
+) -> str:
+    """给某个 DMA 请求注入 .ioc 键组 —— 等价于 GUI 里 DMA Settings → Add(实测)。
+
+    6.18 实测(见 knowledge/rules/dma.yaml):脚本 set 配不了 DMA,但注入键组后
+    config saveas / project generate 都会认,生成的 HAL 骨架里 dma.c 的 MX_DMA_Init、
+    各外设 x.c 里的 hdma_xxx + __HAL_LINKDMA、stm32f1xx_it.c 里的 <通道>_IRQHandler 齐全。
+    只写必需参数(Instance/Direction/PeriphInc/MemInc/Mode),对齐与优先级缺省时
+    交给 CubeMX 按请求类型补默认(ADC→HALFWORD、USART→BYTE)。
+
+    参数:
+      ioc_path:     .ioc 文件绝对路径(会被改写)
+      request:      DMA 请求名(来自 db,如 ADC1 / USART2_RX / SPI1_TX);查表见
+                    knowledge/mcu/<芯片>.dma.yaml
+      channel:      DMA 通道(如 DMA1_Channel1);可显式给,或由调用方查表得到
+      index:        请求序号(-1 = 自动:该请求已存在则复用,否则追加)
+      direction / mode / periph_inc / mem_inc / periph_align / mem_align / priority:
+                    枚举值(留空 = 用 rules/dma.yaml 的默认值,对齐/优先级留空则交给 CubeMX)
+      nvic:         是否同时注入 NVIC.<通道>_IRQn(默认 True,和 GUI Add 之后一致)
+    幂等:同一请求重复注入只重写它自己的参数键,不会重复添加。
+    """
+    rules = knowledge_loader.require_rule_verified("dma")
+    keys = rules.get("ioc_keys") or {}
+    values = rules.get("values") or {}
+    defaults = values.get("defaults") or {}
+    prefix_tpl = keys.get("param_prefix") or "Dma.{request}.{index}."
+    param_order = list(keys.get("param_order") or [])
+
+    req = str(request).strip().upper()
+    ch = str(channel).strip()
+    if not re.fullmatch(r"DMA\d+_Channel\d+", ch):
+        raise ToolError("BAD_ARGUMENT", f"非法 DMA 通道名(应形如 DMA1_Channel1): {channel!r}")
+    if not re.fullmatch(r"[A-Z0-9_]+", req):
+        raise ToolError("BAD_ARGUMENT", f"非法 DMA 请求名(应形如 ADC1 / USART2_RX): {request!r}")
+
+    def _checked(value: str, group: str, label: str) -> str:
+        """枚举值必须来自知识库(values 段);留空返回空串(交给默认值/CubeMX)。"""
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        allowed = sorted((values.get(group) or {}).values())
+        if raw not in allowed:
+            raise ToolError("BAD_ARGUMENT", f"DMA {label} 只支持 {', '.join(allowed)};收到 {value!r}")
+        return raw
+
+    pairs = [
+        ("Instance", ch),
+        ("Direction", _checked(direction, "direction", "direction") or defaults.get("direction", "")),
+        ("PeriphInc", _checked(periph_inc, "periph_inc", "periph_inc") or defaults.get("periph_inc", "")),
+        ("MemInc", _checked(mem_inc, "mem_inc", "mem_inc") or defaults.get("mem_inc", "")),
+        ("Mode", _checked(mode, "mode", "mode") or defaults.get("mode", "")),
+    ]
+    optional = (
+        ("PeriphDataAlignment", "periph_align", periph_align),
+        ("MemDataAlignment", "mem_align", mem_align),
+        ("Priority", "priority", priority),
+    )
+    for name, group, value in optional:
+        got = _checked(value, group, group)
+        if got:
+            pairs.append((name, got))
+    if param_order:
+        pairs.sort(key=lambda kv: param_order.index(kv[0]) if kv[0] in param_order else len(param_order))
+
+    with open(ioc_path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines(keepends=True)
+
+    # 现有请求声明:序号 -> 请求名(用来复用序号 / 计算新序号)
+    existing = {}
+    for ln in lines:
+        hit = re.match(r"Dma\.Request(\d+)=(.+)$", ln.strip())
+        if hit:
+            existing[int(hit.group(1))] = hit.group(2).strip()
+    if index < 0:
+        index = next((i for i, name in existing.items() if name == req), -1)
+        if index < 0:
+            index = max(existing) + 1 if existing else 0
+    requests = dict(existing)
+    requests[index] = req
+
+    prefix = prefix_tpl.format(request=req, index=index)
+    body = [f"{prefix}{name}={value}\n" for name, value in pairs]
+    body.append(f"{prefix}RequestParameters={','.join(name for name, _ in pairs)}\n")
+    for i in sorted(requests):
+        body.append(f"{keys.get('request_index_key', 'Dma.Request{index}').format(index=i)}={requests[i]}\n")
+    body.append(f"{keys.get('requests_nb_key', 'Dma.RequestsNb')}={len(requests)}\n")
+
+    ip_entry = keys.get("ip_list_entry", "DMA")
+
+    def _ip_lines() -> list:
+        """重建 Mcu.IPx 列表:DMA 按字母序插进去(与 GUI 写出的顺序一致)。"""
+        new_ips = [n for n in ip_entries if n != ip_entry]
+        pos = next((i for i, n in enumerate(new_ips) if n > ip_entry), len(new_ips))
+        new_ips.insert(pos, ip_entry)
+        return [f"Mcu.IP{i}={name}\n" for i, name in enumerate(new_ips)] + [f"Mcu.IPNb={len(new_ips)}\n"]
+
+    out = []
+    dma_positions = []
+    ip_entries = []
+    ipnb_seen = False
+    anchor = None
+    for ln in lines:
+        s = ln.strip()
+        # 本请求的旧键、所有请求声明行、旧 NVIC 行:统一剔除后重建
+        if re.match(rf"^Dma\.{re.escape(req)}\.\d+\.", s):
+            continue
+        if re.match(r"^Dma\.Request\d+=", s) or s.startswith(keys.get("requests_nb_key", "Dma.RequestsNb") + "="):
+            continue
+        if nvic and re.match(rf"^NVIC\.{re.escape(ch)}_IRQn=", s):
+            continue
+        if s.startswith("Dma."):
+            dma_positions.append(len(out))
+        if re.match(r"Mcu\.IP\d+=", s):
+            ip_entries.append(s.split("=", 1)[1].strip())
+            continue
+        if re.match(r"Mcu\.IPNb=", s):
+            ipnb_seen = True
+            out.extend(_ip_lines() if ip_entries else [ln])
+            continue
+        if s == "board=custom" and anchor is None:
+            anchor = len(out)
+        out.append(ln)
+    if ip_entries and not ipnb_seen:
+        out.extend(_ip_lines())  # 非标准 .ioc 缺 IPNb 行时补全(防丢 IP 列表)
+
+    # 插入位置:Dma 段末尾(已有其它 Dma 键时),否则 CAD.* 之后(与 GUI 写出的位置一致)
+    if dma_positions:
+        pos = dma_positions[-1] + 1
+    else:
+        pos = next((i + 1 for i, ln in enumerate(out) if ln.strip().startswith("CAD.")), None)
+        if pos is None:
+            pos = anchor if anchor is not None else len(out)
+    out[pos:pos] = body
+
+    if nvic:
+        nvic_line = (keys.get("nvic_pattern") or "").replace("{channel}", ch) + "\n"
+        if not _insert_sorted_line(out, nvic_line, "NVIC."):
+            out.append(nvic_line)
+
+    # functionlistsort 补 MX_DMA_Init(DMA 的 NVIC 初始化在 MX_DMA_Init 里)
+    segment = keys.get("functionlist_segment") or "MX_DMA_Init-DMA-false-HAL-true"
+    for i, ln in enumerate(out):
+        if not ln.strip().startswith("ProjectManager.functionlistsort="):
+            continue
+        segs = [x for x in ln.split("=", 1)[1].split(",") if x.strip()]
+        if not any(re.search(r"MX_DMA_Init-DMA-false-HAL-", x) for x in segs):
+            segs.append(f"{len(segs) + 1}-{segment}")
+        out[i] = ln.split("=", 1)[0] + "=" + ",".join(segs) + "\n"
+        break
+
+    baseline = check_structure(ioc_path)
+    backup(ioc_path)
+    with open(ioc_path, "w", encoding="utf-8", newline="") as f:
+        f.writelines(out)
+    _verify_after_write(ioc_path, [ln.rstrip("\n") for ln in body], baseline)
+    return f"{req} 已注入 DMA 键组(通道 {ch},序号 {index},{'含' if nvic else '不含'} NVIC;请求总数 {len(requests)})"
+
+
+def _dma_requests_of(lines, peripheral: str) -> dict:
+    """挑出属于该外设的 DMA 请求:{请求名: {"channel", "index"}}。
+
+    请求名就是 CubeMX db 里的 DMA_Request 名:与实例同名(ADC1),或以 "{实例}_" 开头
+    (USART2_RX / TIM2_UP / I2C1_TX)。不猜 —— 名字本身来自 db。
+    """
+    found = {}
+    for ln in lines:
+        hit = re.match(r"Dma\.([A-Z0-9_]+)\.(\d+)\.Instance=(\S+)\s*$", ln.strip())
+        if not hit:
+            continue
+        name = hit.group(1)
+        if name == peripheral or name.startswith(f"{peripheral}_"):
+            found[name] = {"channel": hit.group(3), "index": int(hit.group(2))}
+    return found
+
+
+def _peripheral_pins(lines, peripheral: str, patterns=()) -> dict:
+    """挑出绑在该外设上的引脚:{引脚名: 信号名}。
+
+    判据是引脚行的 Signal 值:含实例名(I2C1_SCL / S_TIM3_CH1 / USART2_TX),
+    或匹配 rules/<外设>.yaml 的 remove.pin_signal_patterns —— ADC 的引脚信号是 ADCx_IN0,
+    里面没有 "ADC1",所以那种情况必须由规则给出模式。
+    """
+    pins = {}
+    for ln in lines:
+        hit = re.match(r"([A-Za-z0-9_\-]+)\.Signal=(.+)$", ln.strip())
+        if not hit:
+            continue
+        pin, signal = hit.group(1), hit.group(2).strip()
+        if peripheral in signal or any(signal.startswith(p) for p in patterns):
+            pins[pin] = signal
+    return pins
+
+
+def _remove_rules(peripheral: str) -> dict:
+    """取该外设规则文件里"移除时要用的信息"(共用中断向量、引脚信号模式);查不到返回空 dict。"""
+    rule_name = knowledge_loader.rule_name_for(peripheral)
+    if not rule_name:
+        return {}
+    try:
+        return knowledge_loader.rule(rule_name) or {}
+    except ToolError:
+        return {}
+
+
+def remove_peripheral(ioc_path: str, peripheral: str) -> dict:
+    """从 .ioc 里移除一个外设,连带清掉它的引脚、中断、DMA 请求与初始化段。
+
+    删除范围(由内到外):
+      - Mcu.IPx=<外设> 与 {外设}.* 参数行、虚拟引脚 VP_{外设}*;
+      - 按 Signal 值判定属于它的物理引脚({pin}.* 各行)与对应的 SH.{信号}* 行,
+        并从 Mcu.Pin* 里摘掉;
+      - NVIC.{外设}_IRQn;规则文件声明了共用向量时(如 ADC 的 ADC1_2_IRQn)一并删,
+        但同族实例还在时不删;
+      - DMA 连带:Dma.{请求}.* 、Dma.Request<n>、剩余请求重新连续编号(键前缀序号同步改)、
+        Dma.RequestsNb;被删请求占用的 NVIC.<通道>_IRQn;请求清空时连 Mcu.IPx=DMA 与
+        functionlistsort 里的 MX_DMA_Init 段一起删;
+      - functionlistsort 里该外设的 MX_*_Init 段;IP/Pin 编号重排、Nb 修正。
+
+    返回 {"removed", "keep_ips", "removed_dma", "removed_pins"};没有该外设抛 PERIPHERAL_NOT_FOUND。
     """
     with open(ioc_path, encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
-    # 收集要删的行号:精确匹配 Mcu.IPx=<peripheral> 的行
     ip_line_idx = None
     for i, ln in enumerate(lines):
         if re.fullmatch(rf"Mcu\.IP\d+={re.escape(peripheral)}\s*", ln):
@@ -559,65 +945,146 @@ def remove_peripheral(ioc_path: str, peripheral: str) -> dict:
             break
     if ip_line_idx is None:
         raise ToolError("PERIPHERAL_NOT_FOUND", f".ioc 中未找到外设 {peripheral}(检查大小写,如 TIM3/I2C1)")
-    # 删除规则:先标记要删除的行(保留 Mcu.IPx 供重排)
+
+    rules = _remove_rules(peripheral)
+    shared_irq = str(rules.get("interrupt_irq") or "").strip()
+    pin_patterns = tuple((rules.get("remove") or {}).get("pin_signal_patterns") or ())
+
+    dma_reqs = _dma_requests_of(lines, peripheral)
+    dma_channels = sorted({info["channel"] for info in dma_reqs.values()})
+    victim_pins = _peripheral_pins(lines, peripheral, pin_patterns)
+    victim_signals = sorted(set(victim_pins.values()))
+
+    all_reqs = {}
+    for ln in lines:
+        hit = re.match(r"Dma\.Request(\d+)=(.+)$", ln.strip())
+        if hit:
+            all_reqs[int(hit.group(1))] = hit.group(2).strip()
+    keep_reqs = [name for _idx, name in sorted(all_reqs.items()) if name not in dma_reqs]
+    renumber = {name: new for new, name in enumerate(keep_reqs)}
+
+    keep_ips = [
+        m.group(2).strip()
+        for ln in lines
+        if (m := re.match(r"Mcu\.IP(\d+)=(.*)", ln)) and m.group(2).strip() != peripheral
+    ]
+    if dma_reqs and not keep_reqs:
+        keep_ips = [n for n in keep_ips if n != "DMA"]  # 没有 DMA 请求了,连 DMA 实例一起摘掉
+    # 共用向量(如 ADC1_2_IRQn):同族实例还在就保留,否则跟着删
+    keep_shared_irq = bool(shared_irq) and any(
+        knowledge_loader.rule_name_for(n) == knowledge_loader.rule_name_for(peripheral) for n in keep_ips
+    )
+
+    def _dma_block() -> list:
+        """重建 Dma.Request<n> / RequestsNb(剩余请求按原顺序重新连续编号)。"""
+        out_lines = [f"Dma.Request{i}={name}\n" for i, name in enumerate(keep_reqs)]
+        if keep_reqs:
+            out_lines.append(f"Dma.RequestsNb={len(keep_reqs)}\n")
+        return out_lines
+
     drop = {ip_line_idx}
     removed = [lines[ip_line_idx].strip()]
-    for i, ln in enumerate(lines):
-        if i == ip_line_idx:
-            continue
-        s = ln.strip()
-        if s.startswith(f"{peripheral}.") or s.startswith(f"VP_{peripheral}") or s.startswith(f"SH.S_{peripheral}"):
-            drop.add(i)
-            removed.append(s)
-        elif re.match(rf"NVIC\.{re.escape(peripheral)}_IRQn=", s):
-            drop.add(i)
-            removed.append(s)
-        elif re.match(rf"Mcu\.Pin\d+=VP_{re.escape(peripheral)}", s):
-            drop.add(i)
-            removed.append(s)
-    # 收集剩余外设(按顺序),用于重排 Mcu.IPx 和修正 Mcu.IPNb
-    keep_ips = []
-    for ln in lines:
-        m = re.match(r"Mcu\.IP(\d+)=(.*)", ln)
-        if m and m.group(2).strip() != peripheral:
-            keep_ips.append(m.group(2).strip())
-    # 重写所有行
+    removed_dma = []
+    removed_pins = []
     new_out = []
     ip_counter = 0
     pin_counter = 0
+    dma_block_written = False
     for i, ln in enumerate(lines):
         if i in drop:
-            continue  # 跳过被标记删除的行
+            continue
         s = ln.strip()
-        if re.match(rf"Mcu\.IP\d+={re.escape(peripheral)}$", s):
-            continue  # 被删的外设行(已在 drop,防御)
-        if re.match(r"Mcu\.IP\d+=", s):
-            # 重排其余外设
-            m = re.match(r"Mcu\.IP(\d+)=(.*)", s)
-            new_out.append(f"Mcu.IP{ip_counter}={m.group(2)}\n")
-            ip_counter += 1
+        # ---- DMA:被删请求的键、请求声明行统一在这里处理(顺带重排剩余请求的编号)
+        if s.startswith("Dma."):
+            hit = re.match(r"Dma\.([A-Z0-9_]+)\.(\d+)\.", s)
+            if hit and not dma_block_written and hit.group(1) in dma_reqs:
+                new_out.extend(_dma_block())
+                dma_block_written = True
+            if hit:
+                name, old_idx = hit.group(1), int(hit.group(2))
+                if name in dma_reqs:
+                    removed_dma.append(s)
+                    continue
+                if name in renumber and renumber[name] != old_idx:
+                    ln = ln.replace(f"Dma.{name}.{old_idx}.", f"Dma.{name}.{renumber[name]}.", 1)
+                new_out.append(ln)
+                continue
+            if re.match(r"Dma\.Request\d+=", s) or s.startswith("Dma.RequestsNb="):
+                if not dma_block_written:
+                    new_out.extend(_dma_block())
+                    dma_block_written = True
+                continue
+            new_out.append(ln)
             continue
-        if re.match(r"Mcu\.IPNb=", s):
-            new_out.append(f"Mcu.IPNb={len(keep_ips)}\n")
+        # ---- 被删外设的虚拟引脚条目
+        if re.match(rf"Mcu\.Pin\d+=VP_{re.escape(peripheral)}", s):
+            removed_pins.append(s)
             continue
+        # ---- 引脚列表重排:属于该外设的物理引脚一并摘掉
         if re.match(r"Mcu\.Pin\d+=", s):
-            # 重排剩余引脚(被删外设的 VP 引脚已在 drop 中跳过),并修正 PinsNb
-            m = re.match(r"Mcu\.Pin(\d+)=(.*)", s)
-            new_out.append(f"Mcu.Pin{pin_counter}={m.group(2)}\n")
+            pin_name = s.split("=", 1)[1].strip()
+            if pin_name in victim_pins:
+                removed_pins.append(s)
+                continue
+            new_out.append(f"Mcu.Pin{pin_counter}={pin_name}\n")
             pin_counter += 1
             continue
         if re.match(r"Mcu\.PinsNb=", s):
             new_out.append(f"Mcu.PinsNb={pin_counter}\n")
             continue
+        # ---- 属于该外设的引脚行 / 信号句柄行
+        pin_hit = re.match(r"([A-Za-z0-9_\-]+)\.", s)
+        if pin_hit and pin_hit.group(1) in victim_pins:
+            removed_pins.append(s)
+            continue
+        if s.startswith("SH.") and any(s.startswith(f"SH.{sig}") for sig in victim_signals):
+            removed_pins.append(s)
+            continue
+        # ---- 外设参数行 / 虚拟引脚表达
+        if s.startswith(f"{peripheral}.") or s.startswith(f"VP_{peripheral}") or s.startswith(f"SH.S_{peripheral}"):
+            removed.append(s)
+            continue
+        # ---- 中断:自己的向量 + 规则声明的共用向量
+        if re.match(rf"NVIC\.{re.escape(peripheral)}_IRQn=", s) or (
+            shared_irq and not keep_shared_irq and re.match(rf"NVIC\.{re.escape(shared_irq)}=", s)
+        ):
+            removed.append(s)
+            continue
+        # ---- 被删 DMA 请求占用的通道中断
+        if any(re.match(rf"NVIC\.{re.escape(ch)}_IRQn=", s) for ch in dma_channels):
+            removed_dma.append(s)
+            continue
+        # ---- IP 列表重排(不输出的:DMA 已被摘掉时)
+        if re.match(r"Mcu\.IP\d+=", s):
+            ip_name = s.split("=", 1)[1].strip()
+            if ip_name == peripheral or ip_name not in keep_ips:
+                continue
+            new_out.append(f"Mcu.IP{ip_counter}={ip_name}\n")
+            ip_counter += 1
+            continue
+        if re.match(r"Mcu\.IPNb=", s):
+            new_out.append(f"Mcu.IPNb={len(keep_ips)}\n")
+            continue
+        # ---- functionlistsort:去掉该外设的段(请求清空时连 MX_DMA_Init 一起)
         if "functionlistsort" in ln:
-            # 移除包含该外设的初始化段(段形如 ,N-MX_TIM3_Init-TIM3-false-HAL-true;HAL 使能位可 true/false)
             ln = re.sub(rf",\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-(?:true|false)", "", ln)
             ln = re.sub(rf"(^|,)\d+-[A-Za-z0-9_]*_Init-{re.escape(peripheral)}-false-HAL-(?:true|false),", r"\1", ln)
+            if dma_reqs and not keep_reqs:
+                ln = re.sub(r",\d+-MX_DMA_Init-DMA-false-HAL-(?:true|false)", "", ln)
+                ln = re.sub(r"(^|,)\d+-MX_DMA_Init-DMA-false-HAL-(?:true|false),", r"\1", ln)
             new_out.append(ln)
             continue
         new_out.append(ln)
+    if dma_reqs and not dma_block_written:
+        new_out.extend(_dma_block())
+    baseline = check_structure(ioc_path)
     backup(ioc_path)
     with open(ioc_path, "w", encoding="utf-8", newline="") as f:
         f.writelines(new_out)
-    verify_written(ioc_path, [f"Mcu.IPNb={len(keep_ips)}"])
-    return {"removed": removed, "keep_ips": keep_ips}
+    _verify_after_write(ioc_path, [f"Mcu.IPNb={len(keep_ips)}"], baseline)
+    return {
+        "removed": removed,
+        "keep_ips": keep_ips,
+        "removed_dma": removed_dma,
+        "removed_pins": removed_pins,
+    }

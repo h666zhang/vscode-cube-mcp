@@ -14,8 +14,8 @@ guide: |-
     cubemx_help                本指南(当前)
     cubemx_new_project         从零生成 HAL 工程(首选入口)
     cubemx_intent              按"配置意图"改 .ioc(只说要什么,内部名查知识库;0.4.4.1 新增)
-    cubemx_probe               在 .ioc 副本上试跑命令并给出差异(收录新外设用;0.4.4.1 新增)
-    cubemx_load                加载 .ioc 回读配置(只读)
+    cubemx_probe               在 .ioc 副本上试跑(commands 脚本命令 / inject 键注入)并给出差异(收录新外设用)
+    cubemx_load                加载 .ioc 回读配置 + 结构化摘要(只读)
     cubemx_configure           加载 .ioc,执行 set 命令序列并写回
     cubemx_generate            加载 .ioc 生成 HAL 代码
     cubemx_export_pinout       导出引脚配置 CSV(只读)
@@ -26,7 +26,11 @@ guide: |-
   1) 调 cubemx_help(topic="templates") 查看可用芯片模板
   2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
      mcu="STM32F103C8T6",
-     commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+     intents=[{"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}},
+              {"peripheral": "TIM3", "mode": "internal_clock", "prescaler": 72, "period": 100},
+              {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}])
+     **推荐用 intents**(与 cubemx_intent 同一套解析:配 ADC 自动补合法时钟、配 DMA 查通道表);
+     commands(原始 set 命令)仍可用,两者可以混用(intent 的命令排在前面)
   3) 自己的库(如 SPL_OLED/Src/OLED.c + SPL_OLED/Inc)写进工程根 CMakeLists.txt 的用户区
      (# Add sources to executable / # Add include paths);该文件 CubeMX 只生成一次,不会被覆盖
 
@@ -36,7 +40,8 @@ guide: |-
     couple_files  默认 True(每个外设生成独立 .c/.h);False 则集中到 main.c
     clock_source  默认 "HSE"(外部晶振,72MHz);"HSI" 用内部 RC
     pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
-    commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+    intents       配置意图列表(推荐),见上面第 2 步
+    commands      set 命令列表(原始接口),如 ["set pin PB13 GPIO_Output"]
     template      指定模板路径,优先于 mcu 查找
 
   【外设配置命令与已知坑】
@@ -62,7 +67,10 @@ new_project: |-
   1) 先调 cubemx_help(topic="templates") 查看可用芯片模板
   2) cubemx_new_project(project_name="Demo", project_dir="C:/MINE/STM32Project/Demo",
      mcu="STM32F103C8T6",
-     commands=["set pin PB13 GPIO_Output", "set gpio parameters PB13 GPIO_Label LED"])
+     intents=[{"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}},
+              {"peripheral": "I2C1", "pins": ["PB8", "PB9"]}])
+     intents 走与 cubemx_intent 同一套解析(配 ADC 自动补时钟、配 DMA 查通道表);
+     也可以用原始 commands=["set pin PB13 GPIO_Output"],两者可混用
   3) 自己的库(.c + .h 目录)写进工程根 CMakeLists.txt 的用户区(该文件只生成一次,不会被覆盖)
 
   参数(默认值而非强制):
@@ -71,10 +79,25 @@ new_project: |-
     couple_files  默认 True(每个外设独立 .c/.h);False 则集中到 main.c
     clock_source  默认 "HSE"(72MHz);"HSI" 用内部 RC
     pll_mul       默认 9(8MHz×9=72MHz);HSI 常用 16 → 64MHz
-    commands      set 命令列表,如 ["set pin PB13 GPIO_Output"]
+    intents       配置意图列表(推荐),见上面第 2 步
+    commands      set 命令列表(原始接口),如 ["set pin PB13 GPIO_Output"]
     template      指定模板路径,优先于 mcu 查找
 
   注意:找不到 {mcu}.ioc 模板时错误信息会列出可用模板,并按指引生成新芯片模板。
+probe: |-
+  【探针(cubemx_probe):把"还没实测过"的写法跑出真实差异,再收录进知识库】
+  - 两种输入,可以同时给:
+      commands: CubeMX 脚本命令(如 ["set mode USART2 Asynchronous"])
+      inject:   .ioc 键注入 —— 脚本配不了的写法全走这里,每项形如
+                {"type": "dma", "request": "ADC1", "channel": "DMA1_Channel1", "mode": "DMA_CIRCULAR"}
+                {"type": "tim_internal_clock", "target_tim": "TIM2", "prescaler": 72, "period": 100}
+                {"type": "tim_pwm", "target_tim": "TIM3", "pin": "PA6", "signal": "S_TIM3_CH1"}
+                {"type": "tim_input_capture", "target_tim": "TIM2", "pin": "PA0-WKUP", "signal": "S_TIM2_CH1_ETR"}
+                {"type": "lines", "lines": ["NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true"]}
+  - 给了 inject 时,工具还会让 CubeMX load + saveas 走一遍,并在输出里写明它**原样保留了**
+    还是**改写/丢弃了**注入内容;改写了会多附一段差异(注入后 vs 归一化后)
+  - 基线 .ioc 只读;keep_copy=True 会把副本(aa.probe.ioc)留下给你自己看
+  - 拿到差异后整理进 knowledge/rules/<外设>.yaml(标 verified 与来源)
 peripheral:
   gpio: |-
     【GPIO(已验证)】
@@ -95,7 +118,13 @@ peripheral:
     - 可靠做法:new_project 的 commands 里含
       "set ip parameters TIMx ClockSource TIM_CLOCKSOURCE_INTERNAL",
       server 自动注入 6.18 验证过的内部时钟标准表达(任意 TIM 均可,不依赖模板)。
-    - 1s 中断参数:72MHz 下 Prescaler=7200-1 + Period=10000-1。
+    - 1s 中断参数:72MHz 下 Prescaler=7199 + Period=9999(工具接口上传的是"分频比/计数"
+      7200 / 10000,注入时自动减 1 落成寄存器值)。
+    - TRGO 输出(给别的外设当触发源,如 ADC 的外部触发):可以用 set 命令配 ——
+      set ip parameters TIM3 TIM_MasterOutputTrigger TIM_TRGO_UPDATE
+      实测有效(2026-10-12):CubeMX 会自动把 TIM_MasterOutputTrigger 补进 TIMx.IPParameters。
+      用 TIM 触发 ADC 时这一步不能漏:只设 ADC 的 ExternalTrigConv、触发源没有 TRGO 输出,
+      generate 会弹窗卡死(见 topic="adc")。
 
     【TIM PWM(6.18 标准表达注入,0.4.1 起)】
     - 命令:set ip parameters TIM3 PWM <pin> <signal> [Prescaler n] [Period n] [Pulse n]
@@ -165,6 +194,8 @@ peripheral:
     - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
       generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
     - 还没实测:注入通道(InjectedConv)、模拟看门狗。
+    - DMA 搬运:在同一个意图里加 dma 字段(如 {"peripheral": "ADC1", "pins": ["PA0"], "dma":
+      {"mode": "circular"}}),见 cubemx_help(topic="dma");配 DMA 时 ADC 时钟仍必须先配。
   can: |-
     【CAN(探针实测 2026-10-10)】
     - 命令:set mode CAN CAN_Activate;set pin PA11 CAN_RX / set pin PA12 CAN_TX
@@ -184,10 +215,23 @@ peripheral:
     - 命令:set mode WWDG WWDG_Activate
     - 同上,写的是虚拟引脚 VP_WWDG_VS_WWDG。
   dma: |-
-    【DMA(实测:当前配不了,别在这上面耗时间)】
-    - 脚本 set 配不了:`set mode DMA ...` 一律 KO;CubeMX 的 help 命令表里也没有 DMA 项。
-    - 注入 .ioc 键(Dma.Request0=SPI1_RX 等)会在 CubeMX saveas 时被丢掉。
-    - 要用 DMA:先用 CubeMX GUI 给外设 Add 一次 DMA,然后继续用本工具(工具不会去动已有的 DMA 配置)。
+    【DMA(实测 2026-10-12:脚本 set 不行,但注入 .ioc 键组可用)】
+    - 脚本 set 配不了(`set mode DMA ...` 一律 KO),但注入键组有效 —— 等价于 GUI 里
+      在对应外设的 DMA Settings 点 Add。cubemx_intent 已封装,写在外设意图下:
+        {"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}}
+        {"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX"}}
+    - 请求名来自 CubeMX db(DMA_Request 组):ADC1 / USART2_RX / SPI1_TX / TIM2_UP ...
+      实例名本身就是请求名时可省略 request(ADC1、TIM2 这种);USART2 有 RX/TX 两个,
+      必须显式写 dma.request(有歧义就报错,不替你选)。
+    - 通道由 db 导出的表查出(knowledge/mcu/<芯片>.dma.yaml,如 ADC1→DMA1_Channel1、
+      USART2_RX→DMA1_Channel6),不用自己填;要指定就写 dma.channel。
+    - 其它字段(默认值而非强制):direction / mode(normal/circular) / periph_inc / mem_inc /
+      periph_align / mem_align / priority / interrupt(false 则不注入通道中断)。
+    - 数据宽度不用管:CubeMX 按请求类型补默认(ADC→HALFWORD、USART→BYTE,实测)。
+      generate 后 dma.c 的 MX_DMA_Init、各外设 x.c 的 hdma_xxx + __HAL_LINKDMA、
+      stm32f1xx_it.c 的 <通道>_IRQHandler 都会生成(实测三例:ADC1 / USART2_RX / RX+TX)。
+    - 注意:配 ADC + DMA 时 ADC 时钟照样要先配(ADCPresc),否则 generate 弹 [Clock] 卡死。
+    - 细节与实测记录见 knowledge/rules/dma.yaml。
   nvic: |-
     【中断(探针实测 2026-10-10)】
     - 脚本 set 配不了(CubeMX 命令表里没有中断相关项),但注入 .ioc 键有效:

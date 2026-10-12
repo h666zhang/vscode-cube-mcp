@@ -40,9 +40,15 @@
 
 - **`cubemx_intent`**:只写"要什么"(外设 / 模式 / 引脚 / 频率 / 占空比),`.ioc` 内部名由知识库查出来 —— 优先用它。
   目前支持:`TIMx`(pwm / input_capture / internal_clock)、`GPIO`、`I2Cx`、`USARTx`、`SPIx`、`ADCx`、
-  `IWDG`、`WWDG`、`CAN`、`RTC`;中断在意图里写 `interrupt` 字段(靠注入 `.ioc` 键实现);
-  **DMA 不支持**(CubeMX 脚本接口没有对应命令,见 `knowledge/rules/dma.yaml`)。
-- **`cubemx_probe`**:在 `.ioc` 的副本上试跑命令,输出改前改后的差异;用于收录还没实测过的外设写法。
+  `IWDG`、`WWDG`、`CAN`、`RTC`;中断在意图里写 `interrupt` 字段,DMA 在意图里写 `dma` 子对象
+  (如 `"dma": {"mode": "circular"}`)—— 两者都靠注入 `.ioc` 键实现,见 `knowledge/rules/dma.yaml`。
+- **`cubemx_new_project`**:从零建工程,**也能直接吃 `intents`**(与 cubemx_intent 同一套解析)——
+  推荐用意图而不是在 `commands` 里手写 set 命令(手写 `set mode ADC1 IN0` 不会自动补 ADC 时钟,会卡死 generate)。
+- **`cubemx_probe`**:在 `.ioc` 副本上试跑并给出差异。`commands` 跑脚本命令,`inject` 跑**键注入类**写法
+  (`{"type": "dma"|"tim_internal_clock"|"tim_pwm"|"tim_input_capture"|"lines", ...}`);给了 `inject` 时
+  会让 CubeMX load + saveas 走一遍,并明确告诉你它是**原样保留**还是**改写/丢弃**了注入内容。
+- **`cubemx_load`**:回读配置,默认附一份**结构化摘要**(IP / 引脚 / DMA 请求 / 中断 / 时钟 / 各外设参数 /
+  初始化顺序,JSON),agent 判断"现在配了什么"不必读 `.ioc` 原文;`summary=False` 可关。
 
 ## 已知坑(实测结论,勿重踩)
 
@@ -72,12 +78,13 @@
 
 ## 开发 / 验证
 
-- 单元测试:`python -m pytest`(159 个,其中 5 个集成测试默认跳过;都不依赖 CubeMX)
-- 集成测试(真启动 CubeMX,每个用例约 10s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
-- 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 90%+)
+- 测试:`python -m pytest`(**206 个:198 单元/协议 + 8 集成默认跳过**;单元与协议测试不依赖 CubeMX 安装)
+- 集成测试(真启动 CubeMX,每个用例约 10~30s):设 `ST_CUBEMX_RUN_INTEGRATION=1` 后再跑上面的命令
+- 覆盖率门槛:`python -m pytest`(低于 80% 失败;当前 ~93%)
 - 风格:`ruff check .` / `ruff format --check .`
 - 语法检查:`python -m compileall -q src tests`(PowerShell 不展开 `*.py`,别直接把通配符传给 py_compile)
-- MCP 协议级冒烟:**用官方 `mcp.client.stdio.ClientSession` 连接**;手写 JSON-RPC 直连本 2.0 server 会挂起无响应。
+- MCP 协议级冒烟:**`tests/test_mcp_protocol.py`**(用官方 `mcp.client.stdio.ClientSession` 连接,默认就跑);
+  手写 JSON-RPC 直连本 2.0 server 会挂起无响应。
 
 ## 原则
 

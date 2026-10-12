@@ -65,6 +65,12 @@ clock:
 # cubemx_intent 里写 {"interrupt": true} 时用的就是这个中断名。
 interrupt_irq: ADC1_2_IRQn
 
+# 移除该外设(cubemx_remove_peripheral)时要连带清理的引脚信号模式:
+# ADC 的引脚信号名是 ADCx_IN0(带 x,里面没有 "ADC1"),光靠"信号里含实例名"认不出来,
+# 所以在这里明确给出模式。
+remove:
+  pin_signal_patterns: ["ADCx_IN"]
+
 # 外部触发:意图里可写简写(如 T2_TRGO),补成 ADC_EXTERNALTRIGCONV_T2_TRGO
 trigger_prefix: ADC_EXTERNALTRIGCONV_
 
@@ -84,7 +90,8 @@ known_issues:
   - "**外部触发必须配套触发源**:只把 ExternalTrigConv 设成 ADC_EXTERNALTRIGCONV_T2_TRGO、而 TIM2 没配 TRGO 输出时,generate 会卡死到 240s 超时(实测)。要用外部触发,先用 TIM 把触发源配好(MasterConfig/TRGO),再设 ADC 的 ExternalTrigConv"
   - "db 导出的 NbrOfConversion 写着 max: '1',那是 XML 里 Visible=false 的那份定义;真正可见的定义是 Max=16,实测能设 2 —— 别被 parameters_from_db 的 max 误导"
   - "中断:注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler"
-  - "还没实测:注入通道(InjectedConv)、模拟看门狗、DMA 搬运 ADC 数据(DMA 本身脚本配不了)"
+  - "还没实测:注入通道(InjectedConv)、模拟看门狗"
+  - "DMA 搬运已支持(见 rules/dma.yaml):在意图里加 dma 字段即可;配了 DMA 之后 ADC 时钟仍必须先配好,否则 generate 卡死"
 
 parameters_from_db:
   sampling_time:

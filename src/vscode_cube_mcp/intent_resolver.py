@@ -321,17 +321,7 @@ def adc_commands(intent: dict, ioc_path: str = "") -> list:
     return commands
 
 
-# 实例名 -> 规则文件名(用来查该外设自己的默认中断向量名)
-_RULE_PATTERNS = (
-    (re.compile(r"ADC\d+"), "adc"),
-    (re.compile(r"USART\d+"), "usart"),
-    (re.compile(r"SPI\d+"), "spi"),
-    (re.compile(r"I2C\d+"), "i2c"),
-    (re.compile(r"TIM\d+"), "tim"),
-    (re.compile(r"CAN\d*"), "can"),
-    (re.compile(r"RTC"), "rtc"),
-    (re.compile(r"GPIO"), "gpio"),
-)
+# 实例名 -> 规则文件名:映射在 knowledge_loader.rule_name_for(**唯一**一份定义)
 
 
 def default_irq_name(instance: str) -> str:
@@ -340,16 +330,14 @@ def default_irq_name(instance: str) -> str:
     F103 上 ADC1/ADC2 共用一个向量(ADC1_2_IRQn),这类"实例名推导不出向量名"的情况
     由 knowledge/rules/<外设>.yaml 的 interrupt_irq 声明,不靠猜。
     """
-    for pattern, name in _RULE_PATTERNS:
-        if not pattern.fullmatch(instance):
-            continue
+    rule_name = knowledge_loader.rule_name_for(instance)
+    if rule_name:
         try:
-            irq = str(knowledge_loader.rule(name).get("interrupt_irq") or "").strip()
+            irq = str(knowledge_loader.rule(rule_name).get("interrupt_irq") or "").strip()
         except ToolError:
             irq = ""
         if irq:
             return irq
-        break
     return f"{instance}_IRQn"
 
 
@@ -371,6 +359,80 @@ def interrupt_line(intent: dict) -> str:
     instance = str(intent.get("peripheral", "")).strip().upper()
     irq = default_irq_name(instance) if flag is True else str(flag).strip()
     return pattern.replace("{irq}", irq)
+
+
+def dma_request_name(instance: str, options: dict) -> str:
+    """定出 DMA 请求名:显式给的最优先;否则实例名本身就是请求名(ADC1/TIM2 这类)。
+
+    再否则看 "{实例}_*" 是不是只剩一个候选:USART2 有 USART2_RX / USART2_TX 两个,
+    必须显式写在 dma.request 里(有歧义就报错,不替用户选)。
+    """
+    explicit = str(options.get("request", "")).strip().upper()
+    if explicit:
+        return explicit
+    known = knowledge_loader.dma_requests()
+    if instance in known:
+        return instance
+    hits = [r for r in known if r.startswith(f"{instance}_")]
+    if len(hits) == 1:
+        return hits[0]
+    if hits:
+        raise ToolError("BAD_ARGUMENT", f"{instance} 有多个 DMA 请求: {', '.join(hits)};请在 dma.request 里写明要哪个")
+    raise ToolError(
+        "UNKNOWN_PARAM",
+        f"知识库里没有 {instance} 的 DMA 请求(已收录: {', '.join(known[:15])} ...)",
+    )
+
+
+def dma_fields(intent: dict) -> dict | None:
+    """把意图里的 dma 子对象翻译成 ioc_editor.inject_dma 的参数;没有 dma 字段返回 None。
+
+    写法(挂在具体外设意图下,和 GUI 里"在该外设上 Add 一个 DMA 请求"是同一件事):
+      {"peripheral": "ADC1", "pins": ["PA0"], "dma": {"mode": "circular"}}
+      {"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX"}}
+      {"peripheral": "ADC1", "pins": ["PA0"], "dma": true}          # 全默认
+
+    字段(默认值而非强制):request / channel / direction / mode / periph_inc / mem_inc /
+    periph_align / mem_align / priority / interrupt。
+    通道与方向默认查 db 导出的表(knowledge/mcu/<芯片>.dma.yaml),不猜;对齐与优先级留空
+    时交给 CubeMX 按请求类型补默认(实测 ADC→HALFWORD、USART→BYTE)。
+    """
+    raw = intent.get("dma")
+    if not raw:
+        return None
+    options = raw if isinstance(raw, dict) else {}
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    request = dma_request_name(instance, options)
+    values = knowledge_loader.require_rule_verified("dma").get("values") or {}
+
+    def pick(field: str, raw_value) -> str:
+        """简写(circular / halfword)与完整枚举名都收;查不到就列可选项报错。"""
+        text = str(raw_value or "").strip()
+        if not text:
+            return ""
+        table = values.get(field) or {}
+        key = text.lower().replace("-", "_")
+        if key in table:
+            return str(table[key])
+        for enum in table.values():
+            if str(enum).lower() == text.lower():
+                return str(enum)
+        raise ToolError("BAD_ARGUMENT", f"DMA {field} 不支持 {raw_value!r};可选: {', '.join(sorted(table))}")
+
+    channel = str(options.get("channel", "")).strip() or knowledge_loader.dma_channel(request)
+    irq = options.get("interrupt", options.get("irq", True))
+    return {
+        "request": request,
+        "channel": channel,
+        "direction": pick("direction", options.get("direction")) or knowledge_loader.dma_direction(request),
+        "mode": pick("mode", options.get("mode")),
+        "periph_inc": pick("periph_inc", options.get("periph_inc")),
+        "mem_inc": pick("mem_inc", options.get("mem_inc")),
+        "periph_align": pick("periph_align", options.get("periph_align")),
+        "mem_align": pick("mem_align", options.get("mem_align")),
+        "priority": pick("priority", options.get("priority")),
+        "nvic": bool(irq),
+    }
 
 
 def switch_commands(intent: dict, rule_name: str) -> list:
@@ -479,15 +541,18 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
         "UNKNOWN_PERIPHERAL",
         f"意图层还不支持 {peripheral}(目前:TIMx 的 pwm/input_capture/internal_clock,"
         f"以及 GPIO / I2Cx / USARTx / SPIx / ADCx / IWDG / WWDG / CAN / RTC)。"
-        f"DMA 脚本配不了(见 knowledge/rules/dma.yaml);中断要在意图里写 interrupt 字段",
+        f'DMA 要挂到具体外设意图下写(如 {{"peripheral": "ADC1", "pins": ["PA0"], "dma": true}});'
+        f"中断在意图里写 interrupt 字段",
     )
 
 
 def apply_intents(ioc_path: str, intents: list) -> dict:
     """把一组意图落到 .ioc:先查引脚冲突,再逐个执行。
 
-    返回 {"notes": [每条说明...], "commands": [要交给 CubeMX 脚本的 set 命令...]}。
-    TIM 是就地注入 .ioc;GPIO / I2C / USART 返回命令,由上层拼进 config load / saveas 里跑。
+    返回 {"notes", "commands", "ioc_lines", "dma"}:
+      commands  —— 要交给 CubeMX 脚本的 set 命令(TIM/中断/DMA 之外的部分);
+      ioc_lines —— 直接注入的 .ioc 行(中断 NVIC);
+      dma       —— 要交给 ioc_editor.inject_dma 的 DMA 键组计划(每项一个请求)。
     """
     if not intents:
         raise ToolError("BAD_ARGUMENT", "intents 是空的")
@@ -506,6 +571,7 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
     notes = []
     commands = []
     ioc_lines = []
+    dma_plans = []
     for intent in intents:
         result = apply_one(ioc_path, intent)
         notes.append(result["note"])
@@ -513,4 +579,11 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
         line = interrupt_line(intent)
         if line:
             ioc_lines.append(line)
-    return {"notes": notes, "commands": commands, "ioc_lines": ioc_lines}
+        plan = dma_fields(intent)
+        if plan:
+            dma_plans.append(plan)
+            notes.append(
+                f"DMA 请求 {plan['request']} → 通道 {plan['channel']}"
+                f"({'含' if plan['nvic'] else '不含'}通道中断;注入 .ioc 键组,见 rules/dma.yaml)"
+            )
+    return {"notes": notes, "commands": commands, "ioc_lines": ioc_lines, "dma": dma_plans}

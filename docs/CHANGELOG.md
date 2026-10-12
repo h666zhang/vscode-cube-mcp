@@ -2,9 +2,9 @@
 
 本项目的版本变更记录。开发笔记(原理、实测、SOP)见 [README.dev-notes.md](README.dev-notes.md)。
 
-## 0.4.4.1(2026-10-10)
+## 0.4.4.1(2026-10-10 定号,2026-10-12 发布)
 
-重构:把 STM32 的事实从代码里搬进知识库,并加了"配置意图"这一层。(**未发布**,版本号先定下来)
+重构:把 STM32 的事实从代码里搬进知识库,并加了"配置意图"这一层。(已于 2026-10-12 发布到 PyPI)
 
 - **新增知识库 `knowledge/`**:引脚 / 模式 / 参数从 CubeMX 自带的 `db/` 导出
   (`tools/gen_knowledge_from_db.py`);实测规则放 `knowledge/rules/*.yaml`,每条带 `verified` 与来源
@@ -58,6 +58,93 @@
 - **README 受众收敛**:「开发与测试」移到开发笔记;「知识库」压缩为指路;合并「更多资料 / 更新日志」;
   删掉指向不存在章节的"维护者发版流程"指引
 - 工具数 11 → 10(README / AGENTS.md / 内置帮助 / `__init__` 注释)
+
+### DMA 支持(2026-10-12 实测)
+
+- **结论翻案**:原记录"DMA 脚本与注入都不行"只对了一半 —— 脚本 `set mode DMA ...` 确实配不了,
+  但**注入完整 `.ioc` 键组有效**,等价于 GUI 里在对应外设的 DMA Settings 点 Add。实测三例
+  (ADC1 / USART2_RX / USART2_RX+USART2_TX),generate 回读:`dma.c` 的 `MX_DMA_Init` +
+  `HAL_NVIC_EnableIRQ(<通道>_IRQn)`、外设 `.c` 的 `hdma_xxx` + `__HAL_LINKDMA`、
+  `stm32f1xx_it.c` 的 `<通道>_IRQHandler` 全部生成。当时失败的原因是只注入了 `Dma.Request0` /
+  `Dma.RequestsNb` 两行:缺参数块、`Mcu.IPx=DMA` 与 `NVIC` 行,这些"孤儿键"在 saveas 时被丢掉了
+- **`cubemx_intent` 支持 `dma` 子对象**(挂在外设意图下,和 GUI 的"在该外设上 Add"一个意思):
+  `{"peripheral": "ADC1", "pins": ["PA0", "PA1"], "dma": {"mode": "circular"}}`
+- **通道与方向查 db 表**:`db/mcu/IP/DMA-<ver>_Modes.xml` 的 `ModeLogicOperator` 树与 `RefMode`,
+  由 `tools/gen_knowledge_from_db.py` 导出到 `knowledge/mcu/<芯片>.dma.yaml`(F103 49 条;
+  ADC1→DMA1_Channel1、USART2_RX→DMA1_Channel6)。请求名有歧义(USART2 的 RX/TX)时报错让你选,不代猜
+- **数据宽度不用猜**:只写必需参数(Instance/Direction/PeriphInc/MemInc/Mode),CubeMX 按请求类型
+  补默认(实测 ADC→HALFWORD、USART→BYTE);要覆盖就写 `periph_align` / `mem_align` / `priority`
+- **注入顺序修正**:中断 / DMA 这类注入改到 `project generate` **之前**,
+  同一次调用里 `generate: true` 就能带上(此前注入在 generate 之后,需要再 generate 一次)
+- 实测副产品:CubeMX 加载**任何**带 DMA 的 `.ioc`(含 GUI 自己生成的 `ADC.ioc`)都会打 8 条
+  `(OptionalMessage_ERROR) IP (DMA) : Parameter (…) has Id (…) currently not set` —— 6.18 的噪音,
+  保存与生成都正常
+- `knowledge/rules/dma.yaml` 重写并置 `verified: true`,`cubemx_help(topic="dma")` 与 dev-notes
+  的能力表同步
+- 测试 165 → **178**(新增 `TestInjectDma` / `TestDmaIntent` 与知识库 DMA 查询用例)
+
+### TIM 参数写法修正 + TRGO 配置(2026-10-12 实测)
+
+- **修掉 `Prescaler = 72-1` 这种"未求值"生成代码**:注入 TIM 内部时钟 / PWM / 输入捕获时,
+  片段里写的是 `{prescaler}-1`,CubeMX 会把它**原样抄进 C 代码**
+  (`htim3.Init.Prescaler = 72-1;` —— 合法但难看,且与 GUI 产物不一致)。改为注入器先算好
+  寄存器值(`72` 分频 → `Prescaler=71`);接口语义不变(上传的仍是"分频比 / 计数")
+- **TRGO 输出可以脚本配(新实测)**:`set ip parameters TIM3 TIM_MasterOutputTrigger
+  TIM_TRGO_UPDATE` 有效,CubeMX 会自动把 `TIM_MasterOutputTrigger` 补进 `TIMx.IPParameters` ——
+  "用 TIM 触发 ADC 的外部触发"就靠这一步(只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死)
+- 实测工程:`ADC_DMA_TIM3`(I2C1 PB8/PB9 + ADC1 PA0~PA4 五通道 + DMA1_Channel1 循环 +
+  DMA 中断 + TIM3 10kHz TRGO 触发),generate 回读 `tim.c` / `adc.c` / `dma.c` /
+  `stm32f1xx_it.c` 全部符合预期,六个源文件 `-fsyntax-only` 无警告
+
+### 修复与补测:移除残留 + 验证盲区(2026-10-12)
+
+- **修 `cubemx_remove_peripheral` 的残留**(盘验证盲区时实测发现:删掉 ADC1 之后,
+  `Dma.ADC1.0.*`、`Dma.Request0`、`NVIC.DMA1_Channel1_IRQn`、`PA0-WKUP.Signal=ADCx_IN0`
+  全都留在 `.ioc` 里)。现在连带清理:
+  - 物理引脚(`{pin}.*` 与 `SH.{信号}*`)—— 判据是引脚的 `Signal` 值含实例名;
+    ADC 的 `ADCx_IN0` 里没有 "ADC1",由 `rules/adc.yaml` 新增的
+    `remove.pin_signal_patterns` 认出来;
+  - 共用向量中断(`ADC1_2_IRQn`)—— 同族实例(ADC2)还在时保留,不误删;
+  - **DMA 连带**:`Dma.{请求}.*`(请求名 == 实例名或以 `{实例}_` 开头)、`Dma.Request<n>`、
+    剩余请求**重新连续编号**(键前缀里的序号同步改)、`Dma.RequestsNb`、被删请求占用的
+    `NVIC.<通道>_IRQn`;请求清空时连 `Mcu.IPx=DMA` 与 `MX_DMA_Init` 段一起清
+- **补三块测试盲区**(此前零覆盖):
+  - 集成测试 +3 个真跑 CubeMX 的用例:DMA 注入经得起 `load + saveas`、NVIC 注入同样、
+    配 I2C1 + 它的 DMA 请求再移除后 `.ioc` 仍可 load(本机实测 76.7s 全过)
+  - `tools/gen_knowledge_from_db.py` 的 XML 解析 +5 个单测(内联 XML:默认命名空间
+    那个踩过的坑、`MEMTOMEM` 过滤、一请求多通道收成列表、模式/引脚解析、YAML 结构)
+  - `remove_peripheral` 的 DMA 连带 +3 个单测(含共用向量保留、请求重编号)
+- 「实例名 → 规则文件」的映射收敛到 `knowledge_loader.rule_name_for`(原先在
+  `intent_resolver` 里,现在移除逻辑也要用,只留一份定义)
+- 知识库过时说明修正:`rules/adc.yaml` 的"DMA 本身脚本配不了"改为现状;`rules/dma.yaml`
+  补"移除会连带清 DMA"与"跨芯片未实测"两条;dev-notes 补 `remove_peripheral` 的删除范围
+- 测试 178 → **189**(181 单元 + 8 集成);覆盖率 92.42%
+- 本轮仍是**未验证**:真机烧录、F1 之外的芯片
+
+### 工具接口补洞 + 工程卫生(2026-10-12)
+
+- **`cubemx_new_project` 直接吃 `intents`**(与 `cubemx_intent` 同一套解析)—— 从零建工程一步到位;
+  以前只能用 `commands` 手写 set 命令,而手写 `set mode ADC1 IN0` 不会自动补 ADC 时钟
+  (模板默认 36MHz 超 F103 的 14MHz 上限),`project generate` 会弹 `[Clock]` 对话框把 `-q`
+  批处理卡死(实测)
+- **`cubemx_probe` 支持键注入**(新增 `inject` 参数):DMA / TIM 内部时钟 / PWM / 输入捕获 / NVIC 行
+  都能探;给了 `inject` 时还会让 CubeMX `load + saveas` 走一遍,并明确写出它**原样保留**还是
+  **改写/丢弃**了注入内容(以前收录注入类写法只能手写临时脚本 —— 这次 DMA 实测正是这么干的)
+- **`cubemx_load` 附结构化摘要**(默认开,`summary=False` 关):IP / 引脚 / DMA 请求与参数 / 中断 /
+  时钟 / 各外设参数 / 初始化顺序,JSON 输出,agent 判断"现在配了什么"不必再读 `.ioc` 原文
+- **`ioc_structure.yaml` 从纯文档变成写入校验**:所有改 `.ioc` 的函数写盘后按它校验
+  (IP / Pin 编号必须从 0 连续 + 计数一致),只报"这次新引入的问题",抛 `STRUCTURE_MISMATCH`
+- **MCP 协议级测试固化**:新增 `tests/test_mcp_protocol.py`,用官方 `mcp.client.stdio.ClientSession`
+  连 server,验工具清单(10 个)与错误传递;默认就跑(只碰本地知识库,不启 CubeMX)
+- 修 `ioc_diff.diff_texts` 缺 `summary` 键的问题(渲染差异时会 `KeyError`,探针的
+  "注入后 vs 归一化后"那段会踩到)
+- 文档同步:AGENTS.md(测试数字、三个工具的新能力)、`help.yaml`(新增 `probe` topic、
+  `new_project` 的 intents 示例)、README(工具表与参数表)、dev-notes(探针 SOP、写入双保险);
+  修 `rules/usart.yaml` 里已过期的 todo
+- **`pyproject.toml` 的 authors 重复条目合并**:此前发到 PyPI 的元数据里 `author_email` 显示成
+  "F1ZyCAO_3286 <3286266250@qq.com>"(姓名重复了一次),现在只剩一条
+- 测试 189 → **206**(198 单元/协议 + 8 集成);覆盖率 92.4% → **93.0%**
+- 仍未验证:真机烧录、F1 之外的芯片
 
 ## 0.4.2(2026-08-27)
 - **工程化补强**(非功能迭代,为「全外设完善」里程碑铺路):

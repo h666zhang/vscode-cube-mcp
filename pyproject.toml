@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "F1ZyCaO_3286" },
     { name = "F1ZyCaO_3286", email = "3286266250@qq.com" },
 ]
 keywords = ["mcp", "stm32", "stm32cubemx", "embedded", "hal"]
