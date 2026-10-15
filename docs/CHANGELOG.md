@@ -4,6 +4,10 @@
 
 ## 0.4.4.3(未发布)
 
+- **文档整理**:`AGENTS.md` 139 行 → 54 行,只留 agent 真需要避的坑 —— 7 条「工具已经自动处理」的
+  (ADC 时钟、SPI 波特率、`project path`、零产出校验…)移到 `docs/dev-notes/06-fixed-issues.md`(留来历,
+  不再占 agent 上下文);`docs/README.dev-notes.md`(479 行)按主题拆成 `docs/dev-notes/` 下 6 个文件,
+  原文件变成索引
 - **工具 description 补「什么时候不用我」+ `cubemx_script` 改名 `cubemx_raw_script`**:agent 面对
   "好几个工具都能跑 set 命令"时本来没有排他依据(`cubemx_configure` / `cubemx_probe` / 原始脚本接口
   三者是重合的),现在每个工具的 description 首段就写明**什么时候不该用它**、并指向该用的那个;

@@ -724,7 +724,7 @@ def _finish_ioc_write(ioc_path, out_lines, new_ips, new_pins, counts, params_blo
 def inject_tim_pwm(
     ioc_path: str, target_tim: str, pin: str, signal: str, prescaler: int = 7200, period: int = 10000, pulse: int = 5000
 ) -> str:
-    """把目标 TIM 配成 PWM 输出(6.18 标准表达,内部枚举名对照见 README.dev-notes.md)。
+    """把目标 TIM 配成 PWM 输出(6.18 标准表达,内部枚举名对照见 docs/dev-notes/02-peripherals.md)。
 
     注入的 6.18 原生形态(与 inject_tim_internal_clock 同款骨架):
       Mcu.IPx=TIM3 / Mcu.Pin{N}=PA6

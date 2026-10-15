@@ -3,7 +3,7 @@
 # 事实来源(两条都核对过):
 #   1) 枚举值(如 "PWM Generation1 CH1")与 CubeMX 自带 db/ 导出的
 #      knowledge/ip/TIM1_8F1-gptimer2_v1_x_Cube_Modes.yaml 一致;
-#   2) .ioc 片段与 6.18 原生生成的基准样本逐行比对一致(见 README.dev-notes.md)。
+#   2) .ioc 片段与 6.18 原生生成的基准样本逐行比对一致(见 docs/dev-notes/02-peripherals.md)。
 #
 # 升级 CubeMX 版本后必须重新实测确认,不要凭猜测改动这里的值。
 
