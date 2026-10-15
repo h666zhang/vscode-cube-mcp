@@ -163,7 +163,7 @@ probe: |-
                 {"type": "lines", "lines": ["NVIC.USART2_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:true\\:true\\:true"]}
   - 给了 inject 时,工具还会让 CubeMX load + saveas 走一遍,并在输出里写明它**原样保留了**
     还是**改写/丢弃了**注入内容;改写了会多附一段差异(注入后 vs 归一化后)
-  - 基线 .ioc 只读;keep_copy=True 会把副本(aa.probe.ioc)留下给你自己看
+  - 基线 .ioc 只读;keep_copy=True 会把副本(aa.probe.ioc)保留在磁盘上
   - 拿到差异后整理进 knowledge/rules/<外设>.yaml(标 verified 与来源)
 peripheral:
   gpio: |-

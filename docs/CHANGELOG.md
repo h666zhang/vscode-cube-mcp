@@ -28,8 +28,8 @@
 - **README 加 scope 白名单 + `cubemx_help` 标注知识库录制版本 + CI 加 wheel 安装冒烟**
   (前两个 job 都用 `pip install -e`,暴露不了"wheel 里少了 knowledge/templates"这类打包问题)
 - **文档整理**:`AGENTS.md` 139 行 → 54 行,只留 agent 真需要避的坑 —— 7 条「工具已经自动处理」的
-  (ADC 时钟、SPI 波特率、`project path`、零产出校验…)移到 `docs/dev-notes/06-fixed-issues.md`(留来历,
-  不再占 agent 上下文);`docs/README.dev-notes.md`(479 行)按主题拆成 `docs/dev-notes/` 下 6 个文件,
+  (ADC 时钟、SPI 波特率、`project path`、零产出校验…)移到 `docs/dev-notes/06-fixed-issues.md`;
+  `docs/README.dev-notes.md`(479 行)按主题拆成 `docs/dev-notes/` 下 6 个文件,
   原文件变成索引
 - **工具 description 补「什么时候不用我」+ `cubemx_script` 改名 `cubemx_raw_script`**:agent 面对
   "好几个工具都能跑 set 命令"时本来没有排他依据(`cubemx_configure` / `cubemx_probe` / 原始脚本接口
@@ -142,9 +142,9 @@
   "用了默认分频"误报成"没设"、同时把真正的超限漏掉(实测:`RCC.ADCFreqValue=36000000` 明明写在
   文件里)。现在优先按 `ADCPresc` 现算、没有该行就退回读 `RCC.ADCFreqValue`,既不再误报、也能
   正确报出超限
-- 两条错误提示改说人话:引脚名错误的样例改成"每个端口各挑几个 + 点明编号到 `Pxx15`"(以前按
-  字母序取前几个,报 `PB99` 时给出来的例子里一个 `PB` 都没有);把**目录**当 `.ioc` 传时明确说
-  "你给的是目录,应该指向 .ioc 文件"
+- **错误提示改得更具体**:①引脚名写错时,样例按"每个端口各挑几个、编号点到 `Pxx15`"给出
+  (原来按字母序取前几个,报 `PB99` 时样例里没有一个 `PB`);②把目录当 `.ioc` 传时,提示改为
+  "这是目录,应指向 `.ioc` 文件"
 - help 补 4 处:失败会卡在哪一步、目录里会剩什么半成品(含常见错误码清单)、`adc_clock_div` 的
   合法值表、"值等于库默认值时 CubeMX 不写该行"这条规律、`topic="usart"` 的 `interrupt` 默认语义
   以及与 DMA 通道中断的区别
