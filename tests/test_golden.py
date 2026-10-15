@@ -142,6 +142,56 @@ class TestGoldenIntegration(unittest.TestCase):
             shutil.rmtree(root, ignore_errors=True)
 
 
+@unittest.skipUnless(INTEGRATION, "设 ST_CUBEMX_RUN_INTEGRATION=1 才会真启动 CubeMX(这一条约 70s)")
+class TestGoldenIdempotent(unittest.TestCase):
+    """端到端幂等:同一批命令重复执行,`.ioc` 的结构化内容必须收敛。
+
+    这是 agent 重试的真实形态 —— 它拿着同一批命令再跑一遍(而不是重算意图:重算会撞
+    PIN_CONFLICT,因为引脚已经占上了)。比的是**结构化内容**(排除 ioc_diff.DEFAULT_IGNORE
+    里的版本 / 面板状态 / 工程名等噪声键),不是文件字节 —— CubeMX 每次 saveas 都会改那些。
+
+    实测(2026-10-15):GPIO 用例第 1 次就稳定;I2C1 / ADC 用例第 1 次与第 2 次不同
+    (第一次是"从模板到配置"的过渡形态,CubeMX 再 load + saveas 一次才补全键),但
+    **第 2 次起不再变化** —— 对重试是安全的。
+    """
+
+    CASE = "F103_i2c1_oled"  # 挑一个"第 1 次不收敛"的,最能验证重复执行的稳定性
+    ROUNDS = 3
+
+    def setUp(self):
+        knowledge_loader.reload()
+        from vscode_cube_mcp import cubemx_mcp
+
+        self.cubemx = cubemx_mcp
+
+    @staticmethod
+    def _content_hash(path) -> str:
+        import hashlib
+
+        entries = ioc_diff.parse_ioc(Path(path).read_text(encoding="utf-8", errors="replace"))
+        keep = {k: v for k, v in entries.items() if not ioc_diff._is_ignored(k, ioc_diff.DEFAULT_IGNORE)}
+        return hashlib.sha256(json.dumps(sorted(keep.items()), ensure_ascii=False).encode()).hexdigest()
+
+    def test_replaying_same_commands_converges(self):
+        d = GOLDEN / self.CASE
+        case = json.loads((d / "case.json").read_text(encoding="utf-8"))
+        root = tempfile.mkdtemp(prefix="golden_idem_")
+        try:
+            ioc = os.path.join(root, "proj.ioc")
+            shutil.copy(TEMPLATE, ioc)
+            plan = intent_resolver.apply_intents(ioc, case["intents"])  # 只算一次,之后重复执行
+            script = "\n".join([f'config load "{ioc}"', *plan["commands"], f'config saveas "{ioc}"'])
+            hashes = []
+            for _ in range(self.ROUNDS):
+                r = self.cubemx._run_script(script)
+                self.assertTrue(r["ok"], r.get("output", "")[-500:])
+                hashes.append(self._content_hash(ioc))
+            print(f"\n[{self.CASE}] 重复 {self.ROUNDS} 次的 .ioc 内容 hash: {[h[:10] for h in hashes]}")
+            self.assertEqual(len(set(hashes[1:])), 1, f"重复执行后内容还在变: {hashes}")
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+
 def _make_case_test(dir_name: str, case: dict):
     def test(self):
         self._replay(GOLDEN / dir_name, case)
