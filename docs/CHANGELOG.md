@@ -4,6 +4,11 @@
 
 ## 0.4.4.3(未发布)
 
+- **工具 description 补「什么时候不用我」+ `cubemx_script` 改名 `cubemx_raw_script`**:agent 面对
+  "好几个工具都能跑 set 命令"时本来没有排他依据(`cubemx_configure` / `cubemx_probe` / 原始脚本接口
+  三者是重合的),现在每个工具的 description 首段就写明**什么时候不该用它**、并指向该用的那个;
+  `cubemx_script` → `cubemx_raw_script` 把"降级接口"写进名字(README / AGENTS.md / help.yaml /
+  dev-notes / 测试共 19 处同步改,`cubemx_configure` 保留不动)
 - **修 SPI 配好后 generate "报 OK 却零产出 / 卡死"**(实测根因:默认波特率超上限):CubeMX 默认
   `SPI1.BaudRatePrescaler=2`,APB2=72MHz 下等于 36 MBits/s,超过 F103 的 SPI 上限 18 MBits/s ⇒
   CubeMX 记 `IP not ready for code generation: SPI1` 并弹 `Parameter Error` 对话框,`-q` 批处理
@@ -40,7 +45,7 @@
   `project path` 脚本命令 —— 它返回 `KO`,而带它的批处理里随后的 `project generate`
   既不产出任何文件、还会被判定成失败(实测另有一次 240s 卡死 + 残留 `javaw`)。现在不再
   发这条命令:`project_dir` 指向别的目录时,把 `.ioc` 复制过去就地生成(原 `.ioc` 不动);
-  `cubemx_script` 里手写 `project path` 直接拒绝并给出替代做法
+  `cubemx_raw_script` 里手写 `project path` 直接拒绝并给出替代做法
 - **生成产出校验**(同一次盲测暴露):`cubemx_generate` / `cubemx_new_project` /
   `cubemx_intent(generate=True)` 生成后校验 `Core/Src/*.c` 是否真的落盘 —— 以前"CubeMX
   报 OK 却一个文件都没生成"会被当成功回报,调用方要到第三步才发现;现在报

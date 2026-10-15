@@ -35,7 +35,7 @@
 
 ## 工具一览(11 个)
 
-`cubemx_help` / `cubemx_script` / `cubemx_load` / `cubemx_configure` / `cubemx_generate`
+`cubemx_help` / `cubemx_raw_script` / `cubemx_load` / `cubemx_configure` / `cubemx_generate`
 / `cubemx_export_pinout` / `cubemx_new_project` / `cubemx_intent` / `cubemx_probe`
 / `cubemx_remove_peripheral` / `cubemx_inspect_output`
 
@@ -58,6 +58,10 @@
   按 `pattern` 取匹配行(在整个 `Core/` 下搜,如 `pattern="ContinuousConvMode|ScanConvMode"`)。
   只读、**不返回文件全文**、不展开 `Drivers/` 第三方目录;`cubemx_generate` / `cubemx_new_project`
   成功时也会附一行结构摘要。
+- **`cubemx_raw_script`**:任意脚本的**降级接口**(原 `cubemx_script`)。**主链路上没有它的位置**:
+  能用 `cubemx_intent` 表达就优先用它(会补时钟/DMA/NVIC 与隐含键),要预演用 `cubemx_probe` ——
+  只有两者都表达不了的写法才用它。11 个工具的 description 首段都写了「什么时候不用我」,
+  照那个走就不会选错(它们都指向该用的那个工具)。
 
 ## 已知坑(实测结论,勿重踩)
 
@@ -103,7 +107,7 @@
 - **`project path` 在 CubeMX 6.18 已失效(实测 2026-10-12)**:批处理里发 `project path "dir"`
   返回 KO,且带它的脚本里随后的 `project generate` 既不产出文件、还会被判成失败(另有一次
   240s 卡死 + 残留 `javaw`)。要生成到别的目录用 `cubemx_generate(ioc, project_dir=...)`(工具
-  会把 .ioc 复制过去就地生成);`cubemx_script` 里手写 `project path` 会被直接拒绝。
+  会把 .ioc 复制过去就地生成);`cubemx_raw_script` 里手写 `project path` 会被直接拒绝。
 - **生成后要校验产出**:CubeMX 报 OK 也可能一个文件都没生成(实测 new_project 首次生成
   零产出)—— 工具现在会校验 `Core/Src/*.c`,零产出时报 `CUBEMX_NO_OUTPUT`,成功时返回
   生成文件清单。排查"报 OK 没产物"先看有没有残留 `javaw` 占着 CubeMX 单实例。

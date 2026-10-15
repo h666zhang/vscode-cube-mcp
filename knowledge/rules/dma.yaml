@@ -3,7 +3,7 @@
 # 实测(2026-10-12,CubeMX 6.18.0,STM32F103C8T6,基线 = templates/STM32F103C8T6.ioc 副本):
 #   ① 脚本 set 这条路依然不通(和 2026-10-10 结论一致,未变):
 #        set mode DMA SPI1_RX / set mode DMA DMA1 -> 一律 KO
-#        cubemx_script("help") 的命令表里没有任何 DMA 子命令
+#        cubemx_raw_script("help") 的命令表里没有任何 DMA 子命令
 #   ② 注入路径**可行**,0.4.4.1 之前记的"注入会被 saveas 丢掉"是错的 ——
 #      当时只注入了 Dma.Request0 / Dma.RequestsNb 两行,缺参数块、缺 Mcu.IPx=DMA、
 #      缺 NVIC 行,CubeMX 归一化时把"挂不到 IP 上的孤儿键"丢掉了。写全就全部保留。

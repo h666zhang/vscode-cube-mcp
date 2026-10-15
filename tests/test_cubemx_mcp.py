@@ -192,11 +192,11 @@ class TestToolWrappers(unittest.TestCase):
 
     def test_script_ok(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
-            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_script("config load x"))
+            self.assertIn("[OK exit=0]", cubemx_mcp.cubemx_raw_script("config load x"))
 
     def test_script_fail(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": False, "output": "KO", "exit_code": 2}):
-            self.assertIn("[FAIL exit=2]", cubemx_mcp.cubemx_script("config load x"))
+            self.assertIn("[FAIL exit=2]", cubemx_mcp.cubemx_raw_script("config load x"))
 
     def test_load_ok(self):
         with mock.patch.object(cubemx_mcp, "_run_script", return_value={"ok": True, "output": "OK", "exit_code": 0}):
@@ -273,7 +273,7 @@ class TestToolWrappers(unittest.TestCase):
     def test_script_rejects_project_path(self):
         # 手工脚本里带 project path 直接拒绝(6.18 会 KO + 静默零产出 + 可能卡死)
         with self.assertRaises(ValueError) as cm:
-            cubemx_mcp.cubemx_script('project path "C:/tmp/x"')
+            cubemx_mcp.cubemx_raw_script('project path "C:/tmp/x"')
         self.assertIn("project path", str(cm.exception))
 
     def test_ko_command_is_reported(self):
@@ -290,7 +290,7 @@ class TestToolWrappers(unittest.TestCase):
                 "ko_command": cubemx_mcp._ko_command(output),
             },
         ):
-            r = cubemx_mcp.cubemx_script("config load x")
+            r = cubemx_mcp.cubemx_raw_script("config load x")
         self.assertIn("返回 KO 的命令", r)
         self.assertIn("project path", r)
 

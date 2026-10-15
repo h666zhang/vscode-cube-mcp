@@ -285,7 +285,7 @@ TIM3.IPParameters=Prescaler,Period,OCMode,Pulse,Channel-PWM Generation1 CH1
   `S_TIM2_CH1_ETR:TIM2` —— PA0 的组合名 `S_TIM2_CH1_ETR` 就是这么来的,**不用猜**;
 - `verified: false` 的规则会被拒绝执行(防幻觉闸门);`source` 记着这条规则的实测日期与 CubeMX 版本。
 
-> **技巧:CubeMX 认哪些脚本命令,可以直接问它** —— `cubemx_script("help")` 会列出全部命令。
+> **技巧:CubeMX 认哪些脚本命令,可以直接问它** —— `cubemx_raw_script("help")` 会列出全部命令。
 > 实测(6.18)给出的 `set` 子命令是:`mode` / `username` / `pin` / `pinreservation` / `gpio` /
 > `ip` / `AllIpInContext` / `context*` / `noparam` / `userconst` / `bsp` / `tpl_path` / `dest_path` ——
 > **里面没有 DMA,也没有中断相关项**,这两者都走"注入 `.ioc` 键"这条路(见 `rules/dma.yaml`、`rules/nvic.yaml`)。
@@ -328,10 +328,10 @@ TRGO 顺序、`irq: false` 成功抑制 `TIM3_IRQHandler`,全对)。
 - `cubemx_generate(ioc, project_dir=…)` 报 `CUBEMX_KO`。复现确认:旧代码会发
   `project path "dir"`,而 **CubeMX 6.18 对这条命令回 KO** —— 工具把任意一行 KO 当整体失败
   (那条"`.ioc` 可能不是 6.18 原生生成的"建议就是从这里来的,属误报)。
-- 手工用 `cubemx_script` 复现同一序列 → **240s 卡死被强杀 + 残留 `javaw`**(要 taskkill)。
+- 手工用 `cubemx_raw_script` 复现同一序列 → **240s 卡死被强杀 + 残留 `javaw`**(要 taskkill)。
 
 修复(0.4.4.3):不再发 `project path`(`project_dir` 指向别的目录时把 `.ioc` 复制过去
-就地生成)、`cubemx_script` 直接拒绝手写 `project path`、**生成后校验 `Core/Src/*.c`**
+就地生成)、`cubemx_raw_script` 直接拒绝手写 `project path`、**生成后校验 `Core/Src/*.c`**
 (零产出报 `CUBEMX_NO_OUTPUT`,成功时附生成文件清单)、失败时说清**哪条命令**返回了 KO。
 
 顺带发现:**8 个集成测试里 5 个早就失修了** —— `cubemx_load` 改成默认 `via_cubemx=False`

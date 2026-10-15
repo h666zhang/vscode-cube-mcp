@@ -21,7 +21,7 @@ guide: |-
     cubemx_export_pinout       导出引脚配置 CSV(只读)
     cubemx_remove_peripheral   从 .ioc 移除外设
     cubemx_inspect_output      看生成产物:文件树 + Core/Src 函数签名 + pattern 匹配行(只读,不给全文)
-    cubemx_script              任意 CubeMX 脚本命令(原始脚本接口)
+    cubemx_raw_script              任意 CubeMX 脚本命令(原始脚本接口)
 
   【从零生成工程(标准流程)】
   1) 调 cubemx_help(topic="templates") 查看可用芯片模板

@@ -27,7 +27,7 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 
 EXPECTED_TOOLS = {
     "cubemx_help",
-    "cubemx_script",
+    "cubemx_raw_script",
     "cubemx_load",
     "cubemx_configure",
     "cubemx_generate",

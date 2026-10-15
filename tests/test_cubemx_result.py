@@ -38,12 +38,12 @@ class TestResult(unittest.TestCase):
 
     def test_render_run_accepts_old_shape_result(self):
         # 旧调用方(mock)只给 ok/output/exit_code,不能因为缺 stage/error_code 而崩
-        out = cubemx_result.render_run("cubemx_script", {"ok": False, "output": "KO", "exit_code": 2})
+        out = cubemx_result.render_run("cubemx_raw_script", {"ok": False, "output": "KO", "exit_code": 2})
         self.assertIn("[FAIL exit=2]", out)
 
     def test_render_run_uses_error_code(self):
         out = cubemx_result.render_run(
-            "cubemx_script", {"ok": False, "output": "KO", "exit_code": 0, "error_code": "CUBEMX_KO"}
+            "cubemx_raw_script", {"ok": False, "output": "KO", "exit_code": 0, "error_code": "CUBEMX_KO"}
         )
         self.assertIn("CUBEMX_KO", out)
         self.assertIn("run_cubemx", out)

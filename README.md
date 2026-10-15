@@ -27,7 +27,7 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 | `cubemx_probe` | **探针**:在 .ioc 副本上试跑脚本命令或**键注入**(DMA / TIM / NVIC),输出差异 + CubeMX 是否保留 |
 | `cubemx_export_pinout` | 导出引脚配置 CSV(只读) |
 | `cubemx_remove_peripheral` | 从 .ioc 移除外设 |
-| `cubemx_script` | 任意 CubeMX 脚本命令序列(高级/原始脚本接口) |
+| `cubemx_raw_script` | 任意 CubeMX 脚本命令序列(**降级**接口:能用 `cubemx_intent` / `cubemx_probe` 表达就别用它) |
 
 ## 要求
 

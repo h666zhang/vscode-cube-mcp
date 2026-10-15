@@ -6,7 +6,7 @@
 
 Tools:
   cubemx_help(topic)               内置帮助/可用模板(陌生 agent 建议先调用)
-  cubemx_script(script)            任意脚本(原始脚本接口)
+  cubemx_raw_script(script)            任意脚本(原始脚本接口)
   cubemx_load(ioc)                 config load + 回读配置(只读)
   cubemx_configure(ioc, cmds)      load + set 命令序列 + saveas(写回 .ioc)
   cubemx_generate(ioc, project_dir) load + project generate
@@ -371,6 +371,9 @@ def _project_template(mcu: str, template: str = "") -> str:
 def cubemx_help(topic: str = "") -> str:
     """内置帮助:返回本 server 的使用指南、可用模板与各外设配置方法。
 
+    什么时候不用我:已经知道要配什么外设、只是想读现有工程时 —— 那直接用 cubemx_load /
+    cubemx_intent 更省(本工具只给说明,不碰你的工程)。
+
     陌生环境(第一次接入本 MCP 的 agent)建议先调用本工具,再开始建工程。
     不传 topic 返回完整指南;传 topic 返回该主题详细说明。
 
@@ -419,8 +422,12 @@ def cubemx_help(topic: str = "") -> str:
 
 
 @mcp.tool()
-def cubemx_script(script: str) -> str:
+def cubemx_raw_script(script: str) -> str:
     """执行任意 CubeMX 脚本命令序列(原始脚本接口,原样传给 -q)。
+
+    什么时候不用我:**主链路上没有它的位置**。能用 cubemx_intent 表达就优先用它
+    (intent 会自动补时钟/DMA/NVIC 与 CubeMX 认的隐含键);要预演改动就用 cubemx_probe。
+    只有 intent / probe 都表达不了的写法,才降到本工具。
 
     常用命令示例:
       config load "C:/path/proj.ioc"
@@ -442,12 +449,14 @@ def cubemx_script(script: str) -> str:
             "cubemx_generate(ioc, project_dir=...),它会把 .ioc 复制过去就地生成。",
         )
     r = _run_script(script)
-    return render_run("cubemx_script", r)
+    return render_run("cubemx_raw_script", r)
 
 
 @mcp.tool()
 def cubemx_load(ioc: str, summary: bool = True, via_cubemx: bool = False) -> str:
     """加载 .ioc 工程并回读关键配置(默认只读文本,不修改任何文件)。
+
+    什么时候不用我:要**改**配置时 —— 本工具只读回读,不写任何文件。
 
     summary=True(默认)时返回一份**结构化摘要** —— 直接解析 .ioc 文本得到的
     IP 列表 / 引脚→信号 / DMA 请求与参数 / 中断 / 时钟 / 各外设参数 / 初始化顺序,
@@ -501,6 +510,10 @@ def cubemx_load(ioc: str, summary: bool = True, via_cubemx: bool = False) -> str
 def cubemx_configure(ioc: str, commands: list) -> str:
     """加载 .ioc,依次执行 set 命令,最后 saveas 写回原文件。
 
+    什么时候不用我:常规配置优先用 `cubemx_intent` —— 它会自动补时钟/DMA/NVIC 与隐含键;
+    手写 set 命令很容易踩"CubeMX 静默忽略"的坑(实测 `set mode ADC1 IN0` 不会补 ADC 时钟,
+    下一次 generate 会弹窗卡死)。只有 intent 表达不了的写法才用本工具。
+
     参数:
       ioc: 工程 .ioc 文件绝对路径(会被写回,先备份再调用)
       commands: 命令列表,如 ["set mode USART1 Asynchronous", "set pin PB13 GPIO_Output"]
@@ -516,6 +529,9 @@ def cubemx_configure(ioc: str, commands: list) -> str:
 @mcp.tool()
 def cubemx_generate(ioc: str, project_dir: str = "") -> str:
     """加载 .ioc 并执行 project generate 生成 HAL 代码。
+
+    什么时候不用我:只想看或改 .ioc 时(那用 cubemx_load / cubemx_intent) —— 本工具会真的
+    启动 CubeMX 跑一遍生成(每次 10~30s)。
 
     参数:
       ioc: 工程 .ioc 文件绝对路径
@@ -558,6 +574,8 @@ def cubemx_generate(ioc: str, project_dir: str = "") -> str:
 def cubemx_inspect_output(project_dir: str, pattern: str = "") -> str:
     """看生成出来的工程产物(只读):文件树 + Core/Src 每个 .c 的函数签名;给 pattern 再回匹配行。
 
+    什么时候不用我:要改配置时(只读);本工具也不展开 Drivers/ 等第三方目录、不返回文件全文。
+
     什么时候用:
       - 想知道"到底生成了哪些文件"(generate / new_project 返回里的清单只覆盖 Core/Src/*.c)
       - 想知道某个参数的**最终值** —— CubeMX 会省掉一些参数行(例如 ADC 的
@@ -595,6 +613,9 @@ def cubemx_inspect_output(project_dir: str, pattern: str = "") -> str:
 def cubemx_export_pinout(ioc: str) -> str:
     """加载 .ioc 并导出当前引脚配置 CSV(只读,CSV 写系统临时目录后读回)。
 
+    什么时候不用我:只想看"哪些引脚被占了"的结构化信息时 —— cubemx_load(summary=True) 更直接;
+    本工具产出的是给人/表格软件看的 CSV。
+
     参数:
       ioc: 工程 .ioc 文件绝对路径
     """
@@ -629,6 +650,9 @@ def cubemx_new_project(
     pll_mul: int = 9,
 ) -> str:
     """从零生成一个新的 HAL 工程(基于内置模板改造)。
+
+    什么时候不用我:工程已经存在、只想加/改外设时 —— 那用 cubemx_intent 就够了
+    (本工具会新建整个工程目录、改工程名、写工具链配置)。
 
     流程:从 templates/ 选 6.18 原生 .ioc 模板(或显式 template)复制到
     project_dir,改写工程名,依次执行意图 / set 命令,注入中断与 DMA 这类"脚本配不了"的键,
@@ -879,6 +903,9 @@ def _apply_probe_injects(ioc_path: str, injects: list) -> list:
 def cubemx_probe(ioc: str, commands: list = None, inject: list = None, keep_copy: bool = False) -> str:
     """跑一次探针:在副本上执行命令或键注入,对比改前改后,拿到可写进知识库的真实差异。
 
+    什么时候不用我:写法已经探明、要正式落盘时 —— 那时该用 cubemx_intent(常规)或
+    cubemx_configure(intent 表达不了的 set 命令)。
+
     用在某个外设/写法的还没收录的时候:先跑出真实差异,再整理进 knowledge/rules/<外设>.yaml。
     基线 .ioc 只读,不会被改动。
 
@@ -959,6 +986,9 @@ def _decisions_block(plan: dict) -> str:
 def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
     """按"配置意图"改 .ioc:意图里只说要什么,内部名由知识库查出来。
 
+    什么时候不用我:外设/模式不在支持列表里(先用 cubemx_help 看能力),或是"手写 .ioc 键"
+    那类 intent 表达不了的写法(那用 cubemx_configure,必要时先 cubemx_probe 预演)。
+
     意图示例(业务参数,代码按定时器时钟换算):
       {"peripheral": "TIM3", "mode": "pwm", "pin": "PA6", "freq_hz": 10000, "duty": 0.5}
     也可以直接给寄存器参数(显式给的优先):
@@ -1030,6 +1060,9 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
 @mcp.tool()
 def cubemx_remove_peripheral(ioc: str, peripheral: str) -> str:
     """从 .ioc 中移除一个外设(文本方式)。
+
+    什么时候不用我:只是想改引脚/参数时(那是 cubemx_intent 的活) —— 本工具会把该外设的
+    引脚、参数、DMA 关联一起删掉。
 
     CubeMX 脚本的 `set noparam <IP>` 对部分外设无效(返回 OK 但外设保留),
     因此本工具直接编辑 .ioc 文本:删除 Mcu.IPx 条目、关联引脚/参数、
