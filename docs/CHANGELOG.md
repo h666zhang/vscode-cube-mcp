@@ -4,6 +4,29 @@
 
 ## 0.4.4.3(未发布)
 
+- **新增 golden corpus(6 个回归用例)+ 端到端幂等用例**:`golden/` 下每个用例存一份
+  `expected.ioc`(来自作者真实用过的工程)加 `case.json`(意图 + 断言);离线层默认跑(不启 CubeMX),
+  集成层(`ST_CUBEMX_RUN_INTEGRATION=1`)真重放、断言关键行并与 `expected.ioc` 做结构化 diff。
+  **它一上来就抓到一个真 bug** —— 见下一条
+- **修 GPIO 意图的引脚短名没归一化**(golden 的 LEDRUN 用例抓到):`PA0` 在 `.ioc` 里叫 `PA0-WKUP`,
+  `set pin PA0 GPIO_Output` 能被 CubeMX 接受,但 **`set gpio parameters PA0 ...` 返回 KO** ——
+  8 个引脚的模式都配上了、只有标签没设上,工具却整体报 `CUBEMX_KO`
+- **测试拆分**:`test_cubemx_mcp.py`(133KB / 42 个顶层定义)按被测模块拆成 8 个文件 + `tests/_helpers.py`
+  (原先一个文件里塞了所有工具的测试,review 与定位都费劲)
+- **知识库 `ip/` 文件名统一用下划线**(原来是 CubeMX db 的 XML 名、带 `-` 如 `ADC-aditf_v2_5F1_...`),
+  `meta.yaml` 与 `tools/gen_knowledge_from_db.py` 同步(`loader` 靠 `Path(xml).stem` 定位)
+- **引脚冲突提示点名「调试口」**:遇到 `SYS_JT*` / `RCC_OSC*` 时不再只丢一个 `SYS_JTMS-SWDIO` 让人猜,
+  而是说清"PA13/PA14 是 SWD、PA15/PB3/PB4 是 JTAG、本工具模板用 SWD 所以后三个本来就能当 GPIO"
+- **`_run_script` 的临时脚本文件自愈清理**:Windows 上 javaw 会继承脚本句柄,`finally: os.remove`
+  当场失败且被 `except OSError` 静默跳过 → 越积越多(实测一次会话积 200+ 个,之前手工清过 60 个也是同一原因)。
+  现在每次调用开头清掉 5 分钟前的
+- **知识库 10 项实测**(探针,2026-10-15):IWDG / WWDG / CAN 位时序 / SPI 硬件 NSS / RTC / USART DMA+中断 /
+  SPI 只给 SCK / EWARM·MDK-ARM 的 user 目录 都探明;ADC 注入通道探到一半(`WatchdogMode` 没落盘);
+  DMA `MEMTOMEM` 确认**不支持**(它是通道级模式,不是外设请求)。**顺带推翻两条旧结论**:
+  ① SPI"只给 SCK 不完整"是错的(CubeMX 会自动把 MISO/MOSI 补上)② RTC"两个模式可以单独配"是错的
+  (必须先 `RTC_Enabled`,单独发 `RTC_Calendar` 会 KO)
+- **README 加 scope 白名单 + `cubemx_help` 标注知识库录制版本 + CI 加 wheel 安装冒烟**
+  (前两个 job 都用 `pip install -e`,暴露不了"wheel 里少了 knowledge/templates"这类打包问题)
 - **文档整理**:`AGENTS.md` 139 行 → 54 行,只留 agent 真需要避的坑 —— 7 条「工具已经自动处理」的
   (ADC 时钟、SPI 波特率、`project path`、零产出校验…)移到 `docs/dev-notes/06-fixed-issues.md`(留来历,
   不再占 agent 上下文);`docs/README.dev-notes.md`(479 行)按主题拆成 `docs/dev-notes/` 下 6 个文件,
