@@ -47,7 +47,9 @@
 - **模板必须 6.18 原生生成**:手写/非 6.18 的 `.ioc` 会被拒绝;缺模板时报错会列出可用模板与生成方法。
 - **用户代码写哪里**:CMake 工程写工程根的 `CMakeLists.txt`(`# Add sources to executable` /
   `# Add include paths`,只生成一次、不重写);`cmake/stm32cubemx/CMakeLists.txt` 每次 generate 全量重写,别动。
-  STM32CubeIDE 用 `STM32CubeIDE/Application/User/Core/`;EWARM / MDK-ARM 未实测。
+  STM32CubeIDE 用 `STM32CubeIDE/Application/User/Core/`;EWARM / MDK-ARM **实测(2026-10-15)没有**
+  这种独立用户区 —— 生成的是 `Core/` + `Drivers/` + `EWARM|MDK-ARM/`,用户代码写 `Core/Src/*.c` 的
+  `/* USER CODE BEGIN */` 块里(CubeMX 只保证块内内容不被覆盖)。
 - **其余"实测过的坑"和"工具已经自动处理的坑"**(ADC 时钟、SPI 波特率、`project path`、
   零产出校验……)见 `docs/README.dev-notes.md` 与 `knowledge/rules/*.yaml` —— 那些不需要 agent 记。
 

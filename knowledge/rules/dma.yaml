@@ -96,7 +96,10 @@ known_issues:
   - "配 ADC + DMA 时 ADC 时钟仍必须同时配(ADCPresc),否则 generate 弹 [Clock] 对话框卡死 —— 与 DMA 无关的既有坑,见 rules/adc.yaml"
   - "DMA 中断(NVIC.<channel>_IRQn)默认一起注入:CubeMX 的 DMA Settings 里 Add 之后就是这个状态;不用中断的话可以不注入,但 HAL_ADC_Start_DMA / HAL_UART_Receive_DMA 的完成回调依赖它"
   - "通道由 db 查表得到,不靠猜:同芯片同一请求只有一个通道;跨芯片(如 F4)通道自由度更大,该表需按芯片重新导出"
-  - "还没实测:DMA 的 MEMTOMEM(内存到内存)请求、多个同名前缀请求(同一请求挂两个通道)、DMA 回调(USE_HAL_DMA_REGISTER_CALLBACKS)"
+  - "**MEMTOMEM(内存到内存)当前不支持(实测 2026-10-15)**:`inject_dma` 会明确拒绝 —— direction 只收
+    DMA_MEMORY_TO_PERIPH / DMA_PERIPH_TO_MEMORY;而 db 导出的 49 个请求里也没有 MEMTOMEM(它是**通道级模式**,
+    不是外设请求)。要支持得先探出它的 Dma.* 标准写法,再扩展本工具"
+  - "还没实测:多个同名前缀请求(同一请求挂两个通道)、DMA 回调(USE_HAL_DMA_REGISTER_CALLBACKS)"
   - "移除外设(cubemx_remove_peripheral)会连带删掉它的 DMA 键:请求名 == 实例名或以 '{实例}_' 开头的都算,剩余请求会重新连续编号(键前缀序号同步改);没有请求后连 Mcu.IPx=DMA 与 MX_DMA_Init 段一起清掉"
   - "同一请求挂两个通道(非 F1 芯片可能出现)时 dma_channel() 会拒绝自动选,要显式给 channel —— 这条按代码逻辑设计,未在第二颗芯片上实测"
 

@@ -88,7 +88,7 @@ known_issues:
   - "**必须让波特率落在上限内**:默认为 2,APB2=72MHz 下 36 MBits/s 超过 18 MBits/s 上限 ⇒ CubeMX 记 'IP not ready for code generation: SPIx' 并弹 Parameter Error 对话框 —— -q 批处理没人点会卡到超时,且报 OK 却零产出(实测 2026-10-15)。cubemx_intent 已按总线频率自动补最小合法分频(SPI1→4、SPI2→2)"
   - "**预分频与波特率值必须一起写(两条命令)**:CubeMX 的参数校验看的是 CalculateBaudRate,而 `set ip parameters SPIx BaudRatePrescaler <枚举>` **不会重算它** —— 只改预分频时 .ioc 里那一行还是旧值(实测 36.0 MBits/s),CubeMX 照样判 'IP not ready'、报 OK 却零产出(2026-10-15 实测,一开始就是这么被坑的)。两条都发之后 15.4s 正常生成:`spi.c` 里 BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4、`.ioc` 里 CalculateBaudRate=18000000"
   - "合法分频就 baudrate.prescalers 里那 8 个(2 的幂);波特率 = 该 SPI 所在总线的频率 / 分频"
-  - "全双工下 MISO/MOSI/SCK 三个引脚都要显式 set pin;只给 SCK 不完整(未实测)"
+  - "**只给 SCK 也完整(实测 2026-10-15)**:`set mode SPI1 Full_Duplex_Master` + `set pin PA5 SPI1_SCK` 之后,CubeMX 会自己把 PA6/PA7 补成 SPI1_MISO/SPI1_MOSI,generate 正常产出 8 个文件(旧记录写「只给 SCK 不完整」,是没实测过的猜测)。显式给全三根更清楚,但不是必须"
   - "硬件 NSS(实测 2026-10-15):`set pin PA4 SPI1_NSS` + `set ip parameters SPI1 NSS SPI_NSS_HARD_OUTPUT` 生效(落盘 PA4.Signal=SPI1_NSS 与 SPI1.NSS=SPI_NSS_HARD_OUTPUT)"
 
 parameters_from_db:

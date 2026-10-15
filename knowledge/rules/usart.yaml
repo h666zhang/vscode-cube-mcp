@@ -31,6 +31,14 @@ known_issues:
   - "BaudRate 等于 db 里的默认值(115200)时,CubeMX 不写出 USARTx.BaudRate 行;探针里看不到不代表命令无效(实测:换成 9600 就出现了)"
   - "和 TIM 不一样:USART 的 set mode USART2 Asynchronous 有效;TIM 的 set mode TIMx 一律 KO"
   - "引脚侧写法是 {pin}.Mode=Asynchronous + {pin}.Signal=USARTx_TX/RX,不是 GPIO 那种 GPIO_Output"
+  - >-
+    **DMA + 中断已实测通过(2026-10-15)**:意图写
+    {"peripheral": "USART2", "pins": ["PA2", "PA3"], "dma": {"request": "USART2_RX", "mode": "circular"}, "interrupt": true}
+    —— 通道 DMA1_Channel6 由 db 表查出、不靠猜;生成后 usart.c 里有 hdma_usart2_rx 全套 Init,
+    stm32f1xx_it.c 里有 DMA1_Channel6_IRQHandler 与 USART2_IRQHandler
+  - >-
+    **一个意图只能带一个 DMA 请求**:收(USART2_RX)与发(USART2_TX)各要一个,所以「收发都上 DMA」
+    在意图层表达不了 —— 要两个请求得用 cubemx_configure + inject_dma 手动补第二个
 
 parameters_from_db:
   baudrate:
@@ -41,5 +49,4 @@ parameters_from_db:
     unit: Bits/s
 
 todo:
-  - "DMA 收发、NVIC 中断的写法还没收录(完全没探过)"
   - "同步/半双工等其它 VirtualMode 还没探"

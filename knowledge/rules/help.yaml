@@ -36,7 +36,8 @@ guide: |-
      - CMake(默认):工程根 CMakeLists.txt —— .c 写进 `# Add sources to executable`,
        .h 目录写进 `# Add include paths`(该文件只生成一次,不会被覆盖)
      - STM32CubeIDE:`STM32CubeIDE/Application/User/Core/`(工具链自带的用户区,同样只在首次生成时创建)
-     - 其它工具链(EWARM / MDK-ARM)未实测,找各自的 user 目录即可
+     - EWARM / MDK-ARM(实测 2026-10-15):生成 `Core/` + `Drivers/` + `EWARM|MDK-ARM/`,**没有**
+      `Application/User` 那种独立用户区 —— 用户代码写 `Core/Src/*.c` 的 `/* USER CODE BEGIN */` 块里
      别往 `cmake/stm32cubemx/CMakeLists.txt` 里加(每次 generate 全量重写)
 
   【失败时会怎样(动手前先读)】
