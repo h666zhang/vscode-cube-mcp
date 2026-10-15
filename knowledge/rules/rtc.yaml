@@ -22,8 +22,14 @@ ioc_result:
   - "VP_RTC_VS_RTC_Calendar.Signal=RTC_VS_RTC_Calendar"
 
 known_issues:
-  - "两个模式可以单独配,也可以叠在一起(见 modes.enabled_calendar)"
-  - "RTC 时钟源(LSE/LSI)与日历参数(AsynchPrediv/AutoPrediv/时间日期)的写法还没实测"
+  - "**有顺序依赖(实测 2026-10-15)**:`set mode RTC RTC_Calendar` 单独发会返回 KO —— 必须先
+    `set mode RTC RTC_Enabled`。叠加就是按 Enabled -> Calendar 的顺序发两条(意图里写 mode=enabled_calendar)"
+  - "激活生效的标志是 `Mcu.IPx=RTC` 加两对虚拟引脚行 `VP_RTC_VS_RTC_Activate.*` / `VP_RTC_VS_RTC_Calendar.*`;
+    只 grep `RTC.` 开头的行会以为没生效(2026-10-15 实测踩过这个误判)"
+  - "日历参数 `set ip parameters RTC AsynchPrediv 32767` 实测生效(落盘 RTC.AsynchPrediv);
+    时间/日期(date / time)与 AutoPrediv 的具体写法还没探明"
+  - "**时钟源(LSE/LSI)的写法还没探明**:`set ip parameters RCC RTCClockSelection RCC_RTCCLKSOURCE_LSE`
+    实测没写出对应的 RCC 行(键名可能不是这个);要用 LSE 先在 GUI 里配一次再回读 .ioc"
   - "用 LSE 时 PC14/PC15 会被占用(OSC32_IN/OSC32_OUT),要先和别的用途协调"
 
 parameters_from_db:
