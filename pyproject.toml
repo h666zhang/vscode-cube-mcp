@@ -56,8 +56,9 @@ packages = ["vscode_cube_mcp"]
 "knowledge/rules" = ["knowledge/rules/*.yaml"]
 
 [tool.pytest.ini_options]
-# src 布局:让测试无需先安装即可 import vscode_cube_mcp(本地与 CI 同一配置)
-pythonpath = ["src"]
+# src 布局:让测试无需先安装即可 import vscode_cube_mcp(本地与 CI 同一配置);
+# tests 也放进来,好让各测试文件与 tests/integration/ 都能 `from _helpers import ...`
+pythonpath = ["src", "tests"]
 # 覆盖率门槛:核心逻辑 <80% 视为失败(本地与 CI 同一配置)
 addopts = "--cov=vscode_cube_mcp --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
