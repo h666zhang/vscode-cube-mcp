@@ -367,6 +367,24 @@ def _project_template(mcu: str, template: str = "") -> str:
     )
 
 
+def _version_banner() -> str:
+    """知识库头部横幅:录制这份知识库时用的 CubeMX 版本。
+
+    知识库是按某个 CubeMX 版本实测出来的;升级 CubeMX 后个别条目可能失效,所以每次
+    help 都提醒一句 —— 而不是让人踩了坑再回头怀疑知识库。
+    """
+    try:
+        ver = str(knowledge_loader.meta().get("mxcube_version") or "").strip()
+    except Exception:
+        return ""
+    if not ver:
+        return ""
+    return (
+        f"【知识库基于 CubeMX {ver} 录制(见 knowledge/meta.yaml);你机器上的版本可能不同,"
+        "升级 CubeMX 后个别条目可能失效】"
+    )
+
+
 @mcp.tool()
 def cubemx_help(topic: str = "") -> str:
     """内置帮助:返回本 server 的使用指南、可用模板与各外设配置方法。
@@ -399,6 +417,9 @@ def cubemx_help(topic: str = "") -> str:
         return "\n".join(lines)
     text = knowledge_loader.help_text(t)
     if text:
+        banner = _version_banner()
+        if banner:
+            text = f"{banner}\n\n{text}"
         if not t:
             # 总指南末尾附可用 topic 清单(从 help.yaml 算出来,不硬编码)
             text += "\n\n【可用 topic】" + " / ".join(knowledge_loader.help_topics()) + " / templates"

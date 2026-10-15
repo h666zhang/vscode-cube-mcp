@@ -14,6 +14,12 @@ MCP(Model Context Protocol) server,封装 **STM32CubeMX** 官方命令行脚本�
 > **能力边界**:本工具只生成**工程配置与 HAL 骨架**(引脚、外设、时钟、工具链),
 > 不负责应用逻辑代码(LED 闪烁、OLED 显示内容、传感器驱动等)——业务代码请在生成后的工程里自己写。
 
+> **保证范围(scope)**:目前只保证 **STM32F103C8T6** 这一颗芯片,外设只保证工具现在能配的这些:
+> `TIMx`(pwm / input_capture / internal_clock)、`GPIO`、`I2Cx`、`USARTx`、`SPIx`、`ADCx`、
+> `IWDG`、`WWDG`、`CAN`、`RTC`,以及挂在这些外设下的 DMA 与 NVIC 中断。
+> 白名单**外**的芯片没有内置模板;白名单外的模式会被**明确拒绝**(`cubemx_help` 也不给方法),
+> 而不是勉强拼一个不可靠的配置 —— 可控的失败比隐蔽的错误更省事。
+
 ## 功能一览
 
 | 工具 | 说明 |

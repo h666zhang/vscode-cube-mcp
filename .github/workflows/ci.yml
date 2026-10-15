@@ -48,3 +48,23 @@ jobs:
           python -m pip show mcp
       - name: Run tests (no coverage gate)
         run: python -m pytest -q --no-cov
+
+  # 打包冒烟:上面几个 job 用的是 `pip install -e .`(可编辑安装),它**不会**暴露
+  # "wheel 里少了 knowledge/ 或 templates/"这类打包问题 —— 那种只有真装一次才看得见。
+  # 2026-10-15 加:发布前拦住"装完找不到知识库/模板"这种线上报障。
+  test-wheel-install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build wheel and install into a clean venv
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m venv smoke
+          .\smoke\Scripts\python.exe -m pip install (Get-ChildItem dist\*.whl | Select-Object -First 1).FullName
+      - name: Smoke test (knowledge/ 与 templates/ 是否随 wheel 装上)
+        run: |
+          .\smoke\Scripts\python.exe -c "import vscode_cube_mcp.cubemx_mcp as m, vscode_cube_mcp.knowledge_loader as k; print('knowledge:', k.knowledge_dir()); print('templates:', m._available_templates()); assert k.knowledge_dir().is_dir(), 'knowledge/ 没随 wheel 装上'; assert m._available_templates(), 'templates/ 没随 wheel 装上'; print('SMOKE OK')"
