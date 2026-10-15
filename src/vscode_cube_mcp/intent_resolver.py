@@ -113,10 +113,17 @@ def find_channel(instance: str, pin: str) -> str:
 
 
 def gpio_commands(intent: dict) -> list:
-    """GPIO 走 CubeMX 的 set 命令(不需要注入 .ioc 片段)。"""
+    """GPIO 走 CubeMX 的 set 命令(不需要注入 .ioc 片段)。
+
+    引脚名先归一化:`.ioc` 里带后缀的引脚(PA0-WKUP / PA13)如果只写短名,
+    `set pin` 还能被 CubeMX 接受,但 **`set gpio parameters` 会返回 KO**
+    —— 实测 2026-10-15(LEDRUN 用例):8 个引脚的模式都配上了、只有标签没设上,
+    工具却整体报 `CUBEMX_KO`。
+    """
     pin = str(intent.get("pin", "")).strip()
     if not pin:
         raise ToolError("BAD_ARGUMENT", "GPIO 意图需要 pin(如 PB13)")
+    pin = knowledge_loader.resolve_pin_name(pin)
     role = str(intent.get("mode", "output")).strip().lower()
     mode_map = {
         "output": "GPIO_Output",

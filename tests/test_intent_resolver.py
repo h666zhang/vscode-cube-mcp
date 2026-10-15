@@ -11,6 +11,34 @@ from _helpers import SAMPLE_IOC
 from vscode_cube_mcp import cubemx_mcp, intent_resolver, ioc_editor, knowledge_loader
 
 
+class TestGpioIntent(unittest.TestCase):
+    """GPIO 意图:引脚短名必须归一化(否则 `set gpio parameters` 会 KO)。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self.root = tempfile.mkdtemp(prefix="gpio_intent_")
+        self.ioc = os.path.join(self.root, "proj.ioc")
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("Mcu.Name=STM32F103C(8-B)Tx\nMcu.IPNb=1\nMcu.IP0=RCC\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _cmd(self, intent) -> str:
+        return "; ".join(intent_resolver.apply_intents(self.ioc, [intent])["commands"])
+
+    def test_short_pin_name_is_normalized(self):
+        # PA0 在 .ioc 里叫 PA0-WKUP:只写短名时 set pin 能被接受,但 set gpio parameters 会返回 KO
+        # (实测 2026-10-15,LEDRUN 用例:8 个引脚模式都配上了、只有标签没设上,工具却整体报失败)
+        got = self._cmd({"peripheral": "GPIO", "pin": "PA0", "mode": "output", "label": "LED1"})
+        self.assertIn("set pin PA0-WKUP GPIO_Output", got)
+        self.assertIn("set gpio parameters PA0-WKUP GPIO_Label LED1", got)
+
+    def test_plain_pin_name_unchanged(self):
+        got = self._cmd({"peripheral": "GPIO", "pin": "PB12", "mode": "output", "label": "Speaker"})
+        self.assertIn("set gpio parameters PB12 GPIO_Label Speaker", got)
+
+
 class TestAdcIntent(unittest.TestCase):
     """ADC 意图:自动补 ADC 时钟分频(缺它 CubeMX generate 会卡在 [Clock] 弹窗)。"""
 

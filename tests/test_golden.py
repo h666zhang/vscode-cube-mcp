@@ -5,6 +5,11 @@
   - 集成(设 ST_CUBEMX_RUN_INTEGRATION=1):真跑 CubeMX 把意图重放落盘,断言 .ioc 里的关键行,
     并与 expected.ioc 做结构化 diff 供人工核对(只报告,不判定失败)。
 
+集成层每个用例是**独立的 test 方法**(`test_replay_<用例名>`),所以可以只跑某一个:
+
+    $env:ST_CUBEMX_RUN_INTEGRATION=1
+    python -m pytest tests/test_golden.py -k F103_gpio_out -q -s
+
 用例在仓库根的 golden/ 下,说明见 golden/README.md。
 """
 
@@ -15,7 +20,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from vscode_cube_mcp import intent_resolver, ioc_diff, knowledge_loader
+from vscode_cube_mcp import intent_resolver, ioc_diff, ioc_editor, knowledge_loader
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = ROOT / "golden"
@@ -78,7 +83,7 @@ class TestGoldenCorpus(unittest.TestCase):
                 self.assertIn("board=custom", text)
 
 
-@unittest.skipUnless(INTEGRATION, "设 ST_CUBEMX_RUN_INTEGRATION=1 才会真启动 CubeMX(约 4 分钟)")
+@unittest.skipUnless(INTEGRATION, "设 ST_CUBEMX_RUN_INTEGRATION=1 才会真启动 CubeMX(每个用例约 45s)")
 class TestGoldenIntegration(unittest.TestCase):
     """集成:真跑 CubeMX 重放意图,断言关键行;并给出与 expected.ioc 的结构化 diff。"""
 
@@ -88,47 +93,67 @@ class TestGoldenIntegration(unittest.TestCase):
 
         self.cubemx = cubemx_mcp
 
-    def test_each_case_replays_to_expected_lines(self):
-        for d, case in golden_cases():
-            with self.subTest(case=d.name):
-                root = tempfile.mkdtemp(prefix="golden_replay_")
-                try:
-                    ioc = os.path.join(root, "proj.ioc")
-                    shutil.copy(TEMPLATE, ioc)
-                    plan = intent_resolver.apply_intents(ioc, case["intents"])
+    def _replay(self, d: Path, case: dict) -> None:
+        root = tempfile.mkdtemp(prefix="golden_replay_")
+        try:
+            ioc = os.path.join(root, "proj.ioc")
+            shutil.copy(TEMPLATE, ioc)
+            plan = intent_resolver.apply_intents(ioc, case["intents"])
 
-                    # 会话 1:写配置(与 cubemx_intent 的真实行为一致:load + 命令 + saveas)
-                    script = "\n".join([f'config load "{ioc}"', *plan["commands"], f'config saveas "{ioc}"'])
-                    r1 = self.cubemx._run_script(script)
-                    self.assertTrue(r1["ok"], f"{d.name}: 配置会话失败\n{r1.get('output', '')[-600:]}")
+            # 会话 1:写配置(与 cubemx_intent 的真实行为一致:load + 命令 + saveas)
+            script = "\n".join([f'config load "{ioc}"', *plan["commands"], f'config saveas "{ioc}"'])
+            r1 = self.cubemx._run_script(script)
+            self.assertTrue(
+                r1["ok"], f"{d.name}: 配置会话失败(exit={r1.get('exit_code')})\n{r1.get('output', '')[-600:]}"
+            )
 
-                    # 会话 2:生成(与 cubemx_generate 一致:单独一次 load + generate)
-                    r2 = self.cubemx._run_script(f'config load "{ioc}"\nproject generate')
-                    self.assertTrue(r2["ok"], f"{d.name}: generate 失败\n{r2.get('output', '')[-600:]}")
+            # 会话 1 之后、generate 之前,注入"脚本配不了"的键组(NVIC 行 + DMA)—— 与
+            # cubemx_intent / cubemx_new_project 的顺序一致;漏了这一步 DMA 根本不会生效
+            ioc_editor.add_lines(ioc, plan.get("ioc_lines") or [])
+            for params in plan.get("dma") or []:
+                ioc_editor.inject_dma(ioc, **params)
 
-                    text = Path(ioc).read_text(encoding="utf-8", errors="replace")
-                    for line in case["expect_ioc_lines"]:
-                        self.assertIn(line, text, f"{d.name}: 重放后 .ioc 里没有 {line!r}")
+            # 会话 2:生成(与 cubemx_generate 一致:单独一次 load + generate)
+            r2 = self.cubemx._run_script(f'config load "{ioc}"\nproject generate')
+            self.assertTrue(r2["ok"], f"{d.name}: generate 失败\n{r2.get('output', '')[-600:]}")
 
-                    # 生成的代码里应该出现对应的 MX_*_Init(generate 的产出也可能是空目录)
-                    gen = "\n".join(
-                        p.read_text(encoding="utf-8", errors="replace") for p in Path(root, "Core", "Src").glob("*.c")
-                    )
-                    self.assertTrue(gen, f"{d.name}: Core/Src 下没有 .c(零产出?)")
-                    for fn in case.get("expect_init") or []:
-                        self.assertIn(fn, gen, f"{d.name}: 生成代码里没有 {fn}")
+            text = Path(ioc).read_text(encoding="utf-8", errors="replace")
+            for line in case["expect_ioc_lines"]:
+                self.assertIn(line, text, f"{d.name}: 重放后 .ioc 里没有 {line!r}")
 
-                    # 结构化 diff 只报告(真实工程带 ProjectManager / NVIC 优先级等噪声)。
-                    # diff 的 added/removed/changed 都是 "key=value" —— 断言行若出现在里面,
-                    # 说明重放出来的这份和 expected.ioc 不一致
-                    diff = ioc_diff.diff_files(str(d / "expected.ioc"), ioc)
-                    lines = (diff.get("added") or []) + (diff.get("removed") or []) + (diff.get("changed") or [])
-                    print(f"\n[{d.name}] 与 expected.ioc 的结构化差异: {diff['summary']}")
-                    print(ioc_diff.render_diff(diff)[:1200])
-                    missed = [ln for ln in case["expect_ioc_lines"] if any(ln in x for x in lines)]
-                    self.assertEqual(missed, [], f"{d.name}: 断言行与 expected.ioc 不一致: {missed}")
-                finally:
-                    shutil.rmtree(root, ignore_errors=True)
+            # 生成的代码里应该出现对应的 MX_*_Init(generate 也可能"报 OK 却零产出")
+            gen = "\n".join(
+                p.read_text(encoding="utf-8", errors="replace") for p in Path(root, "Core", "Src").glob("*.c")
+            )
+            self.assertTrue(gen, f"{d.name}: Core/Src 下没有 .c(零产出?)")
+            for fn in case.get("expect_init") or []:
+                self.assertIn(fn, gen, f"{d.name}: 生成代码里没有 {fn}")
+
+            # 结构化 diff 只报告(真实工程带 ProjectManager / NVIC 优先级 / 时钟树等噪声)。
+            # diff 的 added/removed/changed 都是 "key=value" —— 断言行若出现在里面,
+            # 说明重放出来的这份和 expected.ioc 不一致
+            diff = ioc_diff.diff_files(str(d / "expected.ioc"), ioc)
+            lines = (diff.get("added") or []) + (diff.get("removed") or []) + (diff.get("changed") or [])
+            print(f"\n[{d.name}] 与 expected.ioc 的结构化差异: {diff['summary']}")
+            print(ioc_diff.render_diff(diff)[:1200])
+            missed = [ln for ln in case["expect_ioc_lines"] if any(ln in x for x in lines)]
+            self.assertEqual(missed, [], f"{d.name}: 断言行与 expected.ioc 不一致: {missed}")
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+
+def _make_case_test(dir_name: str, case: dict):
+    def test(self):
+        self._replay(GOLDEN / dir_name, case)
+
+    test.__name__ = f"test_replay_{dir_name}"
+    test.__doc__ = f"{dir_name}: {case.get('desc', '')}"
+    return test
+
+
+# 每个用例生成一个独立方法,便于单独跑(-k)
+for _d, _case in golden_cases():
+    setattr(TestGoldenIntegration, f"test_replay_{_d.name}", _make_case_test(_d.name, _case))
 
 
 if __name__ == "__main__":

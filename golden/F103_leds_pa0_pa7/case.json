@@ -51,7 +51,7 @@
     }
   ],
   "expect_commands": [
-    "set pin PA0 GPIO_Output",
+    "set pin PA0-WKUP GPIO_Output",
     "set pin PA7 GPIO_Output"
   ],
   "expect_ioc_lines": [
