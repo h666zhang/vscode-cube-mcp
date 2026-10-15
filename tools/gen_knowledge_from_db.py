@@ -313,10 +313,13 @@ def main() -> None:
             missing.append(ip["instance"])
             continue
         data = parse_modes_xml(xml)
-        data["source"] = f"db/mcu/IP/{xml.name}"
+        data["source"] = f"db/mcu/IP/{xml.name}"  # 留原始 XML 名,方便回溯 CubeMX 的 db
         data["instance"] = ip["instance"]
-        dump_yaml(out_dir / "ip" / f"{xml.stem}.yaml", data)
-        sources[ip["instance"]] = xml.name
+        # 落盘名统一成下划线(CubeMX 的 XML 名里带 "-",如 ADC-aditf_v2_5F1_Cube_Modes.xml);
+        # meta 里的 source_ip_xml 用同一个名字,loader 才能按 Path(xml).stem 找到这个文件
+        safe_stem = xml.stem.replace("-", "_")
+        dump_yaml(out_dir / "ip" / f"{safe_stem}.yaml", data)
+        sources[ip["instance"]] = f"{safe_stem}.xml"
         print(f"  {ip['instance']:<12} -> {xml.name}  ({len(data['modes'])} 模式, {len(data['parameters'])} 参数)")
 
     # DMA 请求 -> 通道/方向(db 的 ModeLogicOperator 树;cubemx_intent 的 dma 意图用它查表)
