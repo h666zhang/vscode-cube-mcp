@@ -178,10 +178,12 @@ def usart_commands(intent: dict) -> list:
     return commands
 
 
-def spi_commands(intent: dict) -> list:
+def spi_commands(intent: dict, ioc_path: str) -> list:
     """SPI 走 set 命令(实测:set mode SPI1 Full_Duplex_Master 有效)。
 
     模式名用下划线形式,可选值见 knowledge/rules/spi.yaml 的 modes。
+    另外必须配波特率分频:用默认值 2 时波特率会超过 SPI 上限,CubeMX 判定该 IP
+    未就绪 ⇒ generate 报 OK 却零产出(还可能弹窗卡死),见 spi_baudrate_command。
     """
     instance = str(intent.get("peripheral", "")).strip().upper()
     rules = knowledge_loader.require_rule_verified("spi")
@@ -195,7 +197,77 @@ def spi_commands(intent: dict) -> list:
     if not pins:
         raise ToolError("BAD_ARGUMENT", f'{instance} 意图需要 pins(如 ["PA5", "PA6", "PA7"])')
     commands.extend(_pin_commands(instance, pins))
+    commands.extend(spi_baudrate_commands(intent, ioc_path))
     return commands
+
+
+def _spi_baudrate(intent: dict, ioc_path: str) -> tuple:
+    """算出 SPI 该用的 (分频枚举名, 分频比, 该总线频率 Hz);非法值直接抛 ToolError。
+
+    依据 rules/spi.yaml 的 baudrate 段(上限 / 实例→总线 / 候选分频),从 .ioc 读该 SPI
+    所在总线的频率,选满足 波特率 ≤ 上限 的最小分频(SPI1@72MHz → 4、SPI2@36MHz → 2)。
+    意图里给 prescaler 可显式覆盖(枚举名或数字),超限/非法值都会被拒绝。
+    返回 ("", 0, 0) 表示知识库没写 baudrate 段,调用方跳过这块。
+    """
+    baud = knowledge_loader.require_rule_verified("spi").get("baudrate") or {}
+    prescalers = baud.get("prescalers") or {}
+    if not prescalers:
+        return "", 0, 0
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    bus = (baud.get("instances") or {}).get(instance) or (baud.get("default") or {})
+    max_hz = int(baud.get("max_hz") or 0)
+    fclk = _read_int(ioc_editor.read_key(ioc_path, bus.get("freq_key", "")), bus.get("default_hz", 72000000))
+
+    explicit = str(intent.get("prescaler", "")).strip()
+    if explicit:
+        name = explicit
+        if name not in prescalers:
+            # 也允许写数字(4 → SPI_BAUDRATEPRESCALER_4)
+            by_div = {str(div): key for key, div in prescalers.items()}
+            if explicit in by_div:
+                name = by_div[explicit]
+            else:
+                legal = ", ".join(sorted(prescalers))
+                nums = ", ".join(str(d) for d in sorted(int(v) for v in prescalers.values()))
+                raise ToolError("BAD_ARGUMENT", f"prescaler 只能写 {legal}(或其中任一数字 {nums});收到 {explicit!r}")
+        div = int(prescalers[name])
+        if max_hz and fclk / div > max_hz:
+            fits = [k for k, d in prescalers.items() if fclk / int(d) <= max_hz]
+            best = min(fits, key=lambda k: int(prescalers[k])) if fits else ""
+            raise ToolError(
+                "BAD_ARGUMENT",
+                f"prescaler={name} 会让 {instance} 的波特率 = {int(fclk / div)} Hz 超过上限 {max_hz} Hz,"
+                "CubeMX 会判定该 IP 未就绪(generate 报 OK 却零产出,还可能弹对话框卡死到超时)。"
+                + (f"当前 {bus.get('freq_key')} = {int(fclk)} Hz,这个频率下请用 {best}。" if best else ""),
+            )
+        return name, div, fclk
+    for key, div in sorted(prescalers.items(), key=lambda kv: int(kv[1])):
+        if max_hz and fclk / int(div) > max_hz:
+            continue
+        return key, int(div), fclk
+    key = max(prescalers, key=lambda k: int(prescalers[k]))  # 最大的分频仍超限:只能退到它
+    return key, int(prescalers[key]), fclk
+
+
+def spi_baudrate_commands(intent: dict, ioc_path: str) -> list:
+    """SPI 波特率命令 —— **两条**:预分频 + 波特率值。
+
+    为什么要两条(实测 2026-10-15):CubeMX 的参数校验看的是 `SPIx.CalculateBaudRate` 这个键,
+    而 `set ip parameters SPIx BaudRatePrescaler ...` **不会重算它** —— 只改预分频时 .ioc 里
+    CalculateBaudRate 仍是旧值(实测 36.0 MBits/s),CubeMX 于是记 "IP not ready for code
+    generation: SPI1" 并跳过代码生成:报 OK 却一个文件都不产出,还可能弹 Parameter Error
+    对话框把 -q 批处理卡死到超时。两条都发之后:15.4s 正常生成,`spi.c` 里
+    `BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4`、`.ioc` 里 `CalculateBaudRate=18000000`。
+    """
+    chosen, div, fclk = _spi_baudrate(intent, ioc_path)
+    if not chosen:
+        return []
+    baud = knowledge_loader.require_rule_verified("spi").get("baudrate") or {}
+    instance = str(intent.get("peripheral", "")).strip().upper()
+    return [
+        f"set ip parameters {instance} {baud.get('parameter', 'BaudRatePrescaler')} {chosen}",
+        f"set ip parameters {instance} {baud.get('rate_key', 'CalculateBaudRate')} {int(fclk / div)}",
+    ]
 
 
 def _read_int(text: str, default) -> int:
@@ -602,6 +674,21 @@ def adc_decisions(instance: str, intent: dict, ioc_path: str) -> list:
     return out
 
 
+def spi_decisions(instance: str, intent: dict, ioc_path: str) -> list:
+    """SPI 意图实际采用的值(含默认与工具自动补的波特率分频)。"""
+    chosen, div, fclk = _spi_baudrate(intent, ioc_path)
+    baud = knowledge_loader.require_rule_verified("spi").get("baudrate") or {}
+    how = "显式指定" if str(intent.get("prescaler", "")).strip() else "按总线频率取满足上限的最小分频"
+    rate = f"{int(fclk / div)} Hz" if div else "?"
+    return [
+        f"{instance}: 波特率分频 {chosen or '(未改,沿用 CubeMX 默认)'}({how}) → {rate}"
+        f"(上限 {baud.get('max_hz')} Hz;同时会写 {baud.get('rate_key', 'CalculateBaudRate')} —— "
+        "只改预分频的话 CubeMX 会判定该 IP 未就绪)",
+        f"{instance}: 模式 {intent.get('mode', 'full_duplex_master')},"
+        f"引脚 {', '.join(intent_pins(intent)) or '(未给)'}",
+    ]
+
+
 def dma_decisions(plan: dict) -> list:
     """DMA 请求实际采用的值(通道/方向/模式/通道中断都是工具推导或默认的)。"""
     return [
@@ -629,8 +716,12 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
         commands = usart_commands(intent)
         return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
     if re.fullmatch(r"SPI\d+", peripheral):
-        commands = spi_commands(intent)
-        return {"note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}", "commands": commands}
+        commands = spi_commands(intent, ioc_path)
+        return {
+            "note": f"{peripheral} 用 set 命令配置: {'; '.join(commands)}",
+            "commands": commands,
+            "decisions": spi_decisions(peripheral, intent, ioc_path),
+        }
     if re.fullmatch(r"ADC\d+", peripheral):
         commands = adc_commands(intent, ioc_path)
         note = f"{peripheral} 用 set 命令配置: {'; '.join(commands)}"

@@ -4,6 +4,27 @@
 
 ## 0.4.4.3(未发布)
 
+- **修 SPI 配好后 generate "报 OK 却零产出 / 卡死"**(实测根因:默认波特率超上限):CubeMX 默认
+  `SPI1.BaudRatePrescaler=2`,APB2=72MHz 下等于 36 MBits/s,超过 F103 的 SPI 上限 18 MBits/s ⇒
+  CubeMX 记 `IP not ready for code generation: SPI1` 并弹 `Parameter Error` 对话框,`-q` 批处理
+  没人点 → 卡死(实测挂 134s+ 无输出),**而且一个 HAL 文件都不生成**(连 `.mxproject` 都没有);
+  只把预分频改成 4 就 16.5s 正常产出(2026-10-15 实测:同一份 `BB8_spi.ioc` 副本只改这一个变量,
+  生成的 `spi.c` 里 `BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4`)。
+  - `cubemx_intent` 的 SPI 意图现在按"该 SPI 挂哪条 APB 总线"自动补**最小合法**分频
+    (SPI1@72MHz→4、SPI2@36MHz→2);上限 / 总线表 / 候选分频都取自 `rules/spi.yaml` 的 `baudrate`
+    段(上限 18000000 就是 db 里 `CalculateBaudRate` 的 `max`),不硬编码。意图里给 `prescaler`
+    可覆盖(枚举名或数字),**超限值直接拒绝**并给出该频率下的可用值
+  - **必须两条命令一起发**(实测踩出来的):CubeMX 的参数校验看的是 `CalculateBaudRate`,而
+    `set ... BaudRatePrescaler` **不会重算它** —— 只改预分频时 .ioc 里那行仍是旧值(36.0 MBits/s),
+    CubeMX 照样记 `IP not ready`、报 OK 却零产出(第一次端到端实测就是这么失败的);两条都发之后
+    15.4s 生成成功,`spi.c` 里 `BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4`
+  - `ioc_editor.check_semantics` 增 SPI 规则:超上限(含"没写这一行、CubeMX 用默认值 2")都报
+  - **零产出的诊断不再误导**:以前一律提示"确认没有残留的 CubeMX/javaw 进程占着单实例";
+    现在从 CubeMX 输出解析 `IP not ready for code generation: <IP>`,报新错误码 `IP_NOT_READY`,
+    直接指出是哪个外设未就绪、常见原因是该外设参数非法
+  - **超时强杀修对**:过去强杀的是 `STM32CubeMX.exe`(launcher,实测 0.1s 就 `exit 0`)的 PID,
+    真正干活的 `javaw` 杀不到 → 残留孤儿进程占着 CubeMX 单实例锁,让后续 generate 静默零产出
+    (实测踩过)。现在记录调用前的 javaw 集合,超时后按**差集**清理(不会动用户自己开的 GUI)
 - **新增离线语义预检**(`ioc_editor.check_semantics`):纯文本判定"配错了但 CubeMX 不报错"的
   组合问题,**不必起 CubeMX**(省掉一次 10~30s 启动)。第一批规则:
   - ADC 用了外部触发 → 触发源 TIM 必须在 `Mcu.IPx` 里,且它的 `TIM_MasterOutputTrigger`

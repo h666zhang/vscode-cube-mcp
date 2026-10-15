@@ -116,6 +116,13 @@ class _FakeProc:
 
 
 class TestRunScript(unittest.TestCase):
+    def setUp(self):
+        # _javaw_pids 会真的去调 tasklist,而它内部走 subprocess.Popen —— 与下面各用例对
+        # Popen 的 mock 会互相干扰,所以统一 mock 掉(超时兜底的差集逻辑另有专门用例)
+        patcher = mock.patch("vscode_cube_mcp.cubemx_mcp._javaw_pids", return_value=set())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_ok_output(self):
         with mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=_FakeProc(0, "OK\noutput\n")):
             r = cubemx_mcp._run_script("config load x")
@@ -147,6 +154,18 @@ class TestRunScript(unittest.TestCase):
             with mock.patch("vscode_cube_mcp.cubemx_mcp._kill_process_tree") as kill:
                 cubemx_mcp._run_script("x")
         kill.assert_called_once_with(fake)
+
+    def test_timeout_kills_new_javaw_only(self):
+        # 超时兜底:把"调用前就存在的 javaw 集合"交给 _kill_new_javaw 做差集(不动用户自己开的 GUI)
+        fake = _FakeProc(0, timeout_error=subprocess.TimeoutExpired("cmd", 1))
+        with (
+            mock.patch("vscode_cube_mcp.cubemx_mcp.subprocess.Popen", return_value=fake),
+            mock.patch("vscode_cube_mcp.cubemx_mcp._kill_process_tree"),
+            mock.patch("vscode_cube_mcp.cubemx_mcp._kill_new_javaw") as knj,
+            mock.patch("vscode_cube_mcp.cubemx_mcp._javaw_pids", return_value={"999"}),
+        ):
+            cubemx_mcp._run_script("x")
+        knj.assert_called_once_with({"999"})
 
     def test_temp_script_cleaned(self):
         before = set(os.listdir(tempfile.gettempdir()))
@@ -639,6 +658,187 @@ MxDb.Version=DB.6.0.180
 ProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false
 board=custom
 """
+
+
+class TestSpiBaudrate(unittest.TestCase):
+    """SPI 意图:自动补波特率分频 —— 缺它 CubeMX 会"报 OK 却零产出 / 弹窗卡死"。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self.root = tempfile.mkdtemp(prefix="spi_baud_")
+        self.ioc = os.path.join(self.root, "proj.ioc")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _seed(self, apb2: str = "72000000", apb1: str = "36000000") -> None:
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("Mcu.Name=STM32F103C(8-B)Tx\nMcu.IPNb=1\nMcu.IP0=RCC\n")
+            f.write(f"RCC.APB1Freq_Value={apb1}\nRCC.APB2Freq_Value={apb2}\n")
+
+    def _cmd(self, intent: dict) -> str:
+        return "; ".join(intent_resolver.apply_intents(self.ioc, [intent])["commands"])
+
+    def test_spi1_gets_prescaler_4_and_rate(self):
+        # APB2 72MHz:/2=36MBits/s 超 18 上限 -> 最小合法分频是 4。
+        # 波特率值也必须一起写:CubeMX 的校验看 CalculateBaudRate,而 set 预分频**不会重算它**
+        # (实测:只改预分频 → .ioc 里仍是 36.0 MBits/s → IP not ready → 报 OK 却零产出)
+        self._seed()
+        got = self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]})
+        self.assertIn("set ip parameters SPI1 BaudRatePrescaler SPI_BAUDRATEPRESCALER_4", got)
+        self.assertIn("set ip parameters SPI1 CalculateBaudRate 18000000", got)
+
+    def test_spi2_follows_apb1(self):
+        # SPI2 挂 APB1(36MHz):/2=18MBits/s 恰好合法 -> 用最小分频 2(说明写入的分频是按总线算的)
+        self._seed()
+        self.assertIn(
+            "set ip parameters SPI2 BaudRatePrescaler SPI_BAUDRATEPRESCALER_2",
+            self._cmd({"peripheral": "SPI2", "pins": ["PB13", "PB14", "PB15"]}),
+        )
+
+    def test_prescaler_follows_lower_apb2(self):
+        self._seed(apb2="18000000")
+        self.assertIn(
+            "SPI_BAUDRATEPRESCALER_2",
+            self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]}),
+        )
+
+    def test_explicit_prescaler_by_number(self):
+        self._seed()
+        self.assertIn(
+            "SPI_BAUDRATEPRESCALER_8",
+            self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"], "prescaler": 8}),
+        )
+
+    def test_explicit_prescaler_by_enum_name(self):
+        self._seed()
+        got = self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"], "prescaler": "SPI_BAUDRATEPRESCALER_16"})
+        self.assertIn("SPI_BAUDRATEPRESCALER_16", got)
+
+    def test_over_limit_prescaler_rejected(self):
+        # Prescaler=2 @APB2 72MHz = 36 MBits/s:显式给也必须拦住(否则下一次 generate 零产出/卡死)
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"], "prescaler": 2})
+        msg = str(ctx.exception)
+        self.assertIn("超过上限", msg)
+        self.assertIn("SPI_BAUDRATEPRESCALER_4", msg)  # 顺便给出这个频率下的可用值
+
+    def test_bad_prescaler_rejected(self):
+        self._seed()
+        with self.assertRaises(ValueError) as ctx:
+            self._cmd({"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"], "prescaler": 3})
+        self.assertIn("BAD_ARGUMENT", str(ctx.exception))
+
+    def test_decisions_report_prescaler(self):
+        self._seed()
+        plan = intent_resolver.apply_intents(self.ioc, [{"peripheral": "SPI1", "pins": ["PA5", "PA6", "PA7"]}])
+        self.assertTrue(any("波特率分频" in d for d in plan["decisions"]), plan["decisions"])
+
+
+class TestSpiPrecheck(unittest.TestCase):
+    """离线预检:SPI 波特率超上限(或没设 → 用默认值 2)要在落盘前就报出来。"""
+
+    def setUp(self):
+        knowledge_loader.reload()
+        self.root = tempfile.mkdtemp(prefix="spi_pre_")
+        self.ioc = os.path.join(self.root, "proj.ioc")
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _write(self, lines) -> None:
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+
+    def test_over_limit_prescaler_reported(self):
+        self._write(
+            [
+                "Mcu.IP0=RCC",
+                "Mcu.IP1=SPI1",
+                "RCC.APB2Freq_Value=72000000",
+                "SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_2",
+            ]
+        )
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("超过上限" in p for p in problems), problems)
+
+    def test_missing_prescaler_reported(self):
+        # 没写这一行时 CubeMX 用默认值 2 —— 实测 BB8_spi 之前就是这样踩的
+        self._write(["Mcu.IP0=RCC", "Mcu.IP1=SPI1", "RCC.APB2Freq_Value=72000000"])
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("超过上限" in p for p in problems), problems)
+
+    def test_stale_rate_reported(self):
+        # 预分频合法(4)但 CalculateBaudRate 是旧值(36.0 MBits/s)—— 实测踩过的形态:
+        # set 预分频不重算这一行,CubeMX 仍按它判定 → IP not ready → 报 OK 却零产出
+        self._write(
+            [
+                "Mcu.IP0=RCC",
+                "Mcu.IP1=SPI1",
+                "RCC.APB2Freq_Value=72000000",
+                "SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4",
+                "SPI1.CalculateBaudRate=36.0 MBits/s",
+            ]
+        )
+        problems = ioc_editor.check_semantics(self.ioc)
+        self.assertTrue(any("CalculateBaudRate" in p and "超过上限" in p for p in problems), problems)
+
+    def test_legal_declared_rate_not_reported(self):
+        self._write(
+            [
+                "Mcu.IP0=RCC",
+                "Mcu.IP1=SPI1",
+                "RCC.APB2Freq_Value=72000000",
+                "SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4",
+                "SPI1.CalculateBaudRate=18000000",
+            ]
+        )
+        problems = [p for p in ioc_editor.check_semantics(self.ioc) if "上限" in p]
+        self.assertEqual(problems, [])
+
+    def test_legal_prescaler_not_reported(self):
+        self._write(
+            [
+                "Mcu.IP0=RCC",
+                "Mcu.IP1=SPI1",
+                "RCC.APB2Freq_Value=72000000",
+                "SPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4",
+            ]
+        )
+        problems = [p for p in ioc_editor.check_semantics(self.ioc) if "波特率" in p]
+        self.assertEqual(problems, [])
+
+
+class TestIpNotReadyDiagnosis(unittest.TestCase):
+    """零产出时别再说"去查残留进程":CubeMX 日志里的 IP not ready 才是直接原因。"""
+
+    def test_parse_single(self):
+        out = "2026-10-15 23:06:47,192 [INFO] ProjectBuilder:2453 - IP not ready for code generation: SPI1\nOK\n"
+        self.assertEqual(cubemx_mcp._ip_not_ready(out), ["SPI1"])
+
+    def test_parse_dedups_and_sorts(self):
+        out = "IP not ready for code generation: SPI1\nIP not ready for code generation: ADC1\nx\n"
+        self.assertEqual(cubemx_mcp._ip_not_ready(out), ["ADC1", "SPI1"])
+
+    def test_absent(self):
+        self.assertEqual(cubemx_mcp._ip_not_ready("OK\nproject generate\nOK\nexit\nBye bye\n"), [])
+
+    def test_reason_prefers_ip_not_ready(self):
+        code, why = cubemx_mcp._no_output_reason("IP not ready for code generation: SPI1", "生成目录: X")
+        self.assertEqual(code, "IP_NOT_READY")
+        self.assertIn("SPI1", why)
+        self.assertIn("生成目录: X", why)
+
+    def test_reason_falls_back_to_no_output(self):
+        code, why = cubemx_mcp._no_output_reason("OK\nBye bye\n", "生成目录: X")
+        self.assertEqual(code, "CUBEMX_NO_OUTPUT")
+        self.assertEqual(why, "生成目录: X")
+
+    def test_ip_not_ready_error_code_explained(self):
+        stage, desc, hint = cubemx_result.explain("IP_NOT_READY")
+        self.assertEqual(stage, "post_check")
+        self.assertTrue(desc and hint)
 
 
 class TestInjectTimInternalClock(unittest.TestCase):

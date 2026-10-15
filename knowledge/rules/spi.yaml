@@ -4,8 +4,14 @@
 #     set mode SPI1 Full_Duplex_Master
 #     set pin PA5 SPI1_SCK / set pin PA6 SPI1_MISO / set pin PA7 SPI1_MOSI
 # 结果是下面 ioc_result(探针差异:新增 19 行 / 修改 7 行)。
+#
+# generate 计时实测(2026-10-15,BB8_spi.ioc 副本,只改 Prescaler 一个变量):
+#     Prescaler=2(默认) → CubeMX 记 "IP not ready for code generation: SPI1" 后弹
+#       Parameter Error 对话框,-q 批处理没人点 → 卡死(实测 >134s 无输出、零产出);
+#     Prescaler=4 → 16.5s 正常生成,spi.c 里 BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4。
+# 原因:APB2=72MHz 下 /2 = 36 MBits/s,超过 SPI 上限 18 MBits/s(见下面 baudrate 段)。
 verified: true
-source: "探针实测 2026-10-10,CubeMX 6.18.0"
+source: "探针实测 2026-10-10 + generate 计时实测 2026-10-15,CubeMX 6.18.0"
 
 modes:
   full_duplex_master: Full_Duplex_Master
@@ -18,6 +24,10 @@ command_examples:
   - "set pin PA5 SPI1_SCK"
   - "set pin PA6 SPI1_MISO"
   - "set pin PA7 SPI1_MOSI"
+  # 波特率:两条一起发。不配时默认值 2 在 APB2=72MHz 下超 18 MBits/s 上限(见 baudrate 段);
+  # 只发第一条**不会重算** CalculateBaudRate,CubeMX 仍会判 "IP not ready"
+  - "set ip parameters SPI1 BaudRatePrescaler SPI_BAUDRATEPRESCALER_4"
+  - "set ip parameters SPI1 CalculateBaudRate 18000000"
 
 ioc_result:
   - "PA5.Locked=true"
@@ -34,11 +44,52 @@ ioc_result:
   - "SPI1.CalculateBaudRate=36.0 MBits/s"
   - "SPI1.IPParameters=VirtualType,Mode,Direction,BaudRatePrescaler,CalculateBaudRate"
 
+# 波特率预分频:配 SPI 时必须让它落在上限内,否则 CubeMX 判定该 IP "not ready for
+# code generation" —— generate 报 OK 却零产出,还会弹对话框把 -q 批处理卡死(实测 2026-10-15)。
+# 上限来自 CubeMX db:SPI 的 CalculateBaudRate 参数 max=18000000(见 knowledge/ip/SPI-*.yaml)。
+baudrate:
+  parameter: BaudRatePrescaler
+  # 波特率值本身:CubeMX 的参数校验看的是它,而 `set ... BaudRatePrescaler **不会重算它** ——
+  # 实测只改预分频时 .ioc 里这一行仍是旧值(36.0 MBits/s),CubeMX 于是记
+  # "IP not ready for code generation: SPIx" 并跳过生成(报 OK 却零产出 / 弹窗卡死)。
+  # 所以两条命令必须一起发。注意 .ioc 里这行有两种写法:纯数字(18000000)或 "36.0 MBits/s"。
+  rate_key: CalculateBaudRate
+  max_hz: 18000000 # STM32F103 的 SPI 上限 18 MBits/s(= db 的 CalculateBaudRate.max)
+  # 实例挂在哪条 APB 总线(F1 系列:SPI1 在 APB2,SPI2/SPI3 在 APB1),
+  # 以及该总线的频率键 / 读不到时的缺省值。找不到实例时用 default 兜底(取频率最高的
+  # APB2,算出来的分频只会更保守、仍然合法)。
+  instances:
+    SPI1:
+      freq_key: "RCC.APB2Freq_Value"
+      default_hz: 72000000
+    SPI2:
+      freq_key: "RCC.APB1Freq_Value"
+      default_hz: 36000000
+    SPI3:
+      freq_key: "RCC.APB1Freq_Value"
+      default_hz: 36000000
+  default:
+    freq_key: "RCC.APB2Freq_Value"
+    default_hz: 72000000
+  # 合法分频比(2 的幂),与 db 的 BaudRatePrescaler.values 一致
+  prescalers:
+    SPI_BAUDRATEPRESCALER_2: 2
+    SPI_BAUDRATEPRESCALER_4: 4
+    SPI_BAUDRATEPRESCALER_8: 8
+    SPI_BAUDRATEPRESCALER_16: 16
+    SPI_BAUDRATEPRESCALER_32: 32
+    SPI_BAUDRATEPRESCALER_64: 64
+    SPI_BAUDRATEPRESCALER_128: 128
+    SPI_BAUDRATEPRESCALER_256: 256
+
 known_issues:
   - "模式名用下划线:Full_Duplex_Master(不是 GUI 里显示的那种写法)"
   - "引脚侧的 Mode 也写 SPI 的模式名(如 PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种"
-  - "默认 BaudRatePrescaler=2(36 MBits/s);改频率的写法还没实测(NSS/硬件片选同理)"
+  - "**必须让波特率落在上限内**:默认为 2,APB2=72MHz 下 36 MBits/s 超过 18 MBits/s 上限 ⇒ CubeMX 记 'IP not ready for code generation: SPIx' 并弹 Parameter Error 对话框 —— -q 批处理没人点会卡到超时,且报 OK 却零产出(实测 2026-10-15)。cubemx_intent 已按总线频率自动补最小合法分频(SPI1→4、SPI2→2)"
+  - "**预分频与波特率值必须一起写(两条命令)**:CubeMX 的参数校验看的是 CalculateBaudRate,而 `set ip parameters SPIx BaudRatePrescaler <枚举>` **不会重算它** —— 只改预分频时 .ioc 里那一行还是旧值(实测 36.0 MBits/s),CubeMX 照样判 'IP not ready'、报 OK 却零产出(2026-10-15 实测,一开始就是这么被坑的)。两条都发之后 15.4s 正常生成:`spi.c` 里 BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4、`.ioc` 里 CalculateBaudRate=18000000"
+  - "合法分频就 baudrate.prescalers 里那 8 个(2 的幂);波特率 = 该 SPI 所在总线的频率 / 分频"
   - "全双工下 MISO/MOSI/SCK 三个引脚都要显式 set pin;只给 SCK 不完整(未实测)"
+  - "还没实测:NSS / 硬件片选(VirtualNSS=VM_NSSHARD)的写法"
 
 parameters_from_db:
   baudrate_prescaler:

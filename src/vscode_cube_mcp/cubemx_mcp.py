@@ -135,6 +135,38 @@ def _ko_command(output: str) -> str:
     return ""
 
 
+# CubeMX 报 OK 却零产出时,日志里会写 `IP not ready for code generation: SPI1`
+IP_NOT_READY_RE = re.compile(r"IP not ready for code generation:\s*([A-Za-z0-9_]+)")
+
+
+def _ip_not_ready(output: str) -> list:
+    """从 CubeMX 输出里抓"哪些 IP 没准备好、被跳过生成"。
+
+    这是"某个外设参数非法"的直接原因(实测 2026-10-15:SPI 的 BaudRatePrescaler 让
+    波特率超过 18 MBits/s 上限时,CubeMX 记 `IP not ready for code generation: SPI1`,
+    然后跳过整个代码生成 —— 报 OK 却零产出)。有它就不该让人去猜"是不是残留实例占了单实例锁"。
+    """
+    return sorted(set(IP_NOT_READY_RE.findall(output or "")))
+
+
+def _no_output_reason(output: str, extra: str) -> tuple:
+    """零产出时给出准确的错误码与说明,返回 (error_code, extra)。
+
+    没有任何 IP 未就绪的线索时退回 CUBEMX_NO_OUTPUT(那种多半是残留实例占着单实例锁)。
+    """
+    not_ready = _ip_not_ready(output)
+    if not not_ready:
+        return "CUBEMX_NO_OUTPUT", extra
+    return (
+        "IP_NOT_READY",
+        extra
+        + "\nCubeMX 判定这些外设未就绪、跳过了代码生成: "
+        + ", ".join(not_ready)
+        + "\n常见原因:该外设参数非法(实测:SPI 的 BaudRatePrescaler 让波特率超过 18 MBits/s 上限)。"
+        + '先看 cubemx_load(summary=True) 摘要里的 precheck 字段,或 cubemx_help(topic="spi"|"adc")。',
+    )
+
+
 def _generated_artifacts(gen_dir: str) -> list:
     """列出生成目录里的 HAL 骨架产物(Core/Src/*.c)。
 
@@ -170,6 +202,47 @@ def _kill_process_tree(proc) -> None:
             pass
 
 
+def _javaw_pids() -> set:
+    """当前活着的 javaw.exe 的 PID —— CubeMX 真正干活的进程。
+
+    STM32CubeMX.exe 只是 launcher:实测 -q 模式下它 0.1s 就 `exit 0` 并把活交给 javaw。
+    所以按 launcher 的 PID 杀进程树**杀不到** javaw —— 它会变成孤儿残留、占着 CubeMX
+    的单实例锁,让后续 generate 静默零产出(实测)。非 Windows 返回空集(tasklist 只在
+    Windows 上有;其它平台由 _kill_process_tree 的 SIGKILL 分支兜底)。
+    """
+    if os.name != "nt":
+        return set()
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq javaw.exe", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout
+    except Exception:  # noqa: BLE001 -- 只是尽力查一下 javaw,查不到就当没有,不该让整个调用失败
+        return set()
+    return {m.group(1) for m in re.finditer(r'"javaw\.exe"\s*,\s*"(\d+)"', out or "")}
+
+
+def _kill_new_javaw(before) -> None:
+    """超时兜底:杀掉本次调用**新出现**的 javaw。
+
+    只杀差集,不动调用前就在跑的 javaw(比如用户自己开的 CubeMX GUI)。
+    """
+    if os.name != "nt":
+        return
+    for pid in sorted(_javaw_pids() - set(before or ())):
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", pid, "/T", "/F"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
 def _run_script(script: str, stage: str = "run_cubemx") -> dict:
     """执行 CubeMX 脚本,返回 {ok, output, exit_code, stage, error_code}。
 
@@ -183,6 +256,7 @@ def _run_script(script: str, stage: str = "run_cubemx") -> dict:
             f.write(script.strip() + "\n")
             f.write("exit\n")
         with _LOCK:
+            before_javaw = _javaw_pids()  # 供超时兜底:只杀本次调用新出现的 javaw
             proc = subprocess.Popen(
                 [CUBEMX_EXE, "-q", tmp],
                 stdout=subprocess.PIPE,
@@ -196,6 +270,7 @@ def _run_script(script: str, stage: str = "run_cubemx") -> dict:
                 stdout, stderr = proc.communicate(timeout=TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
                 _kill_process_tree(proc)
+                _kill_new_javaw(before_javaw)
                 return {
                     "ok": False,
                     "output": f"TIMEOUT: CubeMX 子进程超过 {TIMEOUT_SECONDS}s 被终止(已强杀进程树)",
@@ -467,14 +542,8 @@ def cubemx_generate(ioc: str, project_dir: str = "") -> str:
         return render_run("cubemx_generate", r)
     arts = _generated_artifacts(gen_dir)
     if not arts:
-        return render(
-            "cubemx_generate",
-            False,
-            r.get("exit_code"),
-            "CUBEMX_NO_OUTPUT",
-            output=r.get("output", ""),
-            extra=f"生成目录: {gen_dir}",
-        )
+        code, why = _no_output_reason(r.get("output", ""), f"生成目录: {gen_dir}")
+        return render("cubemx_generate", False, r.get("exit_code"), code, output=r.get("output", ""), extra=why)
     return render_run(
         "cubemx_generate",
         r,
@@ -749,14 +818,17 @@ def cubemx_new_project(
     # 这种情况必须显式失败 —— 否则调用方会拿着一个空目录继续往下走。
     arts = _generated_artifacts(pd) or _generated_artifacts(gen_dir)
     if not arts:
+        code, why = _no_output_reason(
+            r.get("output", ""), f"工程目录: {pd}\n.ioc 已生成: {ioc_dst}(但没有 HAL 骨架产出)"
+        )
         return render(
             "cubemx_new_project",
             False,
             r.get("exit_code"),
-            "CUBEMX_NO_OUTPUT",
+            code,
             steps=[*steps, ("post_check", "FAIL")],
             output=r.get("output", ""),
-            extra=f"工程目录: {pd}\n.ioc 已生成: {ioc_dst}(但没有 HAL 骨架产出)",
+            extra=why,
         )
     extra += f"\n生成文件({len(arts)}): " + ", ".join(arts)
     extra += "\n" + output_inspector.tree_line(output_inspector.scan(pd))
@@ -935,14 +1007,15 @@ def cubemx_intent(ioc: str, intents: list, generate: bool = False) -> str:
             return render_run("cubemx_intent", result, steps=[*steps, ("run_cubemx", "FAIL")])
         arts = _generated_artifacts(os.path.dirname(ap))
         if not arts:
+            code, why = _no_output_reason(result.get("output", ""), f"生成目录: {os.path.dirname(ap)}")
             return render(
                 "cubemx_intent",
                 False,
                 result.get("exit_code"),
-                "CUBEMX_NO_OUTPUT",
+                code,
                 steps=[*steps, ("run_cubemx", "ok"), ("post_check", "FAIL")],
                 output=result.get("output", ""),
-                extra=f"生成目录: {os.path.dirname(ap)}",
+                extra=why,
             )
         steps.append(("run_cubemx", "ok"))
     extra = "\n".join(plan["notes"]) + _decisions_block(plan)

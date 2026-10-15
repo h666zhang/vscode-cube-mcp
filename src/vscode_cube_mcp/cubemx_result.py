@@ -73,6 +73,12 @@ ERRORS = {
         "CubeMX 报成功,但没有生成任何文件",
         "确认没有残留的 CubeMX/javaw 进程占着单实例(结束它再重试);必要时在 GUI 里打开该 .ioc 保存一次再重试",
     ),
+    "IP_NOT_READY": (
+        "post_check",
+        "CubeMX 判定外设未就绪,跳过了代码生成",
+        "看 extra 里列出了哪些 IP:通常是该外设参数非法(实测:SPI 的 BaudRatePrescaler 让波特率"
+        '超过 18 MBits/s 上限)。用 cubemx_help(topic="spi") 查合法取值,或先看 cubemx_load 的 precheck',
+    ),
 }
 
 

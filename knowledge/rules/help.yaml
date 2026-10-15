@@ -272,12 +272,21 @@ peripheral:
       那是搬运中断、不是串口收发中断 —— 详见 topic="dma"。
     - 接收用 DMA 时一般显式写 `"mode": "circular"`(不写的话 UART 接收默认是 `DMA_NORMAL`,只搬一次)。
   spi: |-
-    【SPI(探针实测 2026-10-10)】
+    【SPI(探针实测 2026-10-10 + generate 计时实测 2026-10-15)】
     - 命令:set mode SPI1 Full_Duplex_Master;set pin PA5 SPI1_SCK / PA6 SPI1_MISO / PA7 SPI1_MOSI
     - 模式名用下划线:Full_Duplex_Master / Full_Duplex_Slave / RX_Only_Simplex_Unidirect_Master /
       TX_Only_Simplex_Unidirect_Master。
     - 引脚侧的 Mode 也写 SPI 的模式名(PA5.Mode=Full_Duplex_Master),不是 GPIO_Output 那种。
-    - 默认 BaudRatePrescaler=2 -> 36 MBits/s。
+    - **波特率必须落在上限内**(F103 上限 18 MBits/s):CubeMX 默认 Prescaler=2,在 APB2=72MHz 下
+      等于 36 MBits/s —— 超限时 CubeMX 记 `IP not ready for code generation: SPIx` 并弹 Parameter
+      Error 对话框,`-q` 批处理没人点会卡死,而且**报 OK 却一个文件都不产出**。
+      **要两条命令一起发**:`set ... BaudRatePrescaler` 不会重算 `CalculateBaudRate`,只改预分频
+      时 CubeMX 仍按那个旧值判定(实测 → `IP not ready`),工具现在两条都补。
+      `cubemx_intent` 会按该 SPI 挂的总线频率自动补最小合法分频:SPI1(APB2 72MHz) -> 4、
+      SPI2(APB1 36MHz) -> 2。要指定就写意图里的 `prescaler`(枚举名或数字,如 8 或
+      "SPI_BAUDRATEPRESCALER_8"),超限会被直接拒绝。
+    - 合法分频(2 的幂):SPI_BAUDRATEPRESCALER_2 / 4 / 8 / 16 / 32 / 64 / 128 / 256;
+      波特率 = 该总线频率 / 分频。
   adc: |-
     【ADC(实测 + generate 回读验证 2026-10-10)】
     - 意图字段(默认值而非强制):pin / pins(多通道) / sampling_time / continuous /

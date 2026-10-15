@@ -74,6 +74,15 @@
   72MHz PCLK2 下用 `RCC_ADCPCLK2_DIV6` = 12MHz),否则 CubeMX 判定时钟非法,generate 时弹
   `Warning: Code Generation ... [Clock]` 对话框,`-q` 批处理没人点 → 卡到 240s 超时(强杀后
   `javaw` 还会残留,要手动 taskkill)。`cubemx_intent` 配 ADC 时已按 `.ioc` 的 APB2 频率自动补。
+- **SPI 波特率必配(generate 会"报 OK 却零产出")**:CubeMX 默认 `BaudRatePrescaler=2`,在
+  APB2=72MHz 下是 36 MBits/s,超过 F103 的 SPI 上限 18 MBits/s ⇒ CubeMX 记
+  `IP not ready for code generation: SPI1` 并弹 `Parameter Error` 对话框,`-q` 批处理没人点 →
+  卡死(实测挂 134s+ 零输出),**而且一个文件都不生成**(连 `.mxproject` 都没有)。改成 4 后
+  16.5s 正常产出(实测 2026-10-15)。**要发两条命令**:`set ... BaudRatePrescaler` 不会重算
+  `CalculateBaudRate`,只改预分频时 CubeMX 仍按那个旧值判 `IP not ready`(实测踩过),工具现在
+  两条一起补。`cubemx_intent` 已按总线频率自动补(SPI1→4、SPI2→2),超限值直接拒绝;
+  离线预检也会报。**注意它与上一行 ADC 的 `[Clock]` 弹窗是两个不同机制**
+  (外设参数值非法 vs 时钟树非法),但后果一样。
 - **ADC 多通道 / 外部触发**:多通道用 `pins`(`set mode INn` 只挂引脚,转换序列靠
   `NbrOfConversion` + `Rank-n`/`Channel-n`/`SamplingTime-n`,工具已自动补);**外部触发必须配套
   触发源外设**(如 TIM2 的 TRGO 输出),只设 ADC 的 `ExternalTrigConv` 会让 generate 卡死。

@@ -80,6 +80,18 @@ def _rule_data(rule_name: str) -> dict:
         return {}
 
 
+def _parse_rate(raw) -> int:
+    """解析 .ioc 里的波特率值(Hz)。两种写法都见过:纯数字 `18000000`、`36.0 MBits/s`。"""
+    s = str(raw or "").strip()
+    if not s:
+        return 0
+    try:
+        val = float(s.split()[0])
+    except (ValueError, IndexError):
+        return 0
+    return int(val * 1_000_000) if "bit" in s.lower() else int(val)
+
+
 def check_semantics(ioc_path: str) -> list:
     """离线语义预检:抓那些"配错了但 CubeMX 不报错"的组合问题(只读、零 CubeMX 启动)。
 
@@ -145,7 +157,54 @@ def check_semantics(ioc_path: str) -> list:
             how = presc or "默认分频(取自 RCC.ADCFreqValue)"
             problems.append(f"ADCCLK = {adcclk} Hz 超过上限 {max_hz} Hz({how};generate 会弹 [Clock] 卡死)")
 
-    # ③ DMA 键组要自洽:外设列表里有 DMA、请求序号对得上、通道中断已使能
+    # ③ SPI 的波特率必须在上限内:超限时 CubeMX 判定该 IP "not ready for code generation"
+    #    —— generate 报 OK 却零产出,还可能弹 Parameter Error 对话框把 -q 批处理卡死到超时
+    #    (实测:Prescaler=2 @APB2 72MHz = 36 MBits/s > 18 MBits/s 上限)
+    baud = _rule_data("spi").get("baudrate") or {}
+    spi_prescalers = baud.get("prescalers") or {}
+    spi_max = int(baud.get("max_hz") or 0)
+    spi_key = str(baud.get("parameter") or "BaudRatePrescaler")
+    rate_key = str(baud.get("rate_key") or "CalculateBaudRate")
+    if spi_prescalers:
+        for spi_name in sorted(n for n in ips if re.fullmatch(r"SPI\d+", n)):
+            bus = (baud.get("instances") or {}).get(spi_name) or (baud.get("default") or {})
+            default_hz = bus.get("default_hz", 72000000)
+            try:
+                fclk = int(entries.get(bus.get("freq_key", ""), "") or default_hz)
+            except ValueError:
+                fclk = int(default_hz)
+            # CubeMX 的校验依据是 CalculateBaudRate(实测:set ... BaudRatePrescaler **不会重算它**),
+            # 所以这一行存在就优先看它 —— 只看预分频会漏掉"预分频合法、但波特率值是旧的"这种
+            # 最常见的踩坑形态(正是 generate 报 OK 却零产出的原因)
+            raw_rate = entries.get(f"{spi_name}.{rate_key}", "")
+            declared = _parse_rate(raw_rate)
+            if declared:
+                if spi_max and declared > spi_max:
+                    problems.append(
+                        f"{spi_name}.{rate_key}={raw_rate} 超过上限 {spi_max} Hz:CubeMX 会判定该 IP 未就绪"
+                        " —— generate 报 OK 却零产出、还可能弹 Parameter Error 对话框把批处理卡死。"
+                        f"注意 set ... {spi_key} 不会重算这一行,要同时把 {rate_key} 设成(总线频率 / 分频)"
+                    )
+                continue
+            # 没有这一行(或解析不出来)→ 按预分频现算;预分频也没写就用 CubeMX 的默认值(最小分频)
+            default_div = min(int(v) for v in spi_prescalers.values())
+            value = entries.get(f"{spi_name}.{spi_key}", "")
+            how = f"{spi_key}={value}" if value else f"未设 {spi_key}(CubeMX 默认分频 {default_div})"
+            div = int(spi_prescalers.get(value, 0) or 0) if value else default_div
+            if value and not div:
+                problems.append(f"{spi_name}.{spi_key}={value} 不是合法分频(见 rules/spi.yaml 的 baudrate)")
+                continue
+            if spi_max and div and fclk / div > spi_max:
+                fits = [k for k, d in spi_prescalers.items() if fclk / int(d) <= spi_max]
+                best = min(fits, key=lambda k: int(spi_prescalers[k])) if fits else ""
+                problems.append(
+                    f"{spi_name} 的波特率 = {int(fclk / div)} Hz 超过上限 {spi_max} Hz({how}):"
+                    "CubeMX 会判定该 IP 未就绪 —— generate 报 OK 却零产出、还可能弹 Parameter "
+                    "Error 对话框把批处理卡死"
+                    + (f";当前 {bus.get('freq_key')} = {int(fclk)} Hz,请用 {best}。" if best else "")
+                )
+
+    # ④ DMA 键组要自洽:外设列表里有 DMA、请求序号对得上、通道中断已使能
     dma_keys = _rule_data("dma").get("ioc_keys") or {}
     ip_entry = str(dma_keys.get("ip_list_entry") or "DMA")
     for key, value in sorted(entries.items()):
@@ -162,7 +221,7 @@ def check_semantics(ioc_path: str) -> list:
         if channel and f"NVIC.{channel}_IRQn" not in entries:
             problems.append(f"{request} 用了 {channel},但没使能 NVIC.{channel}_IRQn(DMA 完成回调不会进)")
 
-    # ④ 外设配上了,但 .ioc 的"初始化顺序表"里没有它的 MX_*_Init 段
+    # ⑤ 外设配上了,但 .ioc 的"初始化顺序表"里没有它的 MX_*_Init 段
     #    典型成因:"移除该外设 + 重新加回" —— 移除会删掉那段,加回走 set 命令不会补回;
     #    generate 时 CubeMX 会自己重建,所以**生成的代码不受影响**,但 cubemx_load 摘要的
     #    init_order 会暂时少一项。提示一句,免得只看摘要的人以为"这外设没配上"。
