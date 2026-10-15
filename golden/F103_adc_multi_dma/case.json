@@ -1,0 +1,36 @@
+{
+  "desc": "ADC1 四通道(PA0-PA3)+ DMA circular + I2C1。素材里还有外部触发(T3_TRGO),本用例不覆盖",
+  "intents": [
+    {
+      "peripheral": "ADC1",
+      "pins": [
+        "PA0",
+        "PA1",
+        "PA2",
+        "PA3"
+      ],
+      "dma": {
+        "mode": "circular"
+      }
+    },
+    {
+      "peripheral": "I2C1",
+      "pins": [
+        "PB8",
+        "PB9"
+      ]
+    }
+  ],
+  "expect_commands": [
+    "set ip parameters ADC1 NbrOfConversion 4"
+  ],
+  "expect_ioc_lines": [
+    "ADC1.NbrOfConversion=4",
+    "ADCx_IN0"
+  ],
+  "expect_init": [
+    "MX_ADC1_Init",
+    "MX_DMA_Init"
+  ],
+  "source": "ADC\\ADC.ioc"
+}

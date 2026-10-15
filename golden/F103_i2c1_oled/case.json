@@ -1,0 +1,25 @@
+{
+  "desc": "I2C1(PB8/PB9)接 OLED —— 引脚角色由引脚表推出,不靠调用方指定",
+  "intents": [
+    {
+      "peripheral": "I2C1",
+      "pins": [
+        "PB8",
+        "PB9"
+      ]
+    }
+  ],
+  "expect_commands": [
+    "set pin PB8 I2C1_SCL",
+    "set pin PB9 I2C1_SDA",
+    "set mode I2C1 I2C"
+  ],
+  "expect_ioc_lines": [
+    "PB8.Signal=I2C1_SCL",
+    "PB9.Signal=I2C1_SDA"
+  ],
+  "expect_init": [
+    "MX_I2C1_Init"
+  ],
+  "source": "OLED_HAL\\OLED_HAL.ioc"
+}

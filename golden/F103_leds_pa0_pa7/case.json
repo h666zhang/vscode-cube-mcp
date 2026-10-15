@@ -1,0 +1,65 @@
+{
+  "desc": "8 个 LED(PA0-PA7 推挽输出),验证同端口连续引脚",
+  "intents": [
+    {
+      "peripheral": "GPIO",
+      "pin": "PA0",
+      "mode": "output",
+      "label": "LED1"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA1",
+      "mode": "output",
+      "label": "LED2"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA2",
+      "mode": "output",
+      "label": "LED3"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA3",
+      "mode": "output",
+      "label": "LED4"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA4",
+      "mode": "output",
+      "label": "LED5"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA5",
+      "mode": "output",
+      "label": "LED6"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA6",
+      "mode": "output",
+      "label": "LED7"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA7",
+      "mode": "output",
+      "label": "LED8"
+    }
+  ],
+  "expect_commands": [
+    "set pin PA0 GPIO_Output",
+    "set pin PA7 GPIO_Output"
+  ],
+  "expect_ioc_lines": [
+    "PA0-WKUP.Signal=GPIO_Output",
+    "PA7.Signal=GPIO_Output"
+  ],
+  "expect_init": [
+    "MX_GPIO_Init"
+  ],
+  "source": "LEDRUN\\LEDRUN.ioc"
+}

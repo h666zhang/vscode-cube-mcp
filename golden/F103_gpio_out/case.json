@@ -1,0 +1,22 @@
+{
+  "desc": "GPIO 输出 PB12(音箱使能脚),带标签 —— 最小用例",
+  "intents": [
+    {
+      "peripheral": "GPIO",
+      "pin": "PB12",
+      "mode": "output",
+      "label": "Speaker"
+    }
+  ],
+  "expect_commands": [
+    "set pin PB12 GPIO_Output",
+    "set gpio parameters PB12 GPIO_Label Speaker"
+  ],
+  "expect_ioc_lines": [
+    "PB12.Signal=GPIO_Output"
+  ],
+  "expect_init": [
+    "MX_GPIO_Init"
+  ],
+  "source": "Speaker\\Speaker.ioc"
+}

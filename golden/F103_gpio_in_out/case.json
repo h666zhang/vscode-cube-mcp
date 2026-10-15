@@ -1,0 +1,53 @@
+{
+  "desc": "3 个输入(按键/光敏)+ 3 个输出(LED),验证多引脚同一外设",
+  "intents": [
+    {
+      "peripheral": "GPIO",
+      "pin": "PA2",
+      "mode": "input",
+      "label": "KEY1"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA4",
+      "mode": "input",
+      "label": "KEY2"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PA5",
+      "mode": "input",
+      "label": "LDR"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PB1",
+      "mode": "output",
+      "label": "LED1"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PB10",
+      "mode": "output",
+      "label": "LED2"
+    },
+    {
+      "peripheral": "GPIO",
+      "pin": "PB11",
+      "mode": "output",
+      "label": "LED3"
+    }
+  ],
+  "expect_commands": [
+    "set pin PA2 GPIO_Input",
+    "set pin PB11 GPIO_Output"
+  ],
+  "expect_ioc_lines": [
+    "PA2.Signal=GPIO_Input",
+    "PB11.Signal=GPIO_Output"
+  ],
+  "expect_init": [
+    "MX_GPIO_Init"
+  ],
+  "source": "GPIO_Input\\GPIO_Input.ioc"
+}
