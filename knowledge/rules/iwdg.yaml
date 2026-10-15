@@ -18,7 +18,7 @@ ioc_result:
 
 known_issues:
   - "不需要引脚,写的是虚拟引脚 VP_IWDG_VS_IWDG(CubeMX 自己生成的)"
-  - "Prescaler / Reload 的写法还没实测;默认值见 parameters_from_db"
+  - "实测 2026-10-15:激活用 `set mode IWDG IWDG_Activate`;`set ip parameters IWDG Prescaler IWDG_PRESCALER_64` 生效(落盘 IWDG.Prescaler)。Reload 设成默认值 4095 时 CubeMX **不写出行** —— 值等于默认就不落盘,别以为没生效"
 
 parameters_from_db:
   prescaler:

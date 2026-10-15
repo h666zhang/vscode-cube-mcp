@@ -17,7 +17,7 @@ ioc_result:
 
 known_issues:
   - "和 IWDG 一样用虚拟引脚表达"
-  - "WWDG 中断(EWIMode)与窗口值的写法还没实测"
+  - "实测 2026-10-15:激活用 `set mode WWDG WWDG_Activate`;`set ip parameters WWDG Prescaler WWDG_PRESCALER_8` / `Window 80` / `Counter 100` / `EWIMode WWDG_EWI_ENABLE` 四条全部生效(都落盘)"
 
 parameters_from_db:
   prescaler:

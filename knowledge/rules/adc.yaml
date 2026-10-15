@@ -94,7 +94,7 @@ known_issues:
   - "触发源要分清规则组/注入组:F103 规则组(ExternalTrigConv)的合法取值里**没有 T2_TRGO** —— 那是注入组 ExternalTrigInjecConv 的值(ADC_EXTERNALTRIGINJECCONV_T2_TRGO);规则组要用 TIM2 只能写 T2_CC2 / T2_CC3,要 TRGO 得用 T3_TRGO / T8_TRGO。写非法值时 CubeMX 静默忽略(不报错,硬件永不转换);cubemx_intent 现在对照 db 导出的 values 直接拦下并列出合法取值"
   - "db 导出的 NbrOfConversion 写着 max: '1',那是 XML 里 Visible=false 的那份定义;真正可见的定义是 Max=16,实测能设 2 —— 别被 parameters_from_db 的 max 误导"
   - "中断:注入 NVIC.ADC1_2_IRQn(ADC1/ADC2 共用向量),generate 后 stm32f1xx_it.c 里出现 ADC1_2_IRQHandler"
-  - "还没实测:注入通道(InjectedConv)、模拟看门狗"
+  - "注入通道/模拟看门狗(实测 2026-10-15,只验证到落盘):`set ip parameters ADC1 EnableInjectedConversion ENABLE` / `InjectedConvMode Discontinuous` / `EnableAnalogWatchDog true` 生效;但 `WatchdogMode` / `WatchdogChannel` 这两条**没落盘**(可能还得配套 ChannelForWatchDog 之类),要用得再探"
   - "DMA 搬运已支持(见 rules/dma.yaml):在意图里加 dma 字段即可;配了 DMA 之后 ADC 时钟仍必须先配好,否则 generate 卡死"
 
 parameters_from_db:

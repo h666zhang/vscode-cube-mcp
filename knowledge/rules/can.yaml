@@ -29,7 +29,7 @@ ioc_result:
 
 known_issues:
   - "实例名是 CAN(不是 CAN1):STM32F103C8T6 只有一个 bxCAN"
-  - "默认波特率算出来是 749999 bit/s(CubeMX 自己算的);Prescaler/SJW/BS1/BS2 的写法还没实测"
+  - "实测 2026-10-15:激活用 `set mode CAN CAN_Activate`;`set ip parameters CAN Prescaler 4`(数字,不是枚举) / `SJW CAN_SJW_1TQ` / `BS1 CAN_BS1_8TQ` / `BS2 CAN_BS2_3TQ` / `Mode CAN_MODE_LOOPBACK` 生效。SJW 是默认值时**不写出行**;CalculateBaudRate/TimeBit/TimeQuantum 由 CubeMX 自己算"
   - "不像 USART 那样在 set mode 里带实例号,命令就是 set mode CAN CAN_Activate"
 
 parameters_from_db:
