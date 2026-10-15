@@ -760,6 +760,25 @@ def apply_one(ioc_path: str, intent: dict) -> dict:
     )
 
 
+def _conflict_hint(pin: str, holder: str, who: str) -> str:
+    """引脚冲突时把"被谁占着"说清楚。
+
+    调试口 / 晶振这类占了之后不好直接挪的单独点名 —— 只报 `.ioc` 里的信号名
+    (如 `SYS_JTMS-SWDIO`)调用方看不懂:按 F103 引脚表,PA13/PA14 就是 JTMS/SWCLK,
+    PA15/PB3/PB4 是 JTDI/JTDO/NJTRST。
+    """
+    if holder.startswith("SYS_JT"):
+        return (
+            f"引脚 {pin} 被**调试口**占着(.ioc 里是 {holder})。"
+            "PA13/PA14 是 SWD 的两根线、PA15/PB3/PB4 是 JTAG 的;"
+            "本工具模板用 SWD(只占 PA13/PA14),所以 PA15/PB3/PB4 本来可以直接当 GPIO,"
+            f"而 {pin} 要当普通 GPIO 得先改 SYS 的 Debug 设置,或换一个引脚"
+        )
+    if holder.startswith("RCC_OSC"):
+        return f"引脚 {pin} 被外部晶振占着(.ioc 里是 {holder});改用内部 RC(HSI)或换一个引脚"
+    return f"引脚 {pin} 已被占用(当前 .ioc 里是 {holder});换一个引脚,或先移除占用它的外设(再配 {who})"
+
+
 def apply_intents(ioc_path: str, intents: list) -> dict:
     """把一组意图落到 .ioc:先查引脚冲突,再逐个执行。
 
@@ -780,7 +799,7 @@ def apply_intents(ioc_path: str, intents: list) -> dict:
             if pin in planned:
                 raise ToolError("PIN_CONFLICT", f"引脚 {pin} 在这批意图里被用了两次({planned[pin]} 和 {who})")
             if pin in used:
-                raise ToolError("PIN_CONFLICT", f"引脚 {pin} 已被占用(当前 .ioc 里是 {used[pin]})")
+                raise ToolError("PIN_CONFLICT", _conflict_hint(pin, used[pin], who))
             planned[pin] = who
     notes = []
     commands = []

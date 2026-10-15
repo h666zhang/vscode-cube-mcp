@@ -38,6 +38,19 @@ class TestGpioIntent(unittest.TestCase):
         got = self._cmd({"peripheral": "GPIO", "pin": "PB12", "mode": "output", "label": "Speaker"})
         self.assertIn("set gpio parameters PB12 GPIO_Label Speaker", got)
 
+    def test_debug_port_conflict_names_the_debug_port(self):
+        # PA13/PA14 是 SWD:报错要点名"调试口",而不是只丢一个 SYS_JTMS-SWDIO 让调用方猜
+        with open(self.ioc, "w", encoding="utf-8") as f:
+            f.write(
+                "Mcu.Name=STM32F103C(8-B)Tx\nMcu.IPNb=2\nMcu.IP0=RCC\nMcu.IP1=SYS\n"
+                "PA13.Signal=SYS_JTMS-SWDIO\nPA14.Signal=SYS_JTCK-SWCLK\n"
+            )
+        with self.assertRaises(ValueError) as ctx:
+            self._cmd({"peripheral": "GPIO", "pin": "PA13", "mode": "output"})
+        msg = str(ctx.exception)
+        self.assertIn("调试口", msg)
+        self.assertIn("PIN_CONFLICT", msg)
+
 
 class TestAdcIntent(unittest.TestCase):
     """ADC 意图:自动补 ADC 时钟分频(缺它 CubeMX generate 会卡在 [Clock] 弹窗)。"""

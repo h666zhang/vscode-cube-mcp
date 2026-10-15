@@ -173,6 +173,11 @@ peripheral:
     - 用意图写:{"peripheral": "GPIO", "pin": "PB13", "mode": "output", "label": "LED"}
       字段名就是 `label`(对应上面那条 `GPIO_Label`);`mode` 写 output / input 等。
       生成后引脚会变成宏:main.h 里 `#define LED_Pin GPIO_PIN_13` / `#define LED_GPIO_Port GPIOB`。
+    - **调试口那 5 个脚**(F103:PA13/PA14/PA15/PB3/PB4):本工具模板用 **SWD**,只占 PA13/PA14,
+      所以 PA15/PB3/PB4 可以直接当 GPIO;PA13/PA14 被占着,要动它们得先改 SYS 的 Debug 设置
+      或换引脚(工具报 PIN_CONFLICT 时会点名"调试口",不会只丢一个 SYS_JTMS-SWDIO 给你看)。
+    - 引脚名可写短名(如 PA0),工具会归一化成 `.ioc` 里的名字(PA0-WKUP)—— `set gpio parameters`
+      那条命令**必须**用归一化后的名字,否则 CubeMX 返回 KO(实测踩过)。
   i2c: |-
     【I2C(已验证;实测 2026-08-06 + 2026-10-12 生成回读)】
       set pin PB8 I2C1_SCL
