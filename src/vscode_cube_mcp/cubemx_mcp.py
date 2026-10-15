@@ -243,12 +243,39 @@ def _kill_new_javaw(before) -> None:
             pass
 
 
+def _cleanup_old_scripts(max_age: int = 300) -> None:
+    """清掉以前没删掉的脚本临时文件。
+
+    Windows 上 CubeMX(javaw)会继承脚本文件的句柄,`_run_script` 的 finally 里
+    `os.remove` 当场会失败,而那里是 `except OSError: pass` —— 静默跳过,于是临时
+    目录里越积越多(实测:一次会话能积 200+ 个,见 2026-10-15)。这里只清"早于
+    max_age 秒"的,不会碰本次调用正在用的那个。
+    """
+    import time
+
+    cutoff = time.time() - max_age
+    try:
+        names = os.listdir(tempfile.gettempdir())
+    except OSError:
+        return
+    for name in names:
+        if not (name.startswith("cubemx_mcp_") and name.endswith(".txt")):
+            continue
+        path = os.path.join(tempfile.gettempdir(), name)
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            pass
+
+
 def _run_script(script: str, stage: str = "run_cubemx") -> dict:
     """执行 CubeMX 脚本,返回 {ok, output, exit_code, stage, error_code}。
 
     超时会强杀进程树,防残留 Java 进程占工程文件锁。
     error_code 取值:CUBEMX_TIMEOUT / CUBEMX_EXIT_NONZERO / CUBEMX_KO,成功时为空串。
     """
+    _cleanup_old_scripts()  # 顺手清掉上次没删掉的(见该函数的说明)
     fd, tmp = tempfile.mkstemp(prefix="cubemx_mcp_", suffix=".txt")
     proc = None
     try:
