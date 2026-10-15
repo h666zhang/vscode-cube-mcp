@@ -20,8 +20,10 @@
 
 同类外设因为规则按前缀匹配会自动支持(`USART1/3`、`SPI2`、`I2C2`、`TIM1/4` …)。
 
-**还没实测的参数细节**:RTC 时钟源(LSE/LSI)与日历、ADC 采样时间/多通道扫描、SPI 波特率与 NSS、
-CAN 位时序、USART 的同步/半双工等模式。
+**还没实测的参数细节**(2026-10-15 复核过一遍):剩下的是 RTC 的**时钟源(LSE/LSI)键名**、
+USART 的同步/半双工等模式、DMA 的「同名前缀请求(一请求挂两个通道)」与**回调**。
+原先列在这里的 RTC 日历 / ADC 采样时间与多通道扫描 / SPI 波特率与硬件 NSS / CAN 位时序,
+都已在 2026-10-15 探明 —— 具体见 `knowledge/rules/*.yaml` 的 `known_issues`。
 
 > **改 .ioc 的双保险**:所有写入函数写前备份 `.bak`、写后回读校验(`READBACK_MISMATCH`),
 > 再按 `knowledge/rules/ioc_structure.yaml` 做**结构校验**(IP / Pin 编号必须从 0 连续、

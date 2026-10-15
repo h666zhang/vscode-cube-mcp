@@ -331,7 +331,8 @@ peripheral:
       (规则组没有 T2_TRGO),要 TIM2 就用它的比较事件 `T2_CC2` / `T2_CC3`。
     - **外部触发(trigger)有坑**:只设 ADC 的 ExternalTrigConv、不给触发源外设配 TRGO 输出,
       generate 会卡死到超时;要用触发先把 TIM 配好(MasterConfig/TRGO)。
-    - 还没实测:注入通道(InjectedConv)、模拟看门狗。
+    - 注入通道 / 模拟看门狗(实测 2026-10-15,验证到落盘):`EnableInjectedConversion` /
+      `InjectedConvMode` / `EnableAnalogWatchDog` 生效;`WatchdogMode` / `WatchdogChannel` 还没落盘。
     - DMA 搬运:在同一个意图里加 dma 字段(如 {"peripheral": "ADC1", "pins": ["PA0"], "dma":
       {"mode": "circular"}}),见 cubemx_help(topic="dma");配 DMA 时 ADC 时钟仍必须先配。
   can: |-
